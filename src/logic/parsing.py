@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from src.config import GameConfig, LevelConfig
+from src.logic.config import GameConfig, LevelConfig
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "lives": 3,

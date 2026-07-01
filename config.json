@@ -1,4 +1,3 @@
-
 {
     "lives": 3,
     "points_per_pacgum": 10,
@@ -35,8 +34,7 @@
             "height": 29,
             "seed": 250,
             "level_max_time": 90
-        }
-        ,
+        },
         {
             "width": 31,
             "height": 31,
@@ -44,7 +42,7 @@
             "level_max_time": 90
         },
         {
-            "width": 33,
+            "width": 65,
             "height": 33,
             "seed": 350,
             "level_max_time": 90

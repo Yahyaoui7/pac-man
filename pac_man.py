@@ -1,5 +1,14 @@
+# the main start for parsing + starting the game + saving the updates
+# main start
+# ├── Parse config
+# ├── Validate config
+# ├── Load highscores
+# └── GameStarter(config, highscores).run()
+
+
 import sys
-from src.parsing import Parser
+from src.logic.parsing import Parser
+from src.game_loop import GameStarter
 
 
 def main() -> int:
@@ -10,7 +19,8 @@ def main() -> int:
     parser = Parser(sys.argv[1])
     config = parser.parser_all()
 
-    print(config)  # only for testing now
+    game = GameStarter(config)
+    game.run()
     return 0
 
 

@@ -12,6 +12,7 @@
 
 from mazegenerator import MazeGenerator
 import pygame
+from .logic.config import GameConfig
 
 CELL_SIZE = 30
 PADDING = 20
@@ -22,19 +23,20 @@ WEST = 1 << 3
 
 
 class GameStarter:
-    def __init__(self, config):
+
+    def __init__(self, config: GameConfig):
         self.running = True
         self.config = config
         self.maze = None
         self.screen = None
-        self.curr_level = config["levels"][5]
+        self.curr_level = None
 
     def display(self):
 
         self.screen = pygame.display.set_mode(
             (
-                self.curr_level["width"] * CELL_SIZE + PADDING,
-                self.curr_level["height"] * CELL_SIZE + PADDING,
+                self.curr_level.width * CELL_SIZE + PADDING,
+                self.curr_level.height * CELL_SIZE + PADDING,
             )
         )
         pygame.display.flip()
@@ -85,14 +87,14 @@ class GameStarter:
                     )
 
     def run(self):
+        self.curr_level = self.config.levels[0]
         self.maze = MazeGenerator(
-            size=(self.curr_level["width"], self.curr_level["height"]),
+            size=(self.curr_level.width, self.curr_level.height),
             entry_cell=(0, 0),
             exit_cell=(0, 0),
             perfect=False,
-            seed=self.curr_level["seed"],
+            seed=self.curr_level.seed,
         )
-        print(self.maze.maze)
         pygame.init()
         clock = pygame.time.Clock()
 

@@ -29,6 +29,7 @@ Config = {
 
 
 def main():
+
     game = GameStarter(Config)
     game.run()
 

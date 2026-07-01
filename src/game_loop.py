@@ -14,7 +14,9 @@ from mazegenerator import MazeGenerator
 from .logic.config import GameConfig
 from .logic.inputmanager import InputManager
 import pygame
+import sys
 
+sys.setrecursionlimit(99999999)
 CELL_SIZE = 30
 PADDING = 20
 NORTH = 1 << 0
@@ -37,7 +39,7 @@ class GameStarter:
         self.screen = pygame.display.set_mode(
             (
                 self.curr_level.width * CELL_SIZE + PADDING,
-                self.curr_level.height * CELL_SIZE + PADDING,
+                self.curr_level.height * CELL_SIZE + PADDING + 20,
             )
         )
         pygame.display.flip()
@@ -49,7 +51,8 @@ class GameStarter:
             for col, cell in enumerate(cells):
 
                 x = PADDING // 2 + col * CELL_SIZE
-                y = PADDING // 2 + row * CELL_SIZE
+
+                y = PADDING // 2 + row * CELL_SIZE + 40
 
                 if cell & NORTH:
                     pygame.draw.line(
@@ -88,9 +91,16 @@ class GameStarter:
                     )
 
     def run(self):
-        self.curr_level = self.config.levels[0]
+        self.curr_level = self.config.levels[6]
+
+        if self.curr_level.height > 33:
+            self.curr_level.height = 33
+        if self.curr_level.width > 60:
+            self.curr_level.width = 60
+        if self.curr_level.height == 33:
+            hight = 32
         self.maze = MazeGenerator(
-            size=(self.curr_level.width, self.curr_level.height),
+            size=(self.curr_level.width, hight),
             entry_cell=(0, 0),
             exit_cell=(0, 0),
             perfect=False,

@@ -1,7 +1,6 @@
 .PHONY: install run debug clean lint lint-strict
 
 install:
-	mv mazegenerator-00001-py3-none-any.whl mazegenerator-2.0.2-py3-none-any.whl
 	uv sync
 
 run:

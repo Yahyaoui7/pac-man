@@ -14,6 +14,11 @@ from mazegenerator import MazeGenerator
 import pygame
 
 CELL_SIZE = 30
+PADDING = 20
+NORTH = 1 << 0
+EAST = 1 << 1
+SOUTH = 1 << 2
+WEST = 1 << 3
 
 
 class GameStarter:
@@ -21,29 +26,63 @@ class GameStarter:
         self.running = True
         self.config = config
         self.maze = None
+        self.screen = None
         self.curr_level = config["levels"][5]
 
     def display(self):
 
-        screen = pygame.display.set_mode(
+        self.screen = pygame.display.set_mode(
             (
-                self.curr_level["width"] * CELL_SIZE,
-                self.curr_level["height"] * CELL_SIZE,
+                self.curr_level["width"] * CELL_SIZE + PADDING,
+                self.curr_level["height"] * CELL_SIZE + PADDING,
             )
         )
-        clock = pygame.time.Clock()
-        while self.running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-
-            screen.fill("purple")
-
         pygame.display.flip()
 
-        clock.tick(60)
+    def draw_maze(self, maze):
 
-        pygame.quit()
+        for row, cells in enumerate(maze):
+
+            for col, cell in enumerate(cells):
+
+                x = PADDING // 2 + col * CELL_SIZE
+                y = PADDING // 2 + row * CELL_SIZE
+
+                if cell & NORTH:
+                    pygame.draw.line(
+                        self.screen,
+                        "blue",
+                        (x, y),
+                        (x + CELL_SIZE, y),
+                        2,
+                    )
+
+                if cell & EAST:
+                    pygame.draw.line(
+                        self.screen,
+                        "blue",
+                        (x + CELL_SIZE, y),
+                        (x + CELL_SIZE, y + CELL_SIZE),
+                        2,
+                    )
+
+                if cell & SOUTH:
+                    pygame.draw.line(
+                        self.screen,
+                        "blue",
+                        (x, y + CELL_SIZE),
+                        (x + CELL_SIZE, y + CELL_SIZE),
+                        2,
+                    )
+
+                if cell & WEST:
+                    pygame.draw.line(
+                        self.screen,
+                        "blue",
+                        (x, y),
+                        (x, y + CELL_SIZE),
+                        2,
+                    )
 
     def run(self):
         self.maze = MazeGenerator(
@@ -53,6 +92,18 @@ class GameStarter:
             perfect=False,
             seed=self.curr_level["seed"],
         )
-
+        print(self.maze.maze)
         pygame.init()
+        clock = pygame.time.Clock()
+
         self.display()
+        self.draw_maze(self.maze.maze)
+        while self.running:
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+
+        clock.tick(60)
+
+        pygame.quit()

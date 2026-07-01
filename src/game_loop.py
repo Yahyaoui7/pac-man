@@ -11,8 +11,9 @@
 # └── CollisionSystem
 
 from mazegenerator import MazeGenerator
-import pygame
 from .logic.config import GameConfig
+from .logic.inputmanager import InputManager
+import pygame
 
 CELL_SIZE = 30
 PADDING = 20
@@ -100,12 +101,26 @@ class GameStarter:
 
         self.display()
         self.draw_maze(self.maze.maze)
-        while self.running:
-            pygame.display.flip()
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
+        input_manager = InputManager()
 
-        clock.tick(60)
+        while self.running:
+
+            events = pygame.event.get()
+
+            input_state = input_manager.update(events)
+            if input_state.quit_requested:
+                self.running = False
+
+            if input_state.quit_requested:
+                self.running = False
+
+            if input_state.pause_pressed:
+                print("Pause")
+
+            if input_state.move_left:
+                print("Move Left")
+
+            pygame.display.flip()
+            clock.tick(60)
 
         pygame.quit()

@@ -1,10 +1,11 @@
 .PHONY: install run debug clean lint lint-strict
 
-install:
-	uv sync
 
 run:
 	uv run python pac_man.py config.json
+
+install:
+	uv sync
 
 debug:
 	uv run python -m pdb -m pac_man.py config.json

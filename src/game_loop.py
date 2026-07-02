@@ -11,8 +11,9 @@
 # └── CollisionSystem
 
 from mazegenerator import MazeGenerator
+from src.graphics.renderer import HomeState
 from .logic.config import GameConfig
-from .logic.inputmanager import InputManager
+from .logic.inputmanager import InputManager, StateManager
 import pygame
 import sys
 
@@ -113,22 +114,21 @@ class GameStarter:
         self.draw_maze(self.maze.maze)
         input_manager = InputManager()
 
+        state_manager = StateManager()
+        state_manager.change_state(HomeState(state_manager))
+
         while self.running:
 
             events = pygame.event.get()
-
             input_state = input_manager.update(events)
-            if input_state.quit_requested:
-                self.running = False
 
             if input_state.quit_requested:
                 self.running = False
 
-            if input_state.pause_pressed:
-                print("Pause")
+            state_manager.update(input_state)
 
-            if input_state.move_left:
-                print("Move Left")
+            self.screen.fill("black")
+            state_manager.draw(self.screen)
 
             pygame.display.flip()
             clock.tick(60)

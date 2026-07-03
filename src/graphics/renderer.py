@@ -1,3 +1,5 @@
+import pygame
+
 from ..UI.button import Button
 
 
@@ -18,20 +20,37 @@ class GameState:
         pass
 
 
+class State:
+
+    def __init__(self, game):
+        self.game = game
+
+    def enter(self):
+        pass
+
+    def exit(self):
+        pass
+
+    def update(self, input_state):
+        pass
+
+    def draw(self, screen):
+        pass
+
+
 class StateManager:
 
-    def __init__(self):
-        self.states = []
+    def __init__(self, game):
+        self.game = game
+        self.current = None
 
-    def push_state(self, state):
-        self.states.append(state)
+    def change_state(self, state):
 
-    def pop_state(self):
-        self.states.pop()
+        if self.current:
+            self.current.exit()
 
-    @property
-    def current(self):
-        return self.states[-1]
+        self.current = state
+        self.current.enter()
 
     def update(self, input_state):
         self.current.update(input_state)
@@ -40,48 +59,133 @@ class StateManager:
         self.current.draw(screen)
 
 
-class PauseState(GameState):
+class PauseState(State):
 
-    def __init__(self, manager):
+    def __init__(self, game):
 
-        self.manager = manager
+        super().__init__(game)
 
-        self.resume_button = Button(...)
-        self.home_button = Button(...)
+        self.resume = Button(...)
+        self.home = Button(...)
 
     def update(self, input_state):
 
-        if self.resume_button.update(input_state):
-            self.manager.pop_state()
+        if self.resume.update(input_state):
 
-        elif self.home_button.update(input_state):
-            self.manager.change_state(HomeState(self.manager))
+            self.game.state_manager.change_state(PlayingState(self.game))
+
+        elif self.home.update(input_state):
+
+            self.game.state_manager.change_state(HomeState(self.game))
+
+    def draw(self, screen):
+
+        self.game.draw_maze(self.game.maze.maze)
+
+        self.resume.draw(screen)
+        self.home.draw(screen)
 
 
-class HomeState(GameState):
+class PlayingState(State):
 
-    def __init__(self, manager):
-        self.manager = manager
+    def enter(self):
 
-        self.play_button = Button(...)
-        self.score_button = Button(...)
-        self.quit_button = Button(...)
+        # Create maze here
+        self.game.load_level(6)
+
+    def update(self, input_state):
+
+        if input_state.pause_pressed:
+
+            self.game.state_manager.change_state(PauseState(self.game))
+
+        if input_state.move_left:
+            print("Move left")
+
+    def draw(self, screen):
+
+        screen.fill("black")
+
+        self.game.draw_maze(self.game.maze.maze)
+
+
+class HighScoreState(State):
+
+    def __init__(self, game):
+
+        super().__init__(game)
+
+        self.back = Button(...)
+
+    def update(self, input_state):
+
+        if self.back.update(input_state):
+
+            self.game.state_manager.change_state(HomeState(self.game))
+
+    def draw(self, screen):
+
+        screen.fill("black")
+
+        # Draw scores
+
+        self.back.draw(screen)
+
+
+class HomeState(State):
+
+    def __init__(self, game):
+
+        super().__init__(game)
+
+        used_font = pygame.font.Font(None, 36)
+        self.play_button = Button(
+            50,
+            100,
+            70,
+            20,
+            "first",
+            used_font,
+        )
+        self.score_button = Button(
+            50,
+            140,
+            70,
+            20,
+            "second",
+            used_font,
+        )
+        self.quit_button = Button(
+            50,
+            180,
+            70,
+            20,
+            "thired",
+            used_font,
+        )
 
     def update(self, input_state):
 
         if self.play_button.update(input_state):
-            self.manager.change_state(GameState(self.manager))
+
+            self.game.state_manager.change_state(PlayingState(self.game))
 
         elif self.score_button.update(input_state):
-            self.manager.change_state(HighScoreState(self.manager))
+
+            self.game.state_manager.change_state(HighScoreState(self.game))
 
         elif self.quit_button.update(input_state):
-            self.manager.running = False
+
+            self.game.running = False
 
     def draw(self, screen):
+
+        screen.fill("black")
+
         self.play_button.draw(screen)
         self.score_button.draw(screen)
         self.quit_button.draw(screen)
+
 
 class GameState(GameState):
 
@@ -95,5 +199,4 @@ class GameState(GameState):
         # Update maze
 
     def draw(self, screen):
-        # Draw maze
-        # Draw player
+        pass

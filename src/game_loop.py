@@ -11,9 +11,9 @@
 # └── CollisionSystem
 
 from mazegenerator import MazeGenerator
-from src.graphics.renderer import HomeState
+from src.graphics.renderer import HomeState, StateManager
 from .logic.config import GameConfig
-from .logic.inputmanager import InputManager, StateManager
+from .logic.inputmanager import InputManager
 import pygame
 import sys
 
@@ -34,6 +34,7 @@ class GameStarter:
         self.maze = None
         self.screen = None
         self.curr_level = None
+        self.state_manager = StateManager(self)
 
     def display(self):
 
@@ -93,44 +94,74 @@ class GameStarter:
 
     def run(self):
         self.curr_level = self.config.levels[6]
-
-        if self.curr_level.height > 33:
-            self.curr_level.height = 33
-        if self.curr_level.width > 60:
-            self.curr_level.width = 60
-        if self.curr_level.height == 33:
-            hight = 32
-        self.maze = MazeGenerator(
-            size=(self.curr_level.width, hight),
-            entry_cell=(0, 0),
-            exit_cell=(0, 0),
-            perfect=False,
-            seed=self.curr_level.seed,
-        )
         pygame.init()
+
         clock = pygame.time.Clock()
 
         self.display()
-        self.draw_maze(self.maze.maze)
+
         input_manager = InputManager()
 
-        state_manager = StateManager()
-        state_manager.change_state(HomeState(state_manager))
+        self.state_manager.change_state(HomeState(self))
 
         while self.running:
 
             events = pygame.event.get()
+
             input_state = input_manager.update(events)
 
             if input_state.quit_requested:
                 self.running = False
 
-            state_manager.update(input_state)
+            self.state_manager.update(input_state)
 
-            self.screen.fill("black")
-            state_manager.draw(self.screen)
+            self.state_manager.draw(self.screen)
 
             pygame.display.flip()
+
             clock.tick(60)
+
+        pygame.quit()
+
+        # def run(self):
+        #     self.curr_level = self.config.levels[6]
+        # if self.curr_level.height > 33:
+        #     self.curr_level.height = 33
+        # if self.curr_level.width > 60:
+        #     self.curr_level.width = 60
+        # if self.curr_level.height == 33:
+        #     hight = 32
+        # self.maze = MazeGenerator(
+        #     size=(self.curr_level.width, hight),
+        #     entry_cell=(0, 0),
+        #     exit_cell=(0, 0),
+        #     perfect=False,
+        #     seed=self.curr_level.seed,
+        # )
+        # pygame.init()
+        # clock = pygame.time.Clock()
+
+        # self.display()
+        # self.draw_maze(self.maze.maze)
+        # input_manager = InputManager()
+
+        # state_manager = StateManager()
+        # state_manager.change_state(HomeState(state_manager))
+
+        # while self.running:
+
+        #     events = pygame.event.get()
+        #     input_state = input_manager.update(events)
+
+        #     if input_state.quit_requested:
+        #         self.running = False
+
+        #     state_manager.update(input_state)
+
+        #     self.screen.fill("black")
+        #     state_manager.draw(self.screen)
+
+        #     pygame.display.flip()
+        #     clock.tick(60)
 
         pygame.quit()

@@ -185,7 +185,9 @@ class GameStarter:
         middle_row = self.curr_level.height // 2
         middle_col = self.curr_level.width // 2
 
-        for radius in range(max(self.curr_level.width, self.curr_level.height)):
+        for radius in range(
+            max(self.curr_level.width, self.curr_level.height)
+        ):
             for row in range(middle_row - radius, middle_row + radius + 1):
                 for col in range(middle_col - radius, middle_col + radius + 1):
                     if (
@@ -228,6 +230,8 @@ class GameStarter:
                         possible_directions.append(direction)
 
                 if possible_directions:
-                    movement.set_direction(ghost, random.choice(possible_directions))
+                    movement.set_direction(
+                        ghost, random.choice(possible_directions)
+                    )
 
             movement.update_entity(ghost)

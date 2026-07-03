@@ -1,2 +1,4 @@
 class LevelManager:
-    pass
+
+    def current_level_index():
+        return 0

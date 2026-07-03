@@ -20,10 +20,10 @@ class InputState:
 
 class InputManager:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.state = InputState()
 
-    def update(self, events):
+    def update(self, events: list[pygame.event.Event]) -> InputState:
 
         self.state.quit_requested = False
         self.state.pause_pressed = False

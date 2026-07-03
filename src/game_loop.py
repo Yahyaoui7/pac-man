@@ -43,62 +43,6 @@ class GameStarter:
         self.directions = ["LEFT", "RIGHT", "UP", "DOWN"]
         self.level_manager = LevelManager()
 
-    def display(self):
-
-        self.screen = pygame.display.set_mode(
-            (
-                self.curr_level.width * CELL_SIZE + PADDING,
-                self.curr_level.height * CELL_SIZE + PADDING + 50,
-            )
-        )
-        pygame.display.flip()
-
-    def draw_maze(self, maze):
-
-        for row, cells in enumerate(maze):
-
-            for col, cell in enumerate(cells):
-
-                x = PADDING // 2 + col * CELL_SIZE
-
-                y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
-
-                if cell & NORTH:
-                    pygame.draw.line(
-                        self.screen,
-                        "blue",
-                        (x, y),
-                        (x + CELL_SIZE, y),
-                        2,
-                    )
-
-                if cell & EAST:
-                    pygame.draw.line(
-                        self.screen,
-                        "blue",
-                        (x + CELL_SIZE, y),
-                        (x + CELL_SIZE, y + CELL_SIZE),
-                        2,
-                    )
-
-                if cell & SOUTH:
-                    pygame.draw.line(
-                        self.screen,
-                        "blue",
-                        (x, y + CELL_SIZE),
-                        (x + CELL_SIZE, y + CELL_SIZE),
-                        2,
-                    )
-
-                if cell & WEST:
-                    pygame.draw.line(
-                        self.screen,
-                        "blue",
-                        (x, y),
-                        (x, y + CELL_SIZE),
-                        2,
-                    )
-
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""
         if self.screen is None or self.screen.get_size() != (width, height):

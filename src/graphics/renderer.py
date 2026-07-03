@@ -4,6 +4,16 @@ import pygame
 from typing import Any, List, Optional
 from src.UI.button import Button
 
+from mazegenerator import MazeGenerator
+
+TOP_BAR_HEIGHT = 30
+CELL_SIZE = 30
+PADDING = 20
+NORTH = 1 << 0
+EAST = 1 << 1
+SOUTH = 1 << 2
+WEST = 1 << 3
+
 
 class State:
     """Base class for all screen states."""
@@ -83,7 +93,19 @@ class HomeState(State):
             self.game.score = 0
             self.game.lives = self.game.config.lives
             self.game.level_manager.current_level_index = 0
-            self.game.state_manager.change_state(PlayingState(self.game))
+            self.game.curr_level = self.game.config.levels[0]
+
+            self.game.curr_level.height = min(self.game.curr_level.height, 32)
+            self.game.curr_level.width = min(self.game.curr_level.width, 60)
+
+            maze = MazeGenerator(
+                size=(self.game.curr_level.width, self.game.curr_level.height),
+                entry_cell=(0, 0),
+                exit_cell=(0, 0),
+                perfect=False,
+                seed=self.game.curr_level.seed,
+            )
+            self.game.state_manager.change_state(PlayingState(self.game, maze))
 
         elif self.instructions_button.update(input_state):
             self.game.state_manager.change_state(InstructionsState(self.game))
@@ -96,9 +118,8 @@ class HomeState(State):
 
     def draw(self, screen: pygame.Surface) -> None:
         """Render the main menu elements."""
-        screen.fill((5, 5, 10))  # Slate dark
+        screen.fill((5, 5, 10))
 
-        # Draw glowing retro title
         title_surf = self.font_title.render("PAC-MAN", True, (255, 238, 0))
         title_rect = title_surf.get_rect(center=(300, 80))
         screen.blit(title_surf, title_rect)
@@ -174,13 +195,66 @@ class HighScoreState(State):
 class PlayingState(State):
     """The active gameplay state handling movements, collisions, timers."""
 
-    def __init__(self, game: Any) -> None:
+    def __init__(self, game: Any, maze) -> None:
         """Initialize playing parameters."""
         super().__init__(game)
         self.font_hud = pygame.font.Font(None, 28)
         self.font_msg = pygame.font.Font(None, 48)
         self.msg_timer: float = 0.0
         self.msg_text: str = ""
+        self.maze = maze.maze
+
+    def enter(self):
+        width = self.game.curr_level.width * CELL_SIZE + PADDING
+        height = self.game.curr_level.height * CELL_SIZE + PADDING + TOP_BAR_HEIGHT + 20
+
+        self.game.resize_window(width, height)
+
+    def draw(self, screen: pygame.Surface):
+
+        for row, cells in enumerate(self.maze):
+
+            for col, cell in enumerate(cells):
+
+                x = PADDING // 2 + col * CELL_SIZE
+
+                y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
+
+                if cell & NORTH:
+                    pygame.draw.line(
+                        screen,
+                        "blue",
+                        (x, y),
+                        (x + CELL_SIZE, y),
+                        2,
+                    )
+
+                if cell & EAST:
+                    pygame.draw.line(
+                        screen,
+                        "blue",
+                        (x + CELL_SIZE, y),
+                        (x + CELL_SIZE, y + CELL_SIZE),
+                        2,
+                    )
+
+                if cell & SOUTH:
+                    pygame.draw.line(
+                        screen,
+                        "blue",
+                        (x, y + CELL_SIZE),
+                        (x + CELL_SIZE, y + CELL_SIZE),
+                        2,
+                    )
+
+                if cell & WEST:
+                    pygame.draw.line(
+                        screen,
+                        "blue",
+                        (x, y),
+                        (x, y + CELL_SIZE),
+                        2,
+                    )
 
 
 class PauseState(State):

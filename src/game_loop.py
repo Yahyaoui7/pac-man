@@ -20,6 +20,7 @@ import pygame
 import sys
 
 sys.setrecursionlimit(99999999)
+TOP_BAR_HEIGHT = 30
 CELL_SIZE = 30
 PADDING = 20
 NORTH = 1 << 0
@@ -57,7 +58,7 @@ class GameStarter:
             for col, cell in enumerate(cells):
 
                 x = PADDING // 2 + col * CELL_SIZE
-                y = PADDING // 2 + row * CELL_SIZE + 30
+                y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
 
                 if cell & NORTH:
                     pygame.draw.line(
@@ -118,14 +119,18 @@ class GameStarter:
 
         #
         player_row, player_col = self.find_player_spawn()
-        self.player = Player(player_row, player_col)
+        self.player = Player(player_row, player_col, CELL_SIZE)
+
         movement = MovementSystem(self.maze.maze)
         self.ghosts = [
-            Ghost(0, 0, "Blinky"),
-            Ghost(0, self.curr_level.width - 1, "Pinky"),
-            Ghost(self.curr_level.height - 1, 0, "Inky"),
+            Ghost(0, 0, "Blinky", CELL_SIZE),
+            Ghost(0, self.curr_level.width - 1, "Pinky", CELL_SIZE),
+            Ghost(self.curr_level.height - 1, 0, "Inky", CELL_SIZE),
             Ghost(
-                self.curr_level.height - 1, self.curr_level.width - 1, "Clyde"
+                self.curr_level.height - 1,
+                self.curr_level.width - 1,
+                "Clyde",
+                CELL_SIZE,
             ),
         ]
 
@@ -141,13 +146,13 @@ class GameStarter:
                 print("Pause")
 
             if input_state.move_left:
-                movement.set_direction(self.player, "LEFT")
+                self.player.next_direction = "LEFT"
             elif input_state.move_right:
-                movement.set_direction(self.player, "RIGHT")
+                self.player.next_direction = "RIGHT"
             elif input_state.move_up:
-                movement.set_direction(self.player, "UP")
+                self.player.next_direction = "UP"
             elif input_state.move_down:
-                movement.set_direction(self.player, "DOWN")
+                self.player.next_direction = "DOWN"
 
             self.update_random_ghosts(movement)
 
@@ -162,15 +167,15 @@ class GameStarter:
 
         pygame.quit()
 
-###### ________________________________________________________________
-###### _________________________________________________________________|
+    ###### ________________________________________________________________
+    ###### _________________________________________________________________|
 
     def draw_player(self):
         if self.player is None:
             return
 
-        x = PADDING // 2 + self.player.col * CELL_SIZE + CELL_SIZE // 2
-        y = PADDING // 2 + self.player.row * CELL_SIZE + 30 + CELL_SIZE // 2
+        x = PADDING // 2 + self.player.x
+        y = PADDING // 2 + self.player.y + TOP_BAR_HEIGHT
 
         pygame.draw.circle(
             self.screen,
@@ -210,8 +215,8 @@ class GameStarter:
         }
 
         for ghost in self.ghosts:
-            x = PADDING // 2 + ghost.col * CELL_SIZE + CELL_SIZE // 2
-            y = PADDING // 2 + ghost.row * CELL_SIZE + 30 + CELL_SIZE // 2
+            x = PADDING // 2 + ghost.x
+            y = PADDING // 2 + ghost.y + TOP_BAR_HEIGHT
 
             pygame.draw.circle(
                 self.screen,
@@ -221,13 +226,19 @@ class GameStarter:
             )
 
     def update_random_ghosts(self, movement):
-
         for ghost in self.ghosts:
-            possible_dicrections = []
-            for direction in self.directions:
-                if movement.can_move(ghost.row, ghost.col, direction):
-                    possible_dicrections.append(direction)
-            if not possible_dicrections:
-                continue
-            movement.set_direction(ghost, random.choice(self.directions))
+            if movement.is_centered(ghost):
+                movement.update_cell_position(ghost)
+
+                possible_directions = []
+
+                for direction in self.directions:
+                    if movement.can_move(ghost.row, ghost.col, direction):
+                        possible_directions.append(direction)
+
+                if possible_directions:
+                    movement.set_direction(
+                        ghost, random.choice(possible_directions)
+                    )
+
             movement.update_entity(ghost)

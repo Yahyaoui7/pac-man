@@ -17,14 +17,15 @@ clean:
 	find . -name "*.pyo" -delete 2>/dev/null || true
 
 lint:
-	flake8 .
-	mypy . \
+	uv run flake8 . --exclude=.venv,mazegenerator-2.0.2-py3-none-any
+	uv run mypy . \
+		--exclude=.venv \
+		--exclude=mazegenerator-2.0.2-py3-none-any \
 		--warn-return-any \
 		--warn-unused-ignores \
-		--ignore-missing-imports \
 		--disallow-untyped-defs \
 		--check-untyped-defs
 
 lint-strict:
-	flake8 .
-	mypy . --strict
+	uv run flake8 . --exclude=.venv,mazegenerator-2.0.2-py3-none-any
+	uv run mypy . --strict --exclude=.venv --exclude=mazegenerator-2.0.2-py3-none-any

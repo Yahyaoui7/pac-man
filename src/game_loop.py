@@ -21,8 +21,7 @@ import sys
 
 sys.setrecursionlimit(99999999)
 TOP_BAR_HEIGHT = 30
-CELL_SIZE = 30
-PADDING = 20
+
 NORTH = 1 << 0
 EAST = 1 << 1
 SOUTH = 1 << 2
@@ -41,12 +40,25 @@ class GameStarter:
         self.player = None
         self.ghosts = []
         self.directions = ["LEFT", "RIGHT", "UP", "DOWN"]
-        self.level_manager = LevelManager()
+        self.level_manager = LevelManager(config)
+        self.cell_size: int = 30
+        self.padding: int = 20
 
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""
         if self.screen is None or self.screen.get_size() != (width, height):
             self.screen = pygame.display.set_mode((width, height))
+
+    def recalculate_cell_size(self, width: int, height: int) -> None:
+        """Dynamically resize cells so the maze fits nicely on screen."""
+        max_screen_width = 1200
+        max_screen_height = 750
+        self.cell_size = min(
+            30,
+            max_screen_width // width,
+            (max_screen_height - 100) // height,
+        )
+        self.cell_size = max(12, self.cell_size)
 
     def run(self) -> None:
         """Run the main game loop at 60 FPS."""
@@ -167,14 +179,14 @@ class GameStarter:
         if self.player is None:
             return
 
-        x = PADDING // 2 + self.player.x
-        y = PADDING // 2 + self.player.y + TOP_BAR_HEIGHT
+        x = self.padding // 2 + self.player.x
+        y = self.padding // 2 + self.player.y + TOP_BAR_HEIGHT
 
         pygame.draw.circle(
             self.screen,
             "yellow",
             (x, y),
-            CELL_SIZE // 3,
+            self.cell_size // 3,
         )
 
     def is_valid_spawn(self, row, col):
@@ -206,14 +218,14 @@ class GameStarter:
         }
 
         for ghost in self.ghosts:
-            x = PADDING // 2 + ghost.x
-            y = PADDING // 2 + ghost.y + TOP_BAR_HEIGHT
+            x = self.padding // 2 + ghost.x
+            y = self.padding // 2 + ghost.y + TOP_BAR_HEIGHT
 
             pygame.draw.circle(
                 self.screen,
                 colors.get(ghost.name, "white"),
                 (x, y),
-                CELL_SIZE // 3,
+                self.cell_size // 3,
             )
 
     def update_random_ghosts(self, movement):

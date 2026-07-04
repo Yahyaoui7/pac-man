@@ -4,8 +4,6 @@ import pygame
 from typing import Any, List, Optional
 from src.UI.button import Button
 
-from mazegenerator import MazeGenerator
-
 TOP_BAR_HEIGHT = 30
 CELL_SIZE = 30
 PADDING = 20
@@ -98,14 +96,7 @@ class HomeState(State):
             self.game.curr_level.height = min(self.game.curr_level.height, 32)
             self.game.curr_level.width = min(self.game.curr_level.width, 60)
 
-            maze = MazeGenerator(
-                size=(self.game.curr_level.width, self.game.curr_level.height),
-                entry_cell=(0, 0),
-                exit_cell=(0, 0),
-                perfect=False,
-                seed=self.game.curr_level.seed,
-            )
-            self.game.state_manager.change_state(PlayingState(self.game, maze))
+            self.game.state_manager.change_state(PlayingState(self.game))
 
         elif self.instructions_button.update(input_state):
             self.game.state_manager.change_state(InstructionsState(self.game))
@@ -186,33 +177,38 @@ class InstructionsState(State):
         self.back_button.draw(screen)
 
 
-class HighScoreState(State):
-    """The top 10 highscores display screen."""
-
-    pass
-
-
 class PlayingState(State):
     """The active gameplay state handling movements, collisions, timers."""
 
-    def __init__(self, game: Any, maze) -> None:
+    def __init__(self, game: Any) -> None:
         """Initialize playing parameters."""
         super().__init__(game)
         self.font_hud = pygame.font.Font(None, 28)
         self.font_msg = pygame.font.Font(None, 48)
         self.msg_timer: float = 0.0
         self.msg_text: str = ""
-        self.maze = maze.maze
 
-    def enter(self):
-        width = self.game.curr_level.width * CELL_SIZE + PADDING
-        height = self.game.curr_level.height * CELL_SIZE + PADDING + TOP_BAR_HEIGHT + 20
+    def enter(self) -> None:
+        """Load the level, generate the maze, and set window size."""
+        self.game.level_manager.load_level(
+            self.game.level_manager.current_level_index,
+        )
 
-        self.game.resize_window(width, height)
+        width = self.game.level_manager.get_current_level_config().width
+        height = self.game.level_manager.get_current_level_config().height
+        self.game.recalculate_cell_size(width, height)
+        self.game.resize_window(
+            width * self.game.cell_size + self.game.padding,
+            height * self.game.cell_size + self.game.padding + 60,
+        )
 
-    def draw(self, screen: pygame.Surface):
+        curr_idx = self.game.level_manager.current_level_index
+        self.msg_text = f"LEVEL {curr_idx + 1}"
+        self.msg_timer = 2.0  # Show message for 2 seconds
 
-        for row, cells in enumerate(self.maze):
+    def draw_maze(self, maze, screen: pygame.Surface):
+
+        for row, cells in enumerate(maze):
 
             for col, cell in enumerate(cells):
 
@@ -255,6 +251,45 @@ class PlayingState(State):
                         (x, y + CELL_SIZE),
                         2,
                     )
+
+    def draw(self, screen: pygame.Surface) -> None:
+        """Render HUD, Maze, and Entities."""
+        screen.fill((0, 0, 0))
+
+        # 1. Draw Maze
+        self.draw_maze(self.game.level_manager.current_maze.maze, screen)
+
+        # 3. Draw HUD (Top area)
+        pygame.draw.rect(screen, (10, 10, 20), (0, 0, screen.get_width(), 40))
+        pygame.draw.line(screen, (0, 238, 255), (0, 40), (screen.get_width(), 40), 2)
+
+        score_surf = self.font_hud.render(
+            f"SCORE: {self.game.score}", True, (255, 238, 0)
+        )
+        lvl_num = self.game.level_manager.current_level_index + 1
+        level_surf = self.font_hud.render(f"LEVEL: {lvl_num}", True, (255, 255, 255))
+        lives_surf = self.font_hud.render(
+            f"LIVES: {self.game.lives}", True, (255, 0, 0)
+        )
+
+        time_rem = max(0, int(self.game.level_manager.remaining_time))
+        time_surf = self.font_hud.render(f"TIME: {time_rem}s", True, (0, 255, 0))
+
+        screen.blit(score_surf, (15, 10))
+        screen.blit(level_surf, (screen.get_width() // 3, 10))
+        screen.blit(lives_surf, (2 * screen.get_width() // 3, 10))
+        screen.blit(time_surf, (screen.get_width() - 110, 10))
+
+        # 5. Draw Alert/Status overlay message
+        if self.msg_timer > 0:
+            msg_surf = self.font_msg.render(self.msg_text, True, (255, 255, 255))
+            msg_rect = msg_surf.get_rect(
+                center=(screen.get_width() // 2, screen.get_height() // 2)
+            )
+            bg_rect = msg_rect.inflate(30, 15)
+            pygame.draw.rect(screen, (10, 10, 30), bg_rect)
+            pygame.draw.rect(screen, (0, 238, 255), bg_rect, 2)
+            screen.blit(msg_surf, msg_rect)
 
 
 class PauseState(State):
@@ -311,6 +346,12 @@ class PauseState(State):
 
 class GameOverState(State):
     """The Game Over display screen and Name Input handler."""
+
+    pass
+
+
+class HighScoreState(State):
+    """The top 10 highscores display screen."""
 
     pass
 

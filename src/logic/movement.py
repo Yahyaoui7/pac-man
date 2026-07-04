@@ -71,3 +71,22 @@ class MovementSystem:
         # Move by pixels
         entity.x += entity.col_direction * entity.speed
         entity.y += entity.row_direction * entity.speed
+
+    def update_random_ghost(self, ghost) -> None:
+        possible_directions = []
+
+        for direction in ["LEFT", "RIGHT", "UP", "DOWN"]:
+            if self.can_move(ghost.row, ghost.col, direction):
+                possible_directions.append(direction)
+
+        if not possible_directions:
+            return
+
+        if ghost.direction is None or not self.can_move(
+            ghost.row, ghost.col, ghost.direction
+        ):
+            import random
+
+            ghost.next_direction = random.choice(possible_directions)
+
+        self.update_entity(ghost)

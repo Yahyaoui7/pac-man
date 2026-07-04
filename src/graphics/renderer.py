@@ -6,6 +6,9 @@ from src.UI.button import Button
 
 from mazegenerator import MazeGenerator
 
+from src.logic.movement import MovementSystem
+from src.logic.entities import Player, Ghost
+
 TOP_BAR_HEIGHT = 30
 CELL_SIZE = 30
 PADDING = 20
@@ -30,7 +33,9 @@ class State:
         """Called when leaving this state."""
         pass
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Process logic and events."""
         pass
 
@@ -54,7 +59,9 @@ class StateManager:
         self.current = state
         self.current.enter()
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Forward updates to the active state."""
         if self.current:
             self.current.update(input_state, events)
@@ -75,18 +82,24 @@ class HomeState(State):
         self.font_btn = pygame.font.Font(None, 36)
 
         # Center buttons on a 600x500 screen
-        self.play_button = Button(200, 180, 200, 50, "START GAME", self.font_btn)
+        self.play_button = Button(
+            200, 180, 200, 50, "START GAME", self.font_btn
+        )
         self.instructions_button = Button(
             200, 245, 200, 50, "INSTRUCTIONS", self.font_btn
         )
-        self.scores_button = Button(200, 310, 200, 50, "HIGHSCORES", self.font_btn)
+        self.scores_button = Button(
+            200, 310, 200, 50, "HIGHSCORES", self.font_btn
+        )
         self.quit_button = Button(200, 375, 200, 50, "EXIT", self.font_btn)
 
     def enter(self) -> None:
         """Ensure screen size is set for the main menu."""
         self.game.resize_window(600, 500)
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Check button clicks."""
         if self.play_button.update(input_state):
             # Reset score, lives, and start playing level 0
@@ -124,7 +137,9 @@ class HomeState(State):
         title_rect = title_surf.get_rect(center=(300, 80))
         screen.blit(title_surf, title_rect)
 
-        subtitle_surf = self.font_btn.render("NEON RETRO EDITION", True, (0, 238, 255))
+        subtitle_surf = self.font_btn.render(
+            "NEON RETRO EDITION", True, (0, 238, 255)
+        )
         subtitle_rect = subtitle_surf.get_rect(center=(300, 125))
         screen.blit(subtitle_surf, subtitle_rect)
 
@@ -146,7 +161,9 @@ class InstructionsState(State):
         self.font_btn = pygame.font.Font(None, 36)
         self.back_button = Button(200, 420, 200, 45, "BACK", self.font_btn)
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Check back button click."""
         if self.back_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
@@ -198,17 +215,62 @@ class PlayingState(State):
     def __init__(self, game: Any, maze) -> None:
         """Initialize playing parameters."""
         super().__init__(game)
+
         self.font_hud = pygame.font.Font(None, 28)
         self.font_msg = pygame.font.Font(None, 48)
         self.msg_timer: float = 0.0
         self.msg_text: str = ""
+
         self.maze = maze.maze
+        self.movement = MovementSystem(self.maze)
+
+        player_row, player_col = self.find_player_spawn()
+        self.game.player = Player(player_row, player_col)
+
+        self.game.ghosts = [
+            Ghost(0, 0, "Blinky"),
+            Ghost(0, self.game.curr_level.width - 1, "Pinky"),
+            Ghost(self.game.curr_level.height - 1, 0, "Inky"),
+            Ghost(
+                self.game.curr_level.height - 1,
+                self.game.curr_level.width - 1,
+                "Clyde",
+            ),
+        ]
+
+        self.directions = ["LEFT", "RIGHT", "UP", "DOWN"]
 
     def enter(self):
         width = self.game.curr_level.width * CELL_SIZE + PADDING
-        height = self.game.curr_level.height * CELL_SIZE + PADDING + TOP_BAR_HEIGHT + 20
+        height = (
+            self.game.curr_level.height * CELL_SIZE
+            + PADDING
+            + TOP_BAR_HEIGHT
+            + 20
+        )
 
         self.game.resize_window(width, height)
+
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
+        if input_state.pause_pressed:
+            self.game.state_manager.change_state(PauseState(self.game))
+            return
+
+        if input_state.move_left:
+            self.game.player.next_direction = "LEFT"
+        elif input_state.move_right:
+            self.game.player.next_direction = "RIGHT"
+        elif input_state.move_up:
+            self.game.player.next_direction = "UP"
+        elif input_state.move_down:
+            self.game.player.next_direction = "DOWN"
+
+        self.movement.update_entity(self.game.player)
+
+        for ghost in self.game.ghosts:
+            self.movement.update_random_ghost(ghost)
 
     def draw(self, screen: pygame.Surface):
 
@@ -256,6 +318,35 @@ class PlayingState(State):
                         2,
                     )
 
+    def draw_player(self, screen: pygame.Surface) -> None:
+        player = self.game.player
+        if player is None:
+            return
+
+        x = PADDING // 2 + player.x
+        y = TOP_BAR_HEIGHT + PADDING // 2 + player.y
+
+        pygame.draw.circle(screen, "yellow", (x, y), CELL_SIZE // 3)
+
+    def draw_ghosts(self, screen: pygame.Surface) -> None:
+        colors = {
+            "Blinky": "red",
+            "Pinky": "pink",
+            "Inky": "cyan",
+            "Clyde": "orange",
+        }
+
+        for ghost in self.game.ghosts:
+            x = PADDING // 2 + ghost.x
+            y = TOP_BAR_HEIGHT + PADDING // 2 + ghost.y
+
+            pygame.draw.circle(
+                screen,
+                colors.get(ghost.name, "white"),
+                (x, y),
+                CELL_SIZE // 3,
+            )
+
 
 class PauseState(State):
     """The paused overlay menu screen state."""
@@ -279,7 +370,9 @@ class PauseState(State):
             w // 2 - 100, h // 2 + 25, 200, 45, "MAIN MENU", self.font_btn
         )
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Check button clicks or escape to resume."""
         if input_state.pause_pressed:
             self.game.state_manager.change_state(PlayingState(self.game))

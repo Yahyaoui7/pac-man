@@ -13,6 +13,7 @@
 from mazegenerator import MazeGenerator
 from src.graphics.renderer import HomeState, StateManager
 from src.logic.level_manager import LevelManager
+from src.sounds.soud_manager import SoundManager
 from .logic.config import GameConfig
 from .logic.inputmanager import InputManager
 import random
@@ -41,6 +42,7 @@ class GameStarter:
         self.ghosts = []
         self.directions = ["LEFT", "RIGHT", "UP", "DOWN"]
         self.level_manager = LevelManager(config)
+        self.sound_manager = SoundManager()
         self.cell_size: int = 30
         self.padding: int = 20
 

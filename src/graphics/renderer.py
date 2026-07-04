@@ -83,6 +83,7 @@ class HomeState(State):
     def enter(self) -> None:
         """Ensure screen size is set for the main menu."""
         self.game.resize_window(600, 500)
+        self.game.sound_manager.play_music("menu")
 
     def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
         """Check button clicks."""

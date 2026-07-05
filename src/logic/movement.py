@@ -1,10 +1,6 @@
 from collections import deque
 
-# Wall values from maze generator
-NORTH = 1
-EAST = 2
-SOUTH = 4
-WEST = 8
+from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 
 
 class MovementSystem:
@@ -39,14 +35,14 @@ class MovementSystem:
     def is_centered(self, entity) -> bool:
         """Check if entity is exactly in the center of a maze cell."""
         return (
-            entity.x % entity.cell_size == entity.cell_size // 2
-            and entity.y % entity.cell_size == entity.cell_size // 2
+            entity.x % CELL_SIZE == CELL_SIZE // 2
+            and entity.y % CELL_SIZE == CELL_SIZE // 2
         )
 
     def update_cell_position(self, entity) -> None:
         """Update row/col using the current pixel position x/y."""
-        entity.row = int(entity.y // entity.cell_size)
-        entity.col = int(entity.x // entity.cell_size)
+        entity.row = int(entity.y // CELL_SIZE)
+        entity.col = int(entity.x // CELL_SIZE)
 
     def can_move(self, row: int, col: int, direction: str) -> bool:
         """Check if there is no wall in the wanted direction."""
@@ -64,16 +60,16 @@ class MovementSystem:
         return False
 
     def update_entity(self, entity) -> None:
-        """Move an entity by pixels, but only change direction at cell center."""
+        """Move an entity by pixels, only change direction at cell center."""
 
         if self.is_centered(entity):
             self.update_cell_position(entity)
 
-            # Player uses next_direction.
-            # This lets Pac-Man continue moving until the player changes direction.
             if entity.next_direction is not None:
                 if self.can_move(
-                    entity.row, entity.col, entity.next_direction
+                    entity.row,
+                    entity.col,
+                    entity.next_direction,
                 ):
                     self.set_direction(entity, entity.next_direction)
                     entity.next_direction = None

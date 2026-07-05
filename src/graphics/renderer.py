@@ -1,22 +1,14 @@
 """Implements the State Pattern for game screens and UI rendering."""
 
 import pygame
+import pygame.draw as dr
 from typing import Any, List, Optional
 from src.UI.button import Button
 
 
-from mazegenerator import MazeGenerator
-
+from src.logic.config import CELL_SIZE, PADDING, TOP_BAR_HEIGHT
+from src.logic.config import EAST, NORTH, SOUTH, WEST
 from src.logic.movement import MovementSystem
-from src.logic.entities import Player, Ghost
-
-TOP_BAR_HEIGHT = 30
-CELL_SIZE = 30
-PADDING = 20
-NORTH = 1 << 0
-EAST = 1 << 1
-SOUTH = 1 << 2
-WEST = 1 << 3
 
 
 class State:
@@ -35,7 +27,9 @@ class State:
         pass
 
     def update(
-        self, input_state: Any, events: List[pygame.event.Event]
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
     ) -> None:
         """Process logic and events."""
         pass
@@ -62,7 +56,9 @@ class StateManager:
         self.current.enter()
 
     def update(
-        self, input_state: Any, events: List[pygame.event.Event]
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
     ) -> None:
         """Forward updates to the active state."""
         if self.current:
@@ -85,23 +81,35 @@ class HomeState(State):
 
         # Center buttons on a 600x500 screen
         self.play_button = Button(
-            200, 180, 200, 50, "START GAME", self.font_btn
+            200,
+            180,
+            200,
+            50,
+            "START GAME",
+            self.font_btn,
         )
         self.instructions_button = Button(
             200, 245, 200, 50, "INSTRUCTIONS", self.font_btn
         )
         self.scores_button = Button(
-            200, 310, 200, 50, "HIGHSCORES", self.font_btn
+            200,
+            310,
+            200,
+            50,
+            "HIGHSCORES",
+            self.font_btn,
         )
         self.quit_button = Button(200, 375, 200, 50, "EXIT", self.font_btn)
 
     def enter(self) -> None:
         """Ensure screen size is set for the main menu."""
         self.game.resize_window(600, 500)
-        self.game.sound_manager.play_music("menu")
+        # self.game.sound_manager.play_music("menu")
 
     def update(
-        self, input_state: Any, events: List[pygame.event.Event]
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
     ) -> None:
         """Check button clicks."""
         if self.play_button.update(input_state):
@@ -134,7 +142,9 @@ class HomeState(State):
         screen.blit(title_surf, title_rect)
 
         subtitle_surf = self.font_btn.render(
-            "NEON RETRO EDITION", True, (0, 238, 255)
+            "NEON RETRO EDITION",
+            True,
+            (0, 238, 255),
         )
         subtitle_rect = subtitle_surf.get_rect(center=(300, 125))
         screen.blit(subtitle_surf, subtitle_rect)
@@ -158,7 +168,9 @@ class InstructionsState(State):
         self.back_button = Button(200, 420, 200, 45, "BACK", self.font_btn)
 
     def update(
-        self, input_state: Any, events: List[pygame.event.Event]
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
     ) -> None:
         """Check back button click."""
         if self.back_button.update(input_state):
@@ -212,153 +224,59 @@ class PlayingState(State):
         self.msg_text: str = ""
 
     def enter(self) -> None:
-        """Load the level and initialize gameplay."""
-        # self.game.sound_manager.play_music("game")
+
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
         )
-
-        level = self.game.level_manager.get_current_level_config()
-
-        self.game.recalculate_cell_size(level.width, level.height)
-
-        self.game.resize_window(
-            level.width * self.game.cell_size + self.game.padding,
-            level.height * self.game.cell_size + self.game.padding + 60,
-        )
-
         self.maze = self.game.level_manager.current_maze.maze
+        self.game.entity_manager.load_level_entities(self.maze)
+
         self.movement = MovementSystem(self.maze)
 
-        player_row, player_col = self.find_player_spawn()
+        width = self.game.level_manager.get_current_level_config().width
+        height = self.game.level_manager.get_current_level_config().height
 
-        self.game.player = Player(
-            player_row,
-            player_col,
-            self.game.cell_size,
+        self.game.recalculate_cell_size(width, height)
+        self.game.resize_window(
+            width * CELL_SIZE + PADDING,
+            height * CELL_SIZE + PADDING + 60,
         )
 
-        self.game.ghosts = [
-            Ghost(0, 0, self.game.cell_size, "Blinky"),
-            Ghost(0, level.width - 1, self.game.cell_size, "Pinky"),
-            Ghost(level.height - 1, 0, self.game.cell_size, "Inky"),
-            Ghost(
-                level.height - 1,
-                level.width - 1,
-                self.game.cell_size,
-                "Clyde",
-            ),
-        ]
-
-        self.msg_text = (
-            f"LEVEL {self.game.level_manager.current_level_index + 1}"
-        )
+        curr_idx = self.game.level_manager.current_level_index
+        self.msg_text = f"LEVEL {curr_idx + 1}"
         self.msg_timer = 2.0
 
     def update(
-        self, input_state: Any, events: List[pygame.event.Event]
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
     ) -> None:
         if input_state.pause_pressed:
             self.game.state_manager.change_state(PauseState(self.game, self))
             return
 
         if input_state.move_left:
-            self.game.player.next_direction = "LEFT"
+            self.game.entity_manager.player.next_direction = "LEFT"
         elif input_state.move_right:
-            self.game.player.next_direction = "RIGHT"
+            self.game.entity_manager.player.next_direction = "RIGHT"
         elif input_state.move_up:
-            self.game.player.next_direction = "UP"
+            self.game.entity_manager.player.next_direction = "UP"
         elif input_state.move_down:
-            self.game.player.next_direction = "DOWN"
+            self.game.entity_manager.player.next_direction = "DOWN"
 
-        self.movement.update_entity(self.game.player)
+        self.movement.update_entity(self.game.entity_manager.player)
 
-        for ghost in self.game.ghosts:
+        for ghost in self.game.entity_manager.ghosts:
             if ghost.is_edible:
                 self.movement.update_runaway_ghost(ghost, self.game.player)
             else:
-                self.movement.update_bfs_ghost(ghost, self.game.player)
+                self.movement.update_bfs_ghost(
+                    ghost,
+                    self.game.entity_manager.player,
+                )
 
     def draw(self, screen: pygame.Surface) -> None:
-        self.draw_hud(screen)
-        self.draw_maze(screen)
-        self.draw_player(screen)
-        self.draw_ghosts(screen)
 
-    def draw_maze(self, screen: pygame.Surface) -> None:
-        for row, cells in enumerate(self.maze):
-
-            for col, cell in enumerate(cells):
-                x = PADDING // 2 + col * CELL_SIZE
-                y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
-
-                if cell & NORTH:
-                    pygame.draw.line(
-                        screen, "blue", (x, y), (x + CELL_SIZE, y), 2
-                    )
-
-                if cell & EAST:
-                    pygame.draw.line(
-                        screen,
-                        "blue",
-                        (x + CELL_SIZE, y),
-                        (x + CELL_SIZE, y + CELL_SIZE),
-                        2,
-                    )
-
-                if cell & SOUTH:
-                    pygame.draw.line(
-                        screen,
-                        "blue",
-                        (x, y + CELL_SIZE),
-                        (x + CELL_SIZE, y + CELL_SIZE),
-                        2,
-                    )
-
-                if cell & WEST:
-                    pygame.draw.line(
-                        screen, "blue", (x, y), (x, y + CELL_SIZE), 2
-                    )
-
-    def draw_player(self, screen: pygame.Surface) -> None:
-        player = self.game.player
-        if player is None:
-            return
-
-        x = PADDING // 2 + player.x
-        y = TOP_BAR_HEIGHT + PADDING // 2 + player.y
-
-        pygame.draw.circle(
-            screen,
-            "yellow",
-            (int(x), int(y)),
-            CELL_SIZE // 3,
-        )
-
-    def draw_ghosts(self, screen: pygame.Surface) -> None:
-        colors = {
-            "Blinky": "red",
-            "Pinky": "pink",
-            "Inky": "cyan",
-            "Clyde": "orange",
-        }
-
-        for ghost in self.game.ghosts:
-            x = PADDING // 2 + ghost.x
-            y = TOP_BAR_HEIGHT + PADDING // 2 + ghost.y
-
-            if ghost.is_edible:
-                color = "blue"
-            else:
-                color = colors.get(ghost.name, "white")
-            pygame.draw.circle(
-                screen,
-                color,
-                (int(x), int(y)),
-                CELL_SIZE // 3,
-            )
-
-    def draw_hud(self, screen: pygame.Surface) -> None:
         level_number = self.game.level_manager.current_level_index + 1
 
         hud_text = (
@@ -369,28 +287,26 @@ class PlayingState(State):
 
         hud_surface = self.font_hud.render(hud_text, True, "white")
         screen.blit(hud_surface, (10, 5))
+        c = CELL_SIZE
 
-    def is_valid_spawn(self, row: int, col: int) -> bool:
-        cell = self.maze[row][col]
-        return cell != (NORTH | EAST | SOUTH | WEST)
+        for row, cells in enumerate(self.maze):
 
-    def find_player_spawn(self) -> tuple[int, int]:
-        middle_row = self.game.curr_level.height // 2
-        middle_col = self.game.curr_level.width // 2
+            for col, cell in enumerate(cells):
+                x = PADDING // 2 + col * CELL_SIZE
+                y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
 
-        for radius in range(
-            max(self.game.curr_level.width, self.game.curr_level.height)
-        ):
-            for row in range(middle_row - radius, middle_row + radius + 1):
-                for col in range(middle_col - radius, middle_col + radius + 1):
-                    if (
-                        0 <= row < self.game.curr_level.height
-                        and 0 <= col < self.game.curr_level.width
-                        and self.is_valid_spawn(row, col)
-                    ):
-                        return row, col
+                if cell & NORTH:
+                    dr.line(screen, "blue", (x, y), (x + c, y), 2)
 
-        return 0, 0
+                if cell & EAST:
+                    dr.line(screen, "blue", (x + c, y), (x + c, y + c), 2)
+
+                if cell & SOUTH:
+                    dr.line(screen, "blue", (x, y + c), (x + c, y + c), 2)
+
+                if cell & WEST:
+                    dr.line(screen, "blue", (x, y), (x, y + c), 2)
+            self.game.entity_manager.draw(self.game.screen)
 
 
 class PauseState(State):
@@ -416,7 +332,9 @@ class PauseState(State):
         )
 
     def update(
-        self, input_state: Any, events: List[pygame.event.Event]
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
     ) -> None:
         if input_state.pause_pressed:
             self.game.state_manager.change_state(self.previous_state)

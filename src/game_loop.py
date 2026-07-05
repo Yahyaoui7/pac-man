@@ -10,22 +10,18 @@
 # ├── UISystem
 # └── CollisionSystem
 
-from mazegenerator import MazeGenerator
+
+from src.graphics.entity_manager import EntityManager
 from src.graphics.renderer import HomeState, StateManager
 from src.logic.level_manager import LevelManager
 from src.sounds.soud_manager import SoundManager
-from .logic.config import GameConfig
 from .logic.inputmanager import InputManager
-import random
+from .logic.config import GameConfig
+
 import pygame
 import sys
 
-from src.logic.entities import Player, Ghost
-from src.logic.movement import MovementSystem
-
 sys.setrecursionlimit(99999999)
-
-CELL_SIZE = 30
 
 
 class GameStarter:
@@ -33,17 +29,11 @@ class GameStarter:
     def __init__(self, config: GameConfig):
         self.running = True
         self.config = config
-        self.maze = None
         self.screen = None
-        self.curr_level = None
         self.state_manager = StateManager(self)
-        self.player = None
-        self.ghosts = []
-        self.directions = ["LEFT", "RIGHT", "UP", "DOWN"]
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
-        self.cell_size: int = 30
-        self.padding: int = 20
+        self.entity_manager = EntityManager(config)
 
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""

@@ -1,5 +1,7 @@
 """Implements the State Pattern for game screens and UI rendering."""
 
+import math
+
 import pygame
 import pygame.draw as dr
 from typing import Any, List, Optional
@@ -276,6 +278,10 @@ class PlayingState(State):
         self.game.entity_manager.update(
             self.game.level_manager.current_maze.maze, 1 / 60.0
         )
+        self.check_collision(
+            self.game.entity_manager.player,
+            self.game.entity_manager.ghosts,
+        )
 
     def draw(self, screen: pygame.Surface) -> None:
 
@@ -288,6 +294,22 @@ class PlayingState(State):
         )
 
         hud_surface = self.font_hud.render(hud_text, True, "white")
+
+        if self.msg_timer > 0:
+            self.msg_timer -= 1 / 60
+        else:
+            self.msg_text = ""
+
+        player = self.game.entity_manager.player
+        if self.msg_timer > 0:
+            text_surface = self.font_hud.render(self.msg_text, True, "white")
+            screen.blit(
+                text_surface,
+                (
+                    PADDING // 2 + player.x - text_surface.get_width() // 2,
+                    TOP_BAR_HEIGHT + PADDING // 2 + player.y - 40,
+                ),
+            )
         screen.blit(hud_surface, (10, 5))
         c = CELL_SIZE
 
@@ -309,6 +331,28 @@ class PlayingState(State):
                 if cell & WEST:
                     dr.line(screen, "blue", (x, y), (x, y + c), 2)
             self.game.entity_manager.draw(self.game.screen)
+
+    def check_collision(self, player, ghosts):
+        radius = CELL_SIZE // 3
+
+        for ghost in ghosts:
+            dx = player.x - ghost.x
+            dy = player.y - ghost.y
+
+            distance = math.hypot(dx, dy)
+
+            if distance <= radius * 2:
+                if ghost.is_edible:
+                    ghost.is_eaten = True
+                    self.msg_text = "fiiiin ghadi"
+                    self.msg_timer = 1.0
+
+                else:
+                    player.lives -= 1
+                    self.msg_text = "wa rak mkrfsniiiii"
+                    self.msg_timer = 1.0
+
+        self.font_hud.render(self.msg_text, True, "white")
 
 
 class PauseState(State):

@@ -71,7 +71,6 @@ class EntityManager:
             for ghost in self.ghosts:
                 ghost.is_edible = True
                 if ghost.is_edible:
-
                     ghost.frightened_timer = 7.0
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -129,6 +128,7 @@ class Player(Entity):
 
         self.lives = 3
         self.score = 0
+        self.msg_txt = ""
         self.is_invincible = False
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -187,18 +187,13 @@ class Ghost(Entity):
         self.is_eaten = False
 
     def draw(self, screen: pygame.Surface) -> None:
-        colors = {
-            "Blinky": "red",
-            "Pinky": "pink",
-            "Inky": "cyan",
-            "Clyde": "orange",
-        }
 
         x = PADDING // 2 + self.x
         y = TOP_BAR_HEIGHT + PADDING // 2 + self.y
         if self.is_edible:
             self.color = "blue"
-
+        if self.is_eaten:
+            self.color = "white"
         pygame.draw.circle(
             screen,
             self.color,

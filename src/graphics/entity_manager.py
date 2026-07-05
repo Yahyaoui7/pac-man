@@ -196,10 +196,12 @@ class Ghost(Entity):
 
         x = PADDING // 2 + self.x
         y = TOP_BAR_HEIGHT + PADDING // 2 + self.y
+        if self.is_edible:
+            self.color = "blue"
 
         pygame.draw.circle(
             screen,
-            colors.get(self.name, "white"),
+            self.color,
             (int(x), int(y)),
             CELL_SIZE // 3,
         )

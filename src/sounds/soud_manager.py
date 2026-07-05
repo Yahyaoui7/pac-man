@@ -45,7 +45,7 @@ class SoundManager:
         self.music = {
             "menu": {
                 "file": "src/sounds/pacmantng.mp3",
-                "volume": 0.5,
+                "volume": 0.3,
             },
             # "game": {
             #     "file": "assets/music/game.ogg",

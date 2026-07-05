@@ -57,6 +57,7 @@ class StateManager:
         """Exit the current state and enter the new one."""
         if self.current:
             self.current.exit()
+            self.current.game.sound_manager.stop_music()
         self.current = state
         self.current.enter()
 
@@ -212,7 +213,7 @@ class PlayingState(State):
 
     def enter(self) -> None:
         """Load the level and initialize gameplay."""
-
+        # self.game.sound_manager.play_music("game")
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
         )

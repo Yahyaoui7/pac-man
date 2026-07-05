@@ -1,27 +1,3 @@
-import pygame
-import random
-from .movement import MovementSystem
-
-TOP_BAR_HEIGHT = 30
-PADDING = 20
-NORTH = 1 << 0
-EAST = 1 << 1
-SOUTH = 1 << 2
-WEST = 1 << 3
-
-
-import pygame
-import random
-from .movement import MovementSystem
-
-TOP_BAR_HEIGHT = 30
-PADDING = 20
-NORTH = 1 << 0
-EAST = 1 << 1
-SOUTH = 1 << 2
-WEST = 1 << 3
-
-
 from typing import Optional
 
 
@@ -37,7 +13,6 @@ class Entity:
         self.col = col
         self.cell_size = cell_size
 
-        # Pixel position inside the maze grid
         self.x = col * cell_size + cell_size // 2
         self.y = row * cell_size + cell_size // 2
 
@@ -52,7 +27,7 @@ class Entity:
 
 class Player(Entity):
     def __init__(self, row: int, col: int, cell_size: int) -> None:
-        super().__init__(row, col, cell_size, speed=2)
+        super().__init__(row, col, cell_size, speed=3)
 
         self.lives = 3
         self.score = 0
@@ -76,5 +51,5 @@ class Ghost(Entity):
         self.spawn_x = self.x
         self.spawn_y = self.y
 
-        self.is_edible = False
+        self.is_edible = True
         self.is_eaten = False

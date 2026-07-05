@@ -106,7 +106,7 @@ class HomeState(State):
             self.game.score = 0
             self.game.lives = self.game.config.lives
             self.game.level_manager.current_level_index = 0
-            self.game.curr_level = self.game.config.levels[0]
+            self.game.curr_level = self.game.config.levels[1]
 
             self.game.curr_level.height = min(self.game.curr_level.height, 32)
             self.game.curr_level.width = min(self.game.curr_level.width, 60)
@@ -225,22 +225,21 @@ class PlayingState(State):
         self.movement = MovementSystem(self.maze)
 
         player_row, player_col = self.find_player_spawn()
-        self.game.player = Player(player_row, player_col)
+        self.game.player = Player(player_row, player_col, CELL_SIZE)
 
         self.game.ghosts = [
-            Ghost(0, 0, "Blinky"),
-            Ghost(0, self.game.curr_level.width - 1, "Pinky"),
-            Ghost(self.game.curr_level.height - 1, 0, "Inky"),
+            Ghost(0, 0, CELL_SIZE, "Blinky"),
+            Ghost(0, self.game.curr_level.width - 1, CELL_SIZE, "Pinky"),
+            Ghost(self.game.curr_level.height - 1, 0, CELL_SIZE, "Inky"),
             Ghost(
                 self.game.curr_level.height - 1,
                 self.game.curr_level.width - 1,
+                CELL_SIZE,
                 "Clyde",
             ),
         ]
 
-        self.directions = ["LEFT", "RIGHT", "UP", "DOWN"]
-
-    def enter(self):
+    def enter(self) -> None:
         width = self.game.curr_level.width * CELL_SIZE + PADDING
         height = (
             self.game.curr_level.height * CELL_SIZE
@@ -255,7 +254,7 @@ class PlayingState(State):
         self, input_state: Any, events: List[pygame.event.Event]
     ) -> None:
         if input_state.pause_pressed:
-            self.game.state_manager.change_state(PauseState(self.game))
+            self.game.state_manager.change_state(PauseState(self.game, self))
             return
 
         if input_state.move_left:
@@ -270,25 +269,26 @@ class PlayingState(State):
         self.movement.update_entity(self.game.player)
 
         for ghost in self.game.ghosts:
-            self.movement.update_random_ghost(ghost)
+            if ghost.is_edible:
+                self.movement.update_runaway_ghost(ghost, self.game.player)
+            else:
+                self.movement.update_bfs_ghost(ghost, self.game.player)
 
-    def draw(self, screen: pygame.Surface):
+    def draw(self, screen: pygame.Surface) -> None:
+        self.draw_hud(screen)
+        self.draw_maze(screen)
+        self.draw_player(screen)
+        self.draw_ghosts(screen)
 
+    def draw_maze(self, screen: pygame.Surface) -> None:
         for row, cells in enumerate(self.maze):
-
             for col, cell in enumerate(cells):
-
                 x = PADDING // 2 + col * CELL_SIZE
-
                 y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
 
                 if cell & NORTH:
                     pygame.draw.line(
-                        screen,
-                        "blue",
-                        (x, y),
-                        (x + CELL_SIZE, y),
-                        2,
+                        screen, "blue", (x, y), (x + CELL_SIZE, y), 2
                     )
 
                 if cell & EAST:
@@ -311,11 +311,7 @@ class PlayingState(State):
 
                 if cell & WEST:
                     pygame.draw.line(
-                        screen,
-                        "blue",
-                        (x, y),
-                        (x, y + CELL_SIZE),
-                        2,
+                        screen, "blue", (x, y), (x, y + CELL_SIZE), 2
                     )
 
     def draw_player(self, screen: pygame.Surface) -> None:
@@ -326,7 +322,12 @@ class PlayingState(State):
         x = PADDING // 2 + player.x
         y = TOP_BAR_HEIGHT + PADDING // 2 + player.y
 
-        pygame.draw.circle(screen, "yellow", (x, y), CELL_SIZE // 3)
+        pygame.draw.circle(
+            screen,
+            "yellow",
+            (int(x), int(y)),
+            CELL_SIZE // 3,
+        )
 
     def draw_ghosts(self, screen: pygame.Surface) -> None:
         colors = {
@@ -343,26 +344,60 @@ class PlayingState(State):
             pygame.draw.circle(
                 screen,
                 colors.get(ghost.name, "white"),
-                (x, y),
+                (int(x), int(y)),
                 CELL_SIZE // 3,
             )
+
+    def draw_hud(self, screen: pygame.Surface) -> None:
+        level_number = self.game.level_manager.current_level_index + 1
+
+        hud_text = (
+            f"Score: {self.game.score}   "
+            f"Lives: {self.game.lives}   "
+            f"Level: {level_number}"
+        )
+
+        hud_surface = self.font_hud.render(hud_text, True, "white")
+        screen.blit(hud_surface, (10, 5))
+
+    def is_valid_spawn(self, row: int, col: int) -> bool:
+        cell = self.maze[row][col]
+        return cell != (NORTH | EAST | SOUTH | WEST)
+
+    def find_player_spawn(self) -> tuple[int, int]:
+        middle_row = self.game.curr_level.height // 2
+        middle_col = self.game.curr_level.width // 2
+
+        for radius in range(
+            max(self.game.curr_level.width, self.game.curr_level.height)
+        ):
+            for row in range(middle_row - radius, middle_row + radius + 1):
+                for col in range(middle_col - radius, middle_col + radius + 1):
+                    if (
+                        0 <= row < self.game.curr_level.height
+                        and 0 <= col < self.game.curr_level.width
+                        and self.is_valid_spawn(row, col)
+                    ):
+                        return row, col
+
+        return 0, 0
 
 
 class PauseState(State):
     """The paused overlay menu screen state."""
 
-    def __init__(self, game: Any) -> None:
-        """Initialize buttons centered relative to window."""
+    def __init__(self, game: Any, previous_state: PlayingState) -> None:
         super().__init__(game)
+        self.previous_state = previous_state
         self.font_title = pygame.font.Font(None, 48)
         self.font_btn = pygame.font.Font(None, 36)
         self.resume_button: Optional[Button] = None
         self.home_button: Optional[Button] = None
 
     def enter(self) -> None:
-        """Center buttons on the current window size."""
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
+
         self.resume_button = Button(
             w // 2 - 100, h // 2 - 40, 200, 45, "RESUME", self.font_btn
         )
@@ -373,18 +408,19 @@ class PauseState(State):
     def update(
         self, input_state: Any, events: List[pygame.event.Event]
     ) -> None:
-        """Check button clicks or escape to resume."""
         if input_state.pause_pressed:
-            self.game.state_manager.change_state(PlayingState(self.game))
+            self.game.state_manager.change_state(self.previous_state)
             return
 
         if self.resume_button and self.resume_button.update(input_state):
-            self.game.state_manager.change_state(PlayingState(self.game))
+            self.game.state_manager.change_state(self.previous_state)
+
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Render transparent overlay on top of current gameplay."""
+        self.previous_state.draw(screen)
+
         overlay = pygame.Surface(
             (screen.get_width(), screen.get_height()), pygame.SRCALPHA
         )

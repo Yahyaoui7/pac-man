@@ -265,12 +265,17 @@ class PlayingState(State):
 
         for ghost in self.game.entity_manager.ghosts:
             if ghost.is_edible:
-                self.movement.update_runaway_ghost(ghost, self.game.player)
+                self.movement.update_runaway_ghost(
+                    ghost, self.game.entity_manager.player
+                )
             else:
                 self.movement.update_bfs_ghost(
                     ghost,
                     self.game.entity_manager.player,
                 )
+        self.game.entity_manager.update(
+            self.game.level_manager.current_maze.maze, 1 / 60.0
+        )
 
     def draw(self, screen: pygame.Surface) -> None:
 

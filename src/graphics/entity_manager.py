@@ -35,10 +35,11 @@ class EntityManager:
 
         for y in range(height):
             for x in range(width):
+
                 if (x, y) in corners:
                     self.pellets[y][x] = 2
                     self.total_pellets += 1
-                elif (x, y) == center:
+                elif (x, y) == center or maze[y][x] == 15:
                     self.pellets[y][x] = 0
                 else:
                     self.pellets[y][x] = 1
@@ -55,6 +56,23 @@ class EntityManager:
             Ghost(height - 1, 0, (0, 255, 255), "Inky"),
             Ghost(height - 1, width - 1, (255, 165, 0), "Clyde"),
         ]
+
+    def update(self, maze: list[list[int]], dt: float) -> None:
+
+        px, py = self.player.grid_x, self.player.grid_y
+
+        if self.pellets[py][px] == 1:
+            self.pellets[py][px] = 0
+            self.total_pellets -= 1
+        elif self.pellets[py][px] == 2:
+            self.pellets[py][px] = 0
+            self.total_pellets -= 1
+
+            for ghost in self.ghosts:
+                ghost.is_edible = True
+                if ghost.is_edible:
+
+                    ghost.frightened_timer = 7.0
 
     def draw(self, screen: pygame.Surface) -> None:
         """Draw pellets, player, and Ghosts."""

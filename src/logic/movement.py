@@ -81,8 +81,9 @@ class MovementSystem:
             # If there is a wall in front, stop moving.
             if not self.can_move(entity.row, entity.col, entity.direction):
                 return
+        entity.grid_y = entity.row
+        entity.grid_x = entity.col
 
-        # Pixel movement.
         entity.x += entity.col_direction * entity.speed
         entity.y += entity.row_direction * entity.speed
 

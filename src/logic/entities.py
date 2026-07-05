@@ -51,5 +51,5 @@ class Ghost(Entity):
         self.spawn_x = self.x
         self.spawn_y = self.y
 
-        self.is_edible = True
+        self.is_edible = False
         self.is_eaten = False

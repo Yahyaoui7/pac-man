@@ -34,7 +34,9 @@ class State:
         """Called when leaving this state."""
         pass
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Process logic and events."""
         pass
 
@@ -58,7 +60,9 @@ class StateManager:
         self.current = state
         self.current.enter()
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Forward updates to the active state."""
         if self.current:
             self.current.update(input_state, events)
@@ -79,11 +83,15 @@ class HomeState(State):
         self.font_btn = pygame.font.Font(None, 36)
 
         # Center buttons on a 600x500 screen
-        self.play_button = Button(200, 180, 200, 50, "START GAME", self.font_btn)
+        self.play_button = Button(
+            200, 180, 200, 50, "START GAME", self.font_btn
+        )
         self.instructions_button = Button(
             200, 245, 200, 50, "INSTRUCTIONS", self.font_btn
         )
-        self.scores_button = Button(200, 310, 200, 50, "HIGHSCORES", self.font_btn)
+        self.scores_button = Button(
+            200, 310, 200, 50, "HIGHSCORES", self.font_btn
+        )
         self.quit_button = Button(200, 375, 200, 50, "EXIT", self.font_btn)
 
     def enter(self) -> None:
@@ -91,7 +99,9 @@ class HomeState(State):
         self.game.resize_window(600, 500)
         self.game.sound_manager.play_music("menu")
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Check button clicks."""
         if self.play_button.update(input_state):
             # Reset score, lives, and start playing level 0
@@ -122,7 +132,9 @@ class HomeState(State):
         title_rect = title_surf.get_rect(center=(300, 80))
         screen.blit(title_surf, title_rect)
 
-        subtitle_surf = self.font_btn.render("NEON RETRO EDITION", True, (0, 238, 255))
+        subtitle_surf = self.font_btn.render(
+            "NEON RETRO EDITION", True, (0, 238, 255)
+        )
         subtitle_rect = subtitle_surf.get_rect(center=(300, 125))
         screen.blit(subtitle_surf, subtitle_rect)
 
@@ -144,7 +156,9 @@ class InstructionsState(State):
         self.font_btn = pygame.font.Font(None, 36)
         self.back_button = Button(200, 420, 200, 45, "BACK", self.font_btn)
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         """Check back button click."""
         if self.back_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
@@ -235,10 +249,14 @@ class PlayingState(State):
             ),
         ]
 
-        self.msg_text = f"LEVEL {self.game.level_manager.current_level_index + 1}"
+        self.msg_text = (
+            f"LEVEL {self.game.level_manager.current_level_index + 1}"
+        )
         self.msg_timer = 2.0
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         if input_state.pause_pressed:
             self.game.state_manager.change_state(PauseState(self.game, self))
             return
@@ -274,7 +292,9 @@ class PlayingState(State):
                 y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
 
                 if cell & NORTH:
-                    pygame.draw.line(screen, "blue", (x, y), (x + CELL_SIZE, y), 2)
+                    pygame.draw.line(
+                        screen, "blue", (x, y), (x + CELL_SIZE, y), 2
+                    )
 
                 if cell & EAST:
                     pygame.draw.line(
@@ -295,7 +315,9 @@ class PlayingState(State):
                     )
 
                 if cell & WEST:
-                    pygame.draw.line(screen, "blue", (x, y), (x, y + CELL_SIZE), 2)
+                    pygame.draw.line(
+                        screen, "blue", (x, y), (x, y + CELL_SIZE), 2
+                    )
 
     def draw_player(self, screen: pygame.Surface) -> None:
         player = self.game.player
@@ -324,9 +346,13 @@ class PlayingState(State):
             x = PADDING // 2 + ghost.x
             y = TOP_BAR_HEIGHT + PADDING // 2 + ghost.y
 
+            if ghost.is_edible:
+                color = "blue"
+            else:
+                color = colors.get(ghost.name, "white")
             pygame.draw.circle(
                 screen,
-                colors.get(ghost.name, "white"),
+                color,
                 (int(x), int(y)),
                 CELL_SIZE // 3,
             )
@@ -388,7 +414,9 @@ class PauseState(State):
             w // 2 - 100, h // 2 + 25, 200, 45, "MAIN MENU", self.font_btn
         )
 
-    def update(self, input_state: Any, events: List[pygame.event.Event]) -> None:
+    def update(
+        self, input_state: Any, events: List[pygame.event.Event]
+    ) -> None:
         if input_state.pause_pressed:
             self.game.state_manager.change_state(self.previous_state)
             return

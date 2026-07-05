@@ -107,6 +107,8 @@ class Entity:
         x: int,
         speed: int,
     ) -> None:
+        self.spawn_x = x
+        self.spawn_y = y
         self.grid_y = y
         self.grid_x = x
 
@@ -164,6 +166,16 @@ class Player(Entity):
                         return row, col
 
         return 0, 0
+
+    def reset_location(self):
+        self.x = self.spawn_x * CELL_SIZE + CELL_SIZE // 2
+        self.y = self.spawn_y * CELL_SIZE + CELL_SIZE // 2
+
+        self.direction = None
+        self.next_direction = None
+
+        self.row_direction = 0
+        self.col_direction = 0
 
 
 class Ghost(Entity):

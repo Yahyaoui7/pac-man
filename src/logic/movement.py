@@ -10,11 +10,6 @@ class MovementSystem:
         """Store the maze so we can check walls."""
         self.maze = maze
 
-    # ----------------------------
-    # BASIC ENTITY MOVEMENT
-    # Used by player and ghosts
-    # ----------------------------
-
     def set_direction(self, entity, direction: str) -> None:
         """Set entity direction and convert it to row/col movement."""
         entity.direction = direction
@@ -64,6 +59,8 @@ class MovementSystem:
 
         if self.is_centered(entity):
             self.update_cell_position(entity)
+            entity.grid_y = entity.row
+            entity.grid_x = entity.col
 
             if entity.next_direction is not None:
                 if self.can_move(
@@ -81,16 +78,9 @@ class MovementSystem:
             # If there is a wall in front, stop moving.
             if not self.can_move(entity.row, entity.col, entity.direction):
                 return
-        entity.grid_y = entity.row
-        entity.grid_x = entity.col
 
         entity.x += entity.col_direction * entity.speed
         entity.y += entity.row_direction * entity.speed
-
-    # ----------------------------
-    # NOT EDIBLE GHOST MOVEMENT
-    # Ghost chases player using BFS
-    # ----------------------------
 
     def get_neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
         """Return all cells the ghost can move to from current cell."""
@@ -159,13 +149,15 @@ class MovementSystem:
 
         return None
 
-    def update_bfs_ghost(self, ghost, player) -> None:
+    def update_bfs_ghost(self, ghost, target_row, target_col) -> None:
         """Move ghost toward player when ghost is not edible."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
+            ghost.grid_y = ghost.row
+            ghost.grid_x = ghost.col
 
             start = (ghost.row, ghost.col)
-            target = (player.row, player.col)
+            target = (target_row, target_col)
 
             path = self.bfs_path(start, target)
 
@@ -175,11 +167,6 @@ class MovementSystem:
                     self.set_direction(ghost, direction)
 
         self.update_entity(ghost)
-
-    # ----------------------------
-    # EDIBLE GHOST MOVEMENT
-    # Ghost runs away from player
-    # ----------------------------
 
     def get_next_position(
         self,
@@ -209,10 +196,10 @@ class MovementSystem:
         best_distance = -1
 
         for direction in ["LEFT", "RIGHT", "UP", "DOWN"]:
-            if self.can_move(ghost.row, ghost.col, direction):
+            if self.can_move(ghost.grid_y, ghost.grid_x, direction):
                 next_row, next_col = self.get_next_position(
-                    ghost.row,
-                    ghost.col,
+                    ghost.grid_y,
+                    ghost.grid_x,
                     direction,
                 )
 
@@ -233,6 +220,8 @@ class MovementSystem:
         """Move ghost away from player when ghost is edible."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
+            ghost.grid_y = ghost.row
+            ghost.grid_x = ghost.col
 
             direction = self.choose_runaway_direction(ghost, player)
 

@@ -250,6 +250,10 @@ class PlayingState(State):
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
+        if self.game.entity_manager.player.lives < 1:
+            self.game.state_manager.change_state(
+                GameOverState(self.game),
+            )
         if input_state.pause_pressed:
             self.game.state_manager.change_state(PauseState(self.game, self))
             return
@@ -266,14 +270,26 @@ class PlayingState(State):
         self.movement.update_entity(self.game.entity_manager.player)
 
         for ghost in self.game.entity_manager.ghosts:
-            if ghost.is_edible:
-                self.movement.update_runaway_ghost(
-                    ghost, self.game.entity_manager.player
+
+            if ghost.is_eaten:
+                # Go back to the spawn point
+                self.movement.update_bfs_ghost(
+                    ghost,
+                    ghost.spawn_y,
+                    ghost.spawn_x,
                 )
+
+            elif ghost.is_edible:
+                self.movement.update_runaway_ghost(
+                    ghost,
+                    self.game.entity_manager.player,
+                )
+
             else:
                 self.movement.update_bfs_ghost(
                     ghost,
-                    self.game.entity_manager.player,
+                    self.game.entity_manager.player.grid_y,
+                    self.game.entity_manager.player.grid_x,
                 )
         self.game.entity_manager.update(
             self.game.level_manager.current_maze.maze, 1 / 60.0
@@ -343,13 +359,21 @@ class PlayingState(State):
 
             if distance <= radius * 2:
                 if ghost.is_edible:
+
                     ghost.is_eaten = True
+
                     self.msg_text = "fiiiin ghadi"
                     self.msg_timer = 1.0
 
                 else:
                     player.lives -= 1
-                    self.msg_text = "wa rak mkrfsniiiii"
+                    player.reset_location()
+                    self.movement.update_bfs_ghost(
+                        ghost,
+                        ghost.spawn_y,
+                        ghost.spawn_x,
+                    )
+                    self.msg_text = "rj3 awa rj3"
                     self.msg_timer = 1.0
 
         self.font_hud.render(self.msg_text, True, "white")

@@ -13,6 +13,7 @@
 from mazegenerator import MazeGenerator
 from src.graphics.renderer import HomeState, StateManager
 from src.logic.level_manager import LevelManager
+from src.sounds.soud_manager import SoundManager
 from .logic.config import GameConfig
 from .logic.inputmanager import InputManager
 import random
@@ -39,12 +40,26 @@ class GameStarter:
         self.player = None
         self.ghosts = []
         self.directions = ["LEFT", "RIGHT", "UP", "DOWN"]
-        self.level_manager = LevelManager()
+        self.level_manager = LevelManager(config)
+        self.sound_manager = SoundManager()
+        self.cell_size: int = 30
+        self.padding: int = 20
 
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""
         if self.screen is None or self.screen.get_size() != (width, height):
             self.screen = pygame.display.set_mode((width, height))
+
+    def recalculate_cell_size(self, width: int, height: int) -> None:
+        """Dynamically resize cells so the maze fits nicely on screen."""
+        max_screen_width = 1200
+        max_screen_height = 750
+        self.cell_size = min(
+            30,
+            max_screen_width // width,
+            (max_screen_height - 100) // height,
+        )
+        self.cell_size = max(12, self.cell_size)
 
     def run(self) -> None:
         """Run the main game loop at 60 FPS."""

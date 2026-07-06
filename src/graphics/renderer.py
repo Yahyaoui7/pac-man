@@ -1,6 +1,7 @@
 """Implements the State Pattern for game screens and UI rendering."""
 
 import math
+from src.logic.utils import expired, after
 
 import pygame
 import pygame.draw as dr
@@ -235,6 +236,7 @@ class PlayingState(State):
 
         self.font_hud = pygame.font.Font(None, 28)
         self.font_msg = pygame.font.Font(None, 48)
+        self.player_invincible_until = 0
         self.msg_timer: float = 0.0
         self.msg_text: str = ""
 
@@ -286,7 +288,7 @@ class PlayingState(State):
         for ghost in self.game.entity_manager.ghosts:
 
             if ghost.is_eaten:
-                # Go back to the spawn point
+
                 self.movement.update_bfs_ghost(
                     ghost,
                     ghost.spawn_y,
@@ -404,21 +406,18 @@ class PlayingState(State):
 
             if distance <= radius * 2 and not ghost.is_eaten:
                 if ghost.is_edible:
-
                     ghost.is_eaten = True
-                    self.msg_text = "fiiiin ghadi"
-                    self.msg_timer = 1.0
 
                 else:
-                    self.game.lives -= 1
-                    player.reset_location()
-                    self.movement.update_bfs_ghost(
-                        ghost,
-                        ghost.spawn_y,
-                        ghost.spawn_x,
-                    )
-                    self.msg_text = "rj3 awa rj3"
-                    self.msg_timer = 1.0
+                    if expired(self.player_invincible_until):
+                        self.game.lives -= 1
+
+                        self.player_invincible_until = after(1500)
+
+                        player.reset_location()
+
+                        self.msg_text = "Be careful!"
+                        self.msg_timer = 1.0
 
         self.font_hud.render(self.msg_text, True, "white")
 

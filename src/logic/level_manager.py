@@ -41,10 +41,7 @@ class LevelManager:
                 level_conf.seed,
             )
             self.remaining_time = float(level_conf.level_max_time)
-            print(
-                f"Loading level {level_index}: "
-                f"{width}x{height}, seed={level_conf.seed}"
-            )
+
             return True
 
         except Exception as e:

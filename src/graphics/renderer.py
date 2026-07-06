@@ -425,7 +425,7 @@ class PauseState(State):
             return
 
         if self.resume_button and self.resume_button.update(input_state):
-            self.game.state_manager.change_state(self.previous_state)
+            self.game.state_manager.pop_state()
 
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))

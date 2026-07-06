@@ -126,7 +126,7 @@ class HomeState(State):
     ) -> None:
         """Check button clicks."""
         if self.play_button.update(input_state):
-            # Reset score, lives, and start playing level 0
+
             self.game.score = 0
             self.game.lives = self.game.config.lives
             self.game.level_manager.current_level_index = 0
@@ -141,7 +141,9 @@ class HomeState(State):
             self.game.state_manager.change_state(InstructionsState(self.game))
 
         elif self.scores_button.update(input_state):
-            self.game.state_manager.change_state(HighScoreState(self.game))
+            self.game.state_manager.change_state(
+                HighScoreState(self.game, self),
+            )
 
         elif self.quit_button.update(input_state):
             self.game.running = False
@@ -528,7 +530,48 @@ class GameOverState(State):
 class HighScoreState(State):
     """The top 10 highscores display screen."""
 
-    pass
+    def __init__(self, game: Any, previous_state: HomeState) -> None:
+        super().__init__(game)
+        self.previous_state = previous_state
+        self.font_title = pygame.font.Font(None, 48)
+        self.font_btn = pygame.font.Font(None, 36)
+        self.resume_button: Optional[Button] = None
+        self.home_button: Optional[Button] = None
+
+    def enter(self) -> None:
+        w = self.game.screen.get_width()
+        h = self.game.screen.get_height()
+
+        self.home_button = Button(
+            w // 2 - 100, h // 2 + 25, 200, 45, "Home MENU", self.font_btn
+        )
+
+    def update(
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
+    ) -> None:
+
+        if self.home_button and self.home_button.update(input_state):
+            self.game.state_manager.change_state(HomeState(self.game))
+
+    def draw(self, screen: pygame.Surface) -> None:
+        self.previous_state.draw(screen)
+
+        overlay = pygame.Surface((screen.get_width(), screen.get_height()))
+        overlay.fill((0, 0, 0, 150))
+        screen.blit(overlay, (0, 0))
+
+        title_surf = self.font_title.render(
+            "High Score State empty for now", True, (0, 238, 255)
+        )
+        title_rect = title_surf.get_rect(
+            center=(screen.get_width() // 2, screen.get_height() // 2 - 100)
+        )
+        screen.blit(title_surf, title_rect)
+
+        if self.home_button:
+            self.home_button.draw(screen)
 
 
 class VictoryState(State):

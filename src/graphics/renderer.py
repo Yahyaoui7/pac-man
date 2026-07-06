@@ -329,19 +329,25 @@ class PlayingState(State):
     def draw(self, screen: pygame.Surface) -> None:
 
         pygame.draw.rect(screen, (10, 10, 20), (0, 0, screen.get_width(), 40))
-        pygame.draw.line(screen, (0, 238, 255), (0, 40), (screen.get_width(), 40), 2)
+        pygame.draw.line(
+            screen, (0, 238, 255), (0, 40), (screen.get_width(), 40), 2
+        )
 
         score_surf = self.font_hud.render(
             f"SCORE: {self.game.score}", True, (255, 238, 0)
         )
         lvl_num = self.game.level_manager.current_level_index + 1
-        level_surf = self.font_hud.render(f"LEVEL: {lvl_num}", True, (255, 255, 255))
+        level_surf = self.font_hud.render(
+            f"LEVEL: {lvl_num}", True, (255, 255, 255)
+        )
         lives_surf = self.font_hud.render(
             f"LIVES: {self.game.lives}", True, (255, 0, 0)
         )
 
         time_rem = max(0, int(self.game.level_manager.remaining_time))
-        time_surf = self.font_hud.render(f"TIME: {time_rem}s", True, (0, 255, 0))
+        time_surf = self.font_hud.render(
+            f"TIME: {time_rem}s", True, (0, 255, 0)
+        )
 
         screen.blit(score_surf, (15, 10))
         screen.blit(level_surf, (screen.get_width() // 3, 10))
@@ -513,7 +519,9 @@ class GameOverState(State):
 
     def update(self, input_state, events):
         if self.hi_score_button and self.hi_score_button.update(input_state):
-            self.game.state_manager.change_state(HighScoreState(self.game))
+            self.game.state_manager.change_state(
+                HighScoreState(self.game, self)
+            )
 
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
@@ -566,7 +574,9 @@ class GameOverState(State):
             (255, 238, 0),
         )
 
-        score_label_rect = score_label.get_rect(center=(center_x - 40, center_y - 65))
+        score_label_rect = score_label.get_rect(
+            center=(center_x - 40, center_y - 65)
+        )
         score_value_rect = score_value.get_rect(
             midleft=(score_label_rect.right + 10, score_label_rect.centery)
         )
@@ -585,7 +595,9 @@ class GameOverState(State):
             (255, 238, 0),
         )
 
-        high_label_rect = high_label.get_rect(center=(center_x - 40, center_y - 25))
+        high_label_rect = high_label.get_rect(
+            center=(center_x - 40, center_y - 25)
+        )
         high_value_rect = high_value.get_rect(
             midleft=(high_label_rect.right + 10, high_label_rect.centery)
         )

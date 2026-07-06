@@ -1,5 +1,7 @@
 """Implements the State Pattern for game screens and UI rendering."""
 
+import math
+
 import pygame
 import pygame.draw as dr
 from typing import Any, List, Optional
@@ -116,8 +118,8 @@ class HomeState(State):
             # Reset score, lives, and start playing level 0
             self.game.score = 0
             self.game.lives = self.game.config.lives
-            self.game.level_manager.current_level_index = 0
-            self.game.curr_level = self.game.config.levels[1]
+            self.game.level_manager.current_level_index = 5
+            self.game.curr_level = self.game.config.levels[5]
 
             self.game.curr_level.height = min(self.game.curr_level.height, 32)
             self.game.curr_level.width = min(self.game.curr_level.width, 60)
@@ -251,6 +253,10 @@ class PlayingState(State):
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
+        if self.game.entity_manager.player.lives < 1:
+            self.game.state_manager.change_state(
+                GameOverState(self.game),
+            )
         if input_state.pause_pressed:
             self.game.state_manager.change_state(PauseState(self.game, self))
             return
@@ -267,13 +273,31 @@ class PlayingState(State):
         self.movement.update_entity(self.game.entity_manager.player)
 
         for ghost in self.game.entity_manager.ghosts:
-            if ghost.is_edible:
-                self.movement.update_runaway_ghost(ghost, self.game.player)
-            else:
+
+            if ghost.is_eaten:
+                # Go back to the spawn point
                 self.movement.update_bfs_ghost(
+                    ghost,
+                    ghost.spawn_y,
+                    ghost.spawn_x,
+                )
+
+            elif ghost.is_edible:
+                self.movement.update_runaway_ghost(
                     ghost,
                     self.game.entity_manager.player,
                 )
+            else:
+                self.movement.update_runaway_ghost(
+                    ghost, self.game.entity_manager.player
+                )
+        self.game.entity_manager.update(
+            self.game.level_manager.current_maze.maze, 1 / 60.0
+        )
+        self.check_collision(
+            self.game.entity_manager.player,
+            self.game.entity_manager.ghosts,
+        )
 
     def draw(self, screen: pygame.Surface) -> None:
 
@@ -286,6 +310,22 @@ class PlayingState(State):
         )
 
         hud_surface = self.font_hud.render(hud_text, True, "white")
+
+        if self.msg_timer > 0:
+            self.msg_timer -= 1 / 60
+        else:
+            self.msg_text = ""
+
+        player = self.game.entity_manager.player
+        if self.msg_timer > 0:
+            text_surface = self.font_hud.render(self.msg_text, True, "white")
+            screen.blit(
+                text_surface,
+                (
+                    PADDING // 2 + player.x - text_surface.get_width() // 2,
+                    TOP_BAR_HEIGHT + PADDING // 2 + player.y - 40,
+                ),
+            )
         screen.blit(hud_surface, (10, 5))
         c = CELL_SIZE
 
@@ -307,6 +347,36 @@ class PlayingState(State):
                 if cell & WEST:
                     dr.line(screen, "blue", (x, y), (x, y + c), 2)
             self.game.entity_manager.draw(self.game.screen)
+
+    def check_collision(self, player, ghosts):
+        radius = CELL_SIZE // 3
+
+        for ghost in ghosts:
+            dx = player.x - ghost.x
+            dy = player.y - ghost.y
+
+            distance = math.hypot(dx, dy)
+
+            if distance <= radius * 2:
+                if ghost.is_edible:
+
+                    ghost.is_eaten = True
+
+                    self.msg_text = "fiiiin ghadi"
+                    self.msg_timer = 1.0
+
+                else:
+                    player.lives -= 1
+                    player.reset_location()
+                    self.movement.update_bfs_ghost(
+                        ghost,
+                        ghost.spawn_y,
+                        ghost.spawn_x,
+                    )
+                    self.msg_text = "rj3 awa rj3"
+                    self.msg_timer = 1.0
+
+        self.font_hud.render(self.msg_text, True, "white")
 
 
 class PauseState(State):

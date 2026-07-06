@@ -56,6 +56,22 @@ class EntityManager:
             Ghost(height - 1, width - 1, (255, 165, 0), "Clyde"),
         ]
 
+    def update(self, maze: list[list[int]], dt: float) -> None:
+
+        px, py = self.player.grid_x, self.player.grid_y
+
+        if self.pellets[py][px] == 1:
+            self.pellets[py][px] = 0
+            self.total_pellets -= 1
+        elif self.pellets[py][px] == 2:
+            self.pellets[py][px] = 0
+            self.total_pellets -= 1
+
+            for ghost in self.ghosts:
+                ghost.is_edible = True
+                if ghost.is_edible:
+                    ghost.frightened_timer = 7.0
+
     def draw(self, screen: pygame.Surface) -> None:
         """Draw pellets, player, and Ghosts."""
         height = len(self.pellets)
@@ -90,6 +106,8 @@ class Entity:
         x: int,
         speed: int,
     ) -> None:
+        self.spawn_x = x
+        self.spawn_y = y
         self.grid_y = y
         self.grid_x = x
 
@@ -111,6 +129,7 @@ class Player(Entity):
 
         self.lives = 3
         self.score = 0
+        self.msg_txt = ""
         self.is_invincible = False
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -147,6 +166,16 @@ class Player(Entity):
 
         return 0, 0
 
+    def reset_location(self):
+        self.x = self.spawn_x * CELL_SIZE + CELL_SIZE // 2
+        self.y = self.spawn_y * CELL_SIZE + CELL_SIZE // 2
+
+        self.direction = None
+        self.next_direction = None
+
+        self.row_direction = 0
+        self.col_direction = 0
+
 
 class Ghost(Entity):
     def __init__(
@@ -169,22 +198,17 @@ class Ghost(Entity):
         self.is_eaten = False
 
     def draw(self, screen: pygame.Surface) -> None:
-        colors = {
-            "Blinky": "red",
-            "Pinky": "pink",
-            "Inky": "cyan",
-            "Clyde": "orange",
-        }
 
         x = PADDING // 2 + self.x
         y = TOP_BAR_HEIGHT + PADDING // 2 + self.y
         if self.is_edible:
-            color = "blue"
-        else:
-            color = colors.get(self.name, "white")
+
+            self.color = "blue"
+        if self.is_eaten:
+            self.color = "white"
         pygame.draw.circle(
             screen,
-            color,
+            self.color,
             (int(x), int(y)),
             CELL_SIZE // 3,
         )

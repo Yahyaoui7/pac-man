@@ -35,7 +35,7 @@ class LevelManager:
 
         try:
             width = max(15, min(63, level_conf.width))
-            height = max(15, (33, level_conf.height))
+            height = max(15, min(33, level_conf.height))
             self.current_maze = self.build_maze(
                 width,
                 height,

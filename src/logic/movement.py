@@ -81,8 +81,9 @@ class MovementSystem:
             # If there is a wall in front, stop moving.
             if not self.can_move(entity.row, entity.col, entity.direction):
                 return
+        entity.grid_y = entity.row
+        entity.grid_x = entity.col
 
-        # Pixel movement.
         entity.x += entity.col_direction * entity.speed
         entity.y += entity.row_direction * entity.speed
 
@@ -180,62 +181,52 @@ class MovementSystem:
     # Ghost runs away from player
     # ----------------------------
 
-    def get_next_position(
-        self,
-        row: int,
-        col: int,
-        direction: str,
-    ) -> tuple[int, int]:
-        """Return the next cell if entity moves in this direction."""
-        if direction == "LEFT":
-            return row, col - 1
-        if direction == "RIGHT":
-            return row, col + 1
-        if direction == "UP":
-            return row - 1, col
-        if direction == "DOWN":
-            return row + 1, col
-
-        return row, col
-
     def distance(self, row1: int, col1: int, row2: int, col2: int) -> int:
-        """Calculate distance between two cells."""
         return abs(row1 - row2) + abs(col1 - col2)
 
-    def choose_runaway_direction(self, ghost, player) -> str | None:
-        """Choose the direction that makes ghost farthest from player."""
-        best_direction = None
+    def choose_runaway_target(self, player) -> tuple[int, int]:
+        """Choose the corner farthest from the player."""
+        max_row = len(self.maze) - 1
+        max_col = len(self.maze[0]) - 1
+
+        corners = [
+            (0, 0),
+            (0, max_col),
+            (max_row, 0),
+            (max_row, max_col),
+        ]
+
+        best_corner = corners[0]
         best_distance = -1
 
-        for direction in ["LEFT", "RIGHT", "UP", "DOWN"]:
-            if self.can_move(ghost.row, ghost.col, direction):
-                next_row, next_col = self.get_next_position(
-                    ghost.row,
-                    ghost.col,
-                    direction,
-                )
+        for corner in corners:
+            dist = self.distance(
+                corner[0],
+                corner[1],
+                player.row,
+                player.col,
+            )
 
-                dist = self.distance(
-                    next_row,
-                    next_col,
-                    player.row,
-                    player.col,
-                )
+            if dist > best_distance:
+                best_distance = dist
+                best_corner = corner
 
-                if dist > best_distance:
-                    best_distance = dist
-                    best_direction = direction
-
-        return best_direction
+        return best_corner
 
     def update_runaway_ghost(self, ghost, player) -> None:
-        """Move ghost away from player when ghost is edible."""
+        """Move ghost to the farthest corner when ghost is edible."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
 
-            direction = self.choose_runaway_direction(ghost, player)
+            start = (ghost.row, ghost.col)
+            target = self.choose_runaway_target(player)
 
-            if direction is not None:
-                self.set_direction(ghost, direction)
+            path = self.bfs_path(start, target)
+
+            if len(path) >= 2:
+                direction = self.direction_to_next_cell(path[0], path[1])
+
+                if direction is not None:
+                    self.set_direction(ghost, direction)
 
         self.update_entity(ghost)

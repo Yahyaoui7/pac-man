@@ -5,6 +5,7 @@ import pygame
 
 from src.logic.config import CELL_SIZE, PADDING, TOP_BAR_HEIGHT, GameConfig
 from src.logic.config import NORTH, EAST, SOUTH, WEST
+from src.sounds.soud_manager import SoundManager
 
 
 class EntityManager:
@@ -15,6 +16,7 @@ class EntityManager:
         self.ghosts: list[Ghost] = []
         self.pellets: list[list[int]] = []
         self.total_pellets: int = 0
+        self.sound = SoundManager()
 
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""
@@ -56,6 +58,11 @@ class EntityManager:
             Ghost(height - 1, width - 1, (255, 165, 0), "Clyde"),
         ]
 
+    def play_sound(self):
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.set_volume(0.15)
+            self.sound.play_sound("eat_normal_pellet")
+
     def update(self, maze: list[list[int]], dt: float) -> None:
 
         px, py = self.player.grid_x, self.player.grid_y
@@ -63,6 +70,8 @@ class EntityManager:
         if self.pellets[py][px] == 1:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
+            self.play_sound()
+
         elif self.pellets[py][px] == 2:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
@@ -196,7 +205,7 @@ class Ghost(Entity):
 
         self.is_edible = False
         self.is_eaten = False
-        
+
         self.runaway_target = None
 
     def draw(self, screen: pygame.Surface) -> None:

@@ -47,22 +47,33 @@ class StateManager:
     def __init__(self, game: Any) -> None:
         """Initialize the state manager."""
         self.game = game
-        self.current: Optional[State] = None
+        self.stack: list[State] = []
 
-    def change_state(self, state: State) -> None:
-        """Exit the current state and enter the new one."""
-        if self.current:
-            self.current.exit()
-            self.current.game.sound_manager.stop_music()
-        self.current = state
-        self.current.enter()
+    @property
+    def current(self):
+        if self.stack:
+            return self.stack[-1]
+        return None
 
-    def update(
-        self,
-        input_state: Any,
-        events: List[pygame.event.Event],
-    ) -> None:
-        """Forward updates to the active state."""
+    def change_state(self, state: State):
+        while self.stack:
+            self.stack.pop().exit()
+
+        self.stack.append(state)
+        state.enter()
+
+    def push_state(self, state: State) -> None:
+        self.stack.append(state)
+        state.enter()
+
+    def pop_state(self) -> None:
+        if not self.stack:
+            return
+
+        state = self.stack.pop()
+        state.exit()
+
+    def update(self, input_state, events):
         if self.current:
             self.current.update(input_state, events)
 
@@ -117,7 +128,7 @@ class HomeState(State):
         if not pygame.mixer.music.get_busy():
             self.game.sound_manager.play_music("menu_music")
         if self.play_button.update(input_state):
-            # Reset score, lives, and start playing level 0
+
             self.game.score = 0
             self.game.lives = self.game.config.lives
             self.game.level_manager.current_level_index = 5
@@ -132,7 +143,9 @@ class HomeState(State):
             self.game.state_manager.change_state(InstructionsState(self.game))
 
         elif self.scores_button.update(input_state):
-            self.game.state_manager.change_state(HighScoreState(self.game))
+            self.game.state_manager.change_state(
+                HighScoreState(self.game, self),
+            )
 
         elif self.quit_button.update(input_state):
             self.game.running = False
@@ -260,10 +273,10 @@ class PlayingState(State):
             self.game.sound_manager.play_music("game_music", False)
         if self.game.entity_manager.player.lives < 1:
             self.game.state_manager.change_state(
-                GameOverState(self.game),
+                GameOverState(self.game, self),
             )
         if input_state.pause_pressed:
-            self.game.state_manager.change_state(PauseState(self.game, self))
+            self.game.state_manager.push_state(PauseState(self.game, self))
             return
 
         if input_state.move_left:
@@ -303,19 +316,47 @@ class PlayingState(State):
             self.game.entity_manager.player,
             self.game.entity_manager.ghosts,
         )
+        self.game.level_manager.update_time(1 / 60.0)
+        if self.game.level_manager.is_time_out():
+
+            if self.game.lives <= 0:
+                self.game.state_manager.change_state(GameOverState(self.game))
+            else:
+                level_cfg = self.game.level_manager.get_current_level_config()
+                self.game.level_manager.remaining_time = float(
+                    level_cfg.level_max_time,
+                )
+                self.msg_text = "TIME'S UP! TRY AGAIN"
+                self.msg_timer = 2.0
+            return
 
     def draw(self, screen: pygame.Surface) -> None:
 
-        level_number = self.game.level_manager.current_level_index + 1
-
-        hud_text = (
-            f"Score: {self.game.score}   "
-            f"Lives: {self.game.lives}   "
-            f"Level: {level_number}"
+        pygame.draw.rect(screen, (10, 10, 20), (0, 0, screen.get_width(), 40))
+        pygame.draw.line(
+            screen, (0, 238, 255), (0, 40), (screen.get_width(), 40), 2
         )
 
-        hud_surface = self.font_hud.render(hud_text, True, "white")
+        score_surf = self.font_hud.render(
+            f"SCORE: {self.game.score}", True, (255, 238, 0)
+        )
+        lvl_num = self.game.level_manager.current_level_index + 1
+        level_surf = self.font_hud.render(
+            f"LEVEL: {lvl_num}", True, (255, 255, 255)
+        )
+        lives_surf = self.font_hud.render(
+            f"LIVES: {self.game.lives}", True, (255, 0, 0)
+        )
 
+        time_rem = max(0, int(self.game.level_manager.remaining_time))
+        time_surf = self.font_hud.render(
+            f"TIME: {time_rem}s", True, (0, 255, 0)
+        )
+
+        screen.blit(score_surf, (15, 10))
+        screen.blit(level_surf, (screen.get_width() // 3, 10))
+        screen.blit(lives_surf, (2 * screen.get_width() // 3, 10))
+        screen.blit(time_surf, (screen.get_width() - 110, 10))
         if self.msg_timer > 0:
             self.msg_timer -= 1 / 60
         else:
@@ -331,7 +372,7 @@ class PlayingState(State):
                     TOP_BAR_HEIGHT + PADDING // 2 + player.y - 40,
                 ),
             )
-        screen.blit(hud_surface, (10, 5))
+
         c = CELL_SIZE
 
         for row, cells in enumerate(self.maze):
@@ -403,7 +444,7 @@ class PauseState(State):
             w // 2 - 100, h // 2 - 40, 200, 45, "RESUME", self.font_btn
         )
         self.home_button = Button(
-            w // 2 - 100, h // 2 + 25, 200, 45, "MAIN MENU", self.font_btn
+            w // 2 - 100, h // 2 + 25, 200, 45, "Home MENU", self.font_btn
         )
 
     def update(
@@ -412,11 +453,11 @@ class PauseState(State):
         events: List[pygame.event.Event],
     ) -> None:
         if input_state.pause_pressed:
-            self.game.state_manager.change_state(self.previous_state)
+            self.game.state_manager.pop_state()
             return
 
         if self.resume_button and self.resume_button.update(input_state):
-            self.game.state_manager.change_state(self.previous_state)
+            self.game.state_manager.pop_state()
 
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
@@ -444,13 +485,181 @@ class PauseState(State):
 class GameOverState(State):
     """The Game Over display screen and Name Input handler."""
 
-    pass
+    def __init__(self, game, previous_state: PlayingState):
+        super().__init__(game)
+        self.previous_state = previous_state
+        self.font_title = pygame.font.Font(None, 48)
+        self.losing_cause = pygame.font.Font(None, 42)
+
+        self.font_btn = pygame.font.Font(None, 36)
+
+        self.home_button: Optional[Button] = None
+        self.hi_score_button: Optional[Button] = None
+
+    def enter(self):
+        w = self.game.screen.get_width()
+        h = self.game.screen.get_height()
+
+        center_x = w // 2
+        center_y = h // 2
+
+        self.hi_score_button = Button(
+            center_x - 100,
+            center_y + 20,
+            200,
+            45,
+            "Highest Score",
+            self.font_btn,
+        )
+
+        self.home_button = Button(
+            center_x - 100,
+            center_y + 85,
+            200,
+            45,
+            "Home Menu",
+            self.font_btn,
+        )
+
+    def update(self, input_state, events):
+        if self.hi_score_button and self.hi_score_button.update(input_state):
+            self.game.state_manager.change_state(
+                HighScoreState(self.game, self)
+            )
+
+        elif self.home_button and self.home_button.update(input_state):
+            self.game.state_manager.change_state(HomeState(self.game))
+
+    def draw(self, screen: pygame.Surface) -> None:
+        lives = self.game.entity_manager.player.lives
+
+        self.previous_state.draw(screen)
+
+        # Overlay
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        screen.blit(overlay, (0, 0))
+
+        center_x = screen.get_width() // 2
+        center_y = screen.get_height() // 2
+
+        # ---------- Title ----------
+        title_surf = self.font_title.render(
+            "GAME OVER",
+            True,
+            (0, 238, 255),
+        )
+        title_rect = title_surf.get_rect(center=(center_x, center_y - 170))
+        screen.blit(title_surf, title_rect)
+
+        # ---------- Losing Cause ----------
+        cause = "You were caught by a ghost!" if lives == 0 else "Time's Up!"
+
+        losing_surf = self.losing_cause.render(
+            cause,
+            True,
+            (255, 80, 80),
+        )
+        losing_rect = losing_surf.get_rect(center=(center_x, center_y - 125))
+        screen.blit(losing_surf, losing_rect)
+
+        # ---------- Scores ----------
+        score = self.game.score  # TO Replace
+        high_score = 99999999  # TO Replace
+
+        score_label = self.font_btn.render(
+            "Your Score:",
+            True,
+            (220, 220, 220),
+        )
+        score_value = self.font_btn.render(
+            str(score),
+            True,
+            (255, 238, 0),
+        )
+
+        score_label_rect = score_label.get_rect(
+            center=(center_x - 40, center_y - 65)
+        )
+        score_value_rect = score_value.get_rect(
+            midleft=(score_label_rect.right + 10, score_label_rect.centery)
+        )
+
+        screen.blit(score_label, score_label_rect)
+        screen.blit(score_value, score_value_rect)
+
+        high_label = self.font_btn.render(
+            "Highest Score:",
+            True,
+            (220, 220, 220),
+        )
+        high_value = self.font_btn.render(
+            str(high_score),
+            True,
+            (255, 238, 0),
+        )
+
+        high_label_rect = high_label.get_rect(
+            center=(center_x - 40, center_y - 25)
+        )
+        high_value_rect = high_value.get_rect(
+            midleft=(high_label_rect.right + 10, high_label_rect.centery)
+        )
+
+        screen.blit(high_label, high_label_rect)
+        screen.blit(high_value, high_value_rect)
+
+        # ---------- Buttons ----------
+        if self.hi_score_button and self.home_button:
+            self.hi_score_button.draw(screen)
+            self.home_button.draw(screen)
 
 
 class HighScoreState(State):
     """The top 10 highscores display screen."""
 
-    pass
+    def __init__(self, game: Any, previous_state: HomeState) -> None:
+        super().__init__(game)
+        self.previous_state = previous_state
+        self.font_title = pygame.font.Font(None, 48)
+        self.font_btn = pygame.font.Font(None, 36)
+        self.resume_button: Optional[Button] = None
+        self.home_button: Optional[Button] = None
+
+    def enter(self) -> None:
+        w = self.game.screen.get_width()
+        h = self.game.screen.get_height()
+
+        self.home_button = Button(
+            w // 2 - 100, h // 2 + 25, 200, 45, "Home MENU", self.font_btn
+        )
+
+    def update(
+        self,
+        input_state: Any,
+        events: List[pygame.event.Event],
+    ) -> None:
+
+        if self.home_button and self.home_button.update(input_state):
+            self.game.state_manager.change_state(HomeState(self.game))
+
+    def draw(self, screen: pygame.Surface) -> None:
+        self.previous_state.draw(screen)
+
+        overlay = pygame.Surface((screen.get_width(), screen.get_height()))
+        overlay.fill((0, 0, 0, 150))
+        screen.blit(overlay, (0, 0))
+
+        title_surf = self.font_title.render(
+            "High Score State empty for now", True, (0, 238, 255)
+        )
+        title_rect = title_surf.get_rect(
+            center=(screen.get_width() // 2, screen.get_height() // 2 - 100)
+        )
+        screen.blit(title_surf, title_rect)
+
+        if self.home_button:
+            self.home_button.draw(screen)
 
 
 class VictoryState(State):

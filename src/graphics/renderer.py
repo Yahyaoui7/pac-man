@@ -47,21 +47,33 @@ class StateManager:
     def __init__(self, game: Any) -> None:
         """Initialize the state manager."""
         self.game = game
-        self.current: Optional[State] = None
+        self.stack: list[State] = []
 
-    def change_state(self, state: State) -> None:
-        """Exit the current state and enter the new one."""
-        if self.current:
-            self.current.exit()
-        self.current = state
-        self.current.enter()
+    @property
+    def current(self):
+        if self.stack:
+            return self.stack[-1]
+        return None
 
-    def update(
-        self,
-        input_state: Any,
-        events: List[pygame.event.Event],
-    ) -> None:
-        """Forward updates to the active state."""
+    def change_state(self, state: State):
+        while self.stack:
+            self.stack.pop().exit()
+
+        self.stack.append(state)
+        state.enter()
+
+    def push_state(self, state: State) -> None:
+        self.stack.append(state)
+        state.enter()
+
+    def pop_state(self) -> None:
+        if not self.stack:
+            return
+
+        state = self.stack.pop()
+        state.exit()
+
+    def update(self, input_state, events):
         if self.current:
             self.current.update(input_state, events)
 
@@ -252,10 +264,10 @@ class PlayingState(State):
     ) -> None:
         if self.game.entity_manager.player.lives < 1:
             self.game.state_manager.change_state(
-                GameOverState(self.game),
+                GameOverState(self.game, self),
             )
         if input_state.pause_pressed:
-            self.game.state_manager.change_state(PauseState(self.game, self))
+            self.game.state_manager.push_state(PauseState(self.game, self))
             return
 
         if input_state.move_left:
@@ -398,7 +410,7 @@ class PauseState(State):
             w // 2 - 100, h // 2 - 40, 200, 45, "RESUME", self.font_btn
         )
         self.home_button = Button(
-            w // 2 - 100, h // 2 + 25, 200, 45, "MAIN MENU", self.font_btn
+            w // 2 - 100, h // 2 + 25, 200, 45, "Home MENU", self.font_btn
         )
 
     def update(
@@ -407,7 +419,7 @@ class PauseState(State):
         events: List[pygame.event.Event],
     ) -> None:
         if input_state.pause_pressed:
-            self.game.state_manager.change_state(self.previous_state)
+            self.game.state_manager.pop_state()
             return
 
         if self.resume_button and self.resume_button.update(input_state):
@@ -439,7 +451,78 @@ class PauseState(State):
 class GameOverState(State):
     """The Game Over display screen and Name Input handler."""
 
-    pass
+    def __init__(self, game, previous_state: PlayingState):
+        super().__init__(game)
+        self.previous_state = previous_state
+        self.font_title = pygame.font.Font(None, 48)
+
+        self.font_btn = pygame.font.Font(None, 36)
+
+        self.home_button: Optional[Button] = None
+        self.hi_score_button: Optional[Button] = None
+
+    def enter(self):
+        w = self.game.screen.get_width()
+        h = self.game.screen.get_height()
+
+        center_x = w // 2
+        center_y = h // 2
+
+        self.hi_score_button = Button(
+            center_x - 100,
+            center_y + 20,
+            200,
+            45,
+            "Highest Score",
+            self.font_btn,
+        )
+
+        self.home_button = Button(
+            center_x - 100,
+            center_y + 85,
+            200,
+            45,
+            "Home Menu",
+            self.font_btn,
+        )
+
+    def update(self, input_state, events):
+        if self.hi_score_button and self.hi_score_button.update(input_state):
+            self.game.state_manager.change_state(HighScoreState(self.game))
+
+        elif self.home_button and self.home_button.update(input_state):
+            self.game.state_manager.change_state(HomeState(self.game))
+
+    def draw(self, screen: pygame.Surface) -> None:
+        self.previous_state.draw(screen)
+
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        screen.blit(overlay, (0, 0))
+
+        center_x = screen.get_width() // 2
+        center_y = screen.get_height() // 2
+
+        title_surf = self.font_title.render("GAME OVER", True, (0, 238, 255))
+        title_rect = title_surf.get_rect(center=(center_x, center_y - 170))
+        screen.blit(title_surf, title_rect)
+
+        score = 1500  # TO replace
+        high_score = 99999999  # TO replace
+
+        score_surf = self.font_btn.render(f"Your Score: {score}", True, (255, 255, 255))
+        score_rect = score_surf.get_rect(center=(center_x, center_y - 90))
+        screen.blit(score_surf, score_rect)
+
+        high_score_surf = self.font_btn.render(
+            f"Highest Score: {high_score}", True, (255, 255, 255)
+        )
+        high_score_rect = high_score_surf.get_rect(center=(center_x, center_y - 50))
+        screen.blit(high_score_surf, high_score_rect)
+
+        if self.hi_score_button and self.home_button:
+            self.hi_score_button.draw(screen)
+            self.home_button.draw(screen)
 
 
 class HighScoreState(State):

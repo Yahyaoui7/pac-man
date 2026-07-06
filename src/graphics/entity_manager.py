@@ -48,7 +48,7 @@ class EntityManager:
         center_x = width // 2
         center_y = height // 2
 
-        self.player = Player(center_y, center_x)
+        self.player = Player(center_y, center_x, self.config.lives)
 
         self.ghosts = [
             Ghost(0, 0, (255, 0, 0), "Blinky"),
@@ -125,10 +125,10 @@ class Entity:
 
 
 class Player(Entity):
-    def __init__(self, y: int, x: int) -> None:
+    def __init__(self, y: int, x: int, lives) -> None:
         super().__init__(y, x, speed=3)
 
-        self.lives = 3
+        self.lives = lives
         self.score = 0
         self.msg_txt = ""
         self.is_invincible = False

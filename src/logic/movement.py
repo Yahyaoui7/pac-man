@@ -321,7 +321,10 @@ class MovementSystem:
 
             if ghost.runaway_target is not None:
                 start = (ghost.row, ghost.col)
-                path = self.bfs_path(start, ghost.runaway_target, )
+                path = self.bfs_path(
+                    start,
+                    ghost.runaway_target,
+                )
 
                 if len(path) >= 2:
                     next_cell = path[1]

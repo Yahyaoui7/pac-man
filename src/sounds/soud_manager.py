@@ -6,51 +6,61 @@ class SoundManager:
         pygame.mixer.init()
 
         # ---------- Sound Effects ----------
-        self.sounds = {
-            "chomp": {
-                "sound": pygame.mixer.Sound("src/sounds/pacman_chomp.wav"),
-                "volume": 0.5,
-            },
-            # "eat_ghost": {
-            #     "sound": pygame.mixer.Sound("assets/sounds/eat_ghost.wav"),
-            #     "volume": 0.7,
-            # },
-            "eat_fruit": {
-                "sound": pygame.mixer.Sound("src/sounds/pacman_eatfruit.wav"),
-                "volume": 0.7,
-            },
-            # "power_pellet": {
-            #     "sound": pygame.mixer.Sound("assets/sounds/power_pellet.wav"),
-            #     "volume": 0.7,
-            # },
-            "death": {
-                "sound": pygame.mixer.Sound("src/sounds/pacman_death.wav"),
-                "volume": 0.8,
-            },
-            "extra_life": {
-                "sound": pygame.mixer.Sound("src/sounds/pacman_extrapac.wav"),
-                "volume": 0.8,
-            },
-            # "victory": {
-            #     "sound": pygame.mixer.Sound("assets/sounds/victory.wav"),
-            #     "volume": 0.8,
-            # },
-        }
+        # self.sounds = {
+        #     "chomp": {
+        #         "sound": pygame.mixer.Sound(
+        #             "src/sounds/merhba-biiiik.mp3"
+        #         ),
+        #         "volume": 0.5,
+        #     },
+        #     # "eat_ghost": {
+        #     #     "sound": pygame.mixer.Sound("assets/sounds/eat_ghost.wav"),
+        #     #     "volume": 0.7,
+        #     # },
+        #     "eat_fruit": {
+        #         "sound": pygame.mixer.Sound("src/sounds/pacman_eatfruit.wav"),
+        #         "volume": 0.7,
+        #     },
+        #     # "power_pellet": {
+        #     #     "sound": pygame.mixer.Sound("assets/sounds/power_pellet.wav"),
+        #     #     "volume": 0.7,
+        #     # },
+        #     "death": {
+        #         "sound": pygame.mixer.Sound("src/sounds/pacman_death.wav"),
+        #         "volume": 0.8,
+        #     },
+        #     "extra_life": {
+        #         "sound": pygame.mixer.Sound("src/sounds/pacman_extrapac.wav"),
+        #         "volume": 0.8,
+        #     },
+        #     # "victory": {
+        #     #     "sound": pygame.mixer.Sound("assets/sounds/victory.wav"),
+        #     #     "volume": 0.8,
+        #     # },
+        # }
 
         # Apply volumes
-        for data in self.sounds.values():
-            data["sound"].set_volume(data["volume"])
+        # for data in self.sounds.values():
+        #     data["sound"].set_volume(data["volume"])
 
         # ---------- Music ----------
         self.music = {
-            "menu": {
+            "menu_intro": {
+                "file": "src/sounds/merhba-biiiik.mp3",
+                "volume": 0.3,
+            },
+            "menu_music": {
                 "file": "src/sounds/pacmantng.mp3",
                 "volume": 0.3,
             },
-            # "game": {
-            #     "file": "assets/music/game.ogg",
-            #     "volume": 0.4,
-            # },
+            "game_intro": {
+                "file": "src/sounds/lslm-lykm-b-d-hy-lwl.mp3",
+                "volume": 0.4,
+            },
+            "game_music": {
+                "file": "src/sounds/hzym-lr-d_3Kc3wxM.mp3",
+                "volume": 0.4,
+            },
             # "game_over": {
             #     "file": "assets/music/game_over.ogg",
             #     "volume": 0.5,

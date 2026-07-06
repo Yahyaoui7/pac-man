@@ -106,7 +106,7 @@ class HomeState(State):
     def enter(self) -> None:
         """Ensure screen size is set for the main menu."""
         self.game.resize_window(600, 500)
-        # self.game.sound_manager.play_music("menu")
+        self.game.sound_manager.play_music("menu_intro", False)
 
     def update(
         self,
@@ -114,6 +114,8 @@ class HomeState(State):
         events: List[pygame.event.Event],
     ) -> None:
         """Check button clicks."""
+        if not pygame.mixer.music.get_busy():
+            self.game.sound_manager.play_music("menu_music")
         if self.play_button.update(input_state):
             # Reset score, lives, and start playing level 0
             self.game.score = 0
@@ -227,6 +229,7 @@ class PlayingState(State):
 
     def enter(self) -> None:
 
+        self.game.sound_manager.play_music("game_intro", False)
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
         )
@@ -253,6 +256,8 @@ class PlayingState(State):
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
+        if not pygame.mixer.music.get_busy():
+            self.game.sound_manager.play_music("game_music", False)
         if self.game.entity_manager.player.lives < 1:
             self.game.state_manager.change_state(
                 GameOverState(self.game),
@@ -368,7 +373,7 @@ class PlayingState(State):
                 else:
                     player.lives -= 1
                     player.reset_location()
-                    self.movement.update_bfs_ghost(
+                    self.movement.update_ghost_to_target(
                         ghost,
                         ghost.spawn_y,
                         ghost.spawn_x,

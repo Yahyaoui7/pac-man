@@ -58,10 +58,8 @@ class EntityManager:
             Ghost(height - 1, width - 1, (255, 165, 0), "Clyde"),
         ]
 
-    def play_sound(self):
-        if pygame.mixer.music.get_busy():
-            pygame.mixer.music.set_volume(0.15)
-            self.sound.play_sound("eat_normal_pellet")
+    def play_sound(self, name):
+        self.sound.play_sound_with_duck(name)
 
     def update(self, maze: list[list[int]], dt: float) -> None:
 
@@ -70,12 +68,12 @@ class EntityManager:
         if self.pellets[py][px] == 1:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
-            self.play_sound()
+            self.play_sound("eat_normal_pellet")
 
         elif self.pellets[py][px] == 2:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
-
+            self.play_sound("eat_super_pacgum")
             for ghost in self.ghosts:
                 ghost.is_edible = True
                 if ghost.is_edible:

@@ -407,7 +407,7 @@ class PlayingState(State):
                 if ghost.is_edible:
 
                     ghost.is_eaten = True
-
+                    # TO add sound managment
                     self.msg_text = "fiiiin ghadi"
                     self.msg_timer = 1.0
 

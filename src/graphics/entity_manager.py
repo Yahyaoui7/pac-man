@@ -196,6 +196,8 @@ class Ghost(Entity):
 
         self.is_edible = False
         self.is_eaten = False
+        
+        self.runaway_target = None
 
     def draw(self, screen: pygame.Surface) -> None:
 

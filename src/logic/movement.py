@@ -1,6 +1,7 @@
 from collections import deque
 
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
+import random
 
 
 class MovementSystem:
@@ -9,6 +10,7 @@ class MovementSystem:
     def __init__(self, maze):
         """Store the maze so we can check walls."""
         self.maze = maze
+        self.rng = random.Random()
 
     # ----------------------------
     # BASIC ENTITY MOVEMENT
@@ -159,6 +161,24 @@ class MovementSystem:
 
         return None
 
+    def update_ghost_to_target(self, ghost, target_row, target_col):
+        if self.is_centered(ghost):
+            self.update_cell_position(ghost)
+
+            start = (ghost.row, ghost.col)
+            target = (target_row, target_col)
+
+            path = self.bfs_path(start, target)
+
+            if len(path) >= 2:
+                next_cell = path[1]
+                direction = self.direction_to_next_cell(start, next_cell)
+
+                if direction is not None:
+                    self.set_direction(ghost, direction)
+
+        self.update_entity(ghost)
+
     def update_bfs_ghost(self, ghost, player) -> None:
         """Move ghost toward player when ghost is not edible."""
         if self.is_centered(ghost):
@@ -181,52 +201,135 @@ class MovementSystem:
     # Ghost runs away from player
     # ----------------------------
 
-    def distance(self, row1: int, col1: int, row2: int, col2: int) -> int:
-        return abs(row1 - row2) + abs(col1 - col2)
+    def get_zone(self, row, col):
+        middle_row = len(self.maze) // 2
+        middle_col = len(self.maze[0]) // 2
+        if row < middle_row and col < middle_col:
+            return "TOP_LEFT"
+        if row < middle_row and col >= middle_col:
+            return "TOP_RIGHT"
+        if row >= middle_row and col < middle_col:
+            return "BOTTOM_LEFT"
 
-    def choose_runaway_target(self, player) -> tuple[int, int]:
-        """Choose the corner farthest from the player."""
+        return "BOTTOM_RIGHT"
+
+    def get_zone_bounds(self, zone: str):
+        middle_row = len(self.maze) // 2
+        middle_col = len(self.maze[0]) // 2
         max_row = len(self.maze) - 1
         max_col = len(self.maze[0]) - 1
 
-        corners = [
-            (0, 0),
-            (0, max_col),
-            (max_row, 0),
-            (max_row, max_col),
+        if zone == "TOP_LEFT":
+            return (0, middle_row - 1), (0, middle_col - 1)
+        if zone == "TOP_RIGHT":
+            return (0, middle_row - 1), (middle_col, max_col)
+        if zone == "BOTTOM_LEFT":
+            return (middle_row, max_row), (0, middle_col - 1)
+        return (middle_row, max_row), (middle_col, max_col)
+
+    def is_valid_cell(self, row, col):
+        for direction in ["LEFT", "RIGHT", "UP", "DOWN"]:
+            if self.can_move(row, col, direction):
+                return True
+
+        return False
+
+    def choose_runaway_target_by_zone(self, player):
+        player_zone = self.get_zone(player.row, player.col)
+
+        zones = [
+            "TOP_LEFT",
+            "TOP_RIGHT",
+            "BOTTOM_LEFT",
+            "BOTTOM_RIGHT",
         ]
 
-        best_corner = corners[0]
-        best_distance = -1
+        safe_zones = []
 
-        for corner in corners:
-            dist = self.distance(
-                corner[0],
-                corner[1],
-                player.row,
-                player.col,
+        for zone in zones:
+            if zone != player_zone:
+                safe_zones.append(zone)
+
+        while safe_zones:
+            random_zone = self.rng.choice(safe_zones)
+
+            (row_min, row_max), (col_min, col_max) = self.get_zone_bounds(
+                random_zone
             )
 
-            if dist > best_distance:
-                best_distance = dist
-                best_corner = corner
+            valid_cells = []
 
-        return best_corner
+            for row in range(row_min, row_max + 1):
+                for col in range(col_min, col_max + 1):
+                    if self.is_valid_cell(row, col):
+                        valid_cells.append((row, col))
+
+            if valid_cells:
+                return self.rng.choice(valid_cells)
+
+            safe_zones.remove(random_zone)
+
+        return None
+
+    # def distance(self, row1: int, col1: int, row2: int, col2: int) -> int:
+    #     return abs(row1 - row2) + abs(col1 - col2)
+
+    # def choose_runaway_target(self, player) -> tuple[int, int]:
+    #     """Choose the corner farthest from the player."""
+    #     max_row = len(self.maze) - 1
+    #     max_col = len(self.maze[0]) - 1
+
+    #     corners = [
+    #         (0, 0),
+    #         (0, max_col),
+    #         (max_row, 0),
+    #         (max_row, max_col),
+    #     ]
+
+    #     best_corner = corners[0]
+    #     best_distance = -1
+
+    #     for corner in corners:
+    #         dist = self.distance(
+    #             corner[0],
+    #             corner[1],
+    #             player.row,
+    #             player.col,
+    #         )
+
+    #         if dist > best_distance:
+    #             best_distance = dist
+    #             best_corner = corner
+
+    #     return best_corner
 
     def update_runaway_ghost(self, ghost, player) -> None:
-        """Move ghost to the farthest corner when ghost is edible."""
+        """Move edible ghost away from the player using one fixed random target."""
+
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
 
-            start = (ghost.row, ghost.col)
-            target = self.choose_runaway_target(player)
+            if ghost.runaway_target is None:
+                ghost.runaway_target = self.choose_runaway_target_by_zone(
+                    player
+                )
 
-            path = self.bfs_path(start, target)
+            if ghost.runaway_target == (ghost.row, ghost.col):
+                ghost.runaway_target = self.choose_runaway_target_by_zone(
+                    player
+                )
 
-            if len(path) >= 2:
-                direction = self.direction_to_next_cell(path[0], path[1])
+            if ghost.runaway_target is not None:
+                start = (ghost.row, ghost.col)
+                path = self.bfs_path(start, ghost.runaway_target, )
 
-                if direction is not None:
-                    self.set_direction(ghost, direction)
+                if len(path) >= 2:
+                    next_cell = path[1]
+                    direction = self.direction_to_next_cell(start, next_cell)
+
+                    if direction is not None:
+                        self.set_direction(ghost, direction)
+                else:
+                    ghost.runaway_target = None
 
         self.update_entity(ghost)

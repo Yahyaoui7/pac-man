@@ -276,7 +276,7 @@ class PlayingState(State):
 
             if ghost.is_eaten:
                 # Go back to the spawn point
-                self.movement.update_bfs_ghost(
+                self.movement.update_ghost_to_target(
                     ghost,
                     ghost.spawn_y,
                     ghost.spawn_x,
@@ -288,7 +288,7 @@ class PlayingState(State):
                     self.game.entity_manager.player,
                 )
             else:
-                self.movement.update_runaway_ghost(
+                self.movement.update_bfs_ghost(
                     ghost, self.game.entity_manager.player
                 )
         self.game.entity_manager.update(

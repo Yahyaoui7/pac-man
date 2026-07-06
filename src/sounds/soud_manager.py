@@ -100,3 +100,10 @@ class SoundManager:
 
         self.play_sound(name)
         self.duck_music_timer = self.duck_music_duration
+
+    def update(self, dt: float) -> None:
+        if self.duck_music_timer > 0:
+            self.duck_music_timer -= dt
+
+            if self.duck_music_timer <= 0:
+                pygame.mixer.music.set_volume(self.current_music_volume)

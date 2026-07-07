@@ -17,6 +17,7 @@ from src.logic.level_manager import LevelManager
 from src.sounds.soud_manager import SoundManager
 from .logic.inputmanager import InputManager
 from .logic.config import GameConfig
+from .logic.score import ScoreManager
 
 import pygame
 import sys
@@ -33,7 +34,8 @@ class GameStarter:
         self.state_manager = StateManager(self)
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
-        self.entity_manager = EntityManager(config)
+        self.score_management = ScoreManager(config)
+        self.entity_manager = EntityManager(config, self.score_management)
         self.lives: int = config.lives
 
     def resize_window(self, width: int, height: int) -> None:

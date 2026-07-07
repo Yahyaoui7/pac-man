@@ -343,7 +343,9 @@ class PlayingState(State):
             return
         if self.game.entity_manager.total_pellets <= 0:
             self.game.sound_manager.play_sound("level_complete")
-
+            self.game.score_management.score += int(
+                self.game.level_manager.remaining_time
+            )
             next_lvl = self.game.level_manager.current_level_index + 1
 
             if next_lvl >= len(self.game.config.levels):
@@ -360,7 +362,7 @@ class PlayingState(State):
         )
 
         score_surf = self.font_hud.render(
-            f"SCORE: {self.game.score}", True, (255, 238, 0)
+            f"SCORE: {self.game.score_management.score}", True, (255, 238, 0)
         )
         lvl_num = self.game.level_manager.current_level_index + 1
         level_surf = self.font_hud.render(
@@ -429,6 +431,7 @@ class PlayingState(State):
                 if ghost.is_edible:
                     ghost.is_eaten = True
                     self.game.sound_manager.play_sound("eat_ghost")
+                    self.game.score_management.add_ghost()
 
                 else:
                     if expired(self.player_invincible_until):
@@ -520,9 +523,8 @@ class GameOverState(State):
         self.hi_score_button: Optional[Button] = None
 
     def enter(self):
-        self.game.sound_manager.play_music(
-            "game_over_music", loop=False
-        )
+        self.game.sound_manager.play_music("game_over_music", loop=False)
+        self.game.score_management.reset()
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
 

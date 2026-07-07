@@ -9,9 +9,10 @@ from src.sounds.soud_manager import SoundManager
 
 
 class EntityManager:
-    def __init__(self, config: GameConfig) -> None:
+    def __init__(self, config: GameConfig, score_management) -> None:
         """Initialize systems and settings from configuration."""
         self.config: GameConfig = config
+        self.score_management = score_management
         self.player: Optional[Player] = None
         self.ghosts: list[Ghost] = []
         self.pellets: list[list[int]] = []
@@ -43,6 +44,7 @@ class EntityManager:
                 if (x, y) in corners:
                     self.pellets[y][x] = 2
                     self.total_pellets += 1
+
                 elif (x, y) == center or maze[y][x] == 15:
                     self.pellets[y][x] = 0
                 else:
@@ -72,11 +74,15 @@ class EntityManager:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
             self.play_sound("eat_normal_pellet")
+            self.score_management.add_normal_pellet()
 
         elif self.pellets[py][px] == 2:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
+
             self.play_sound("eat_super_pacgum")
+            self.score_management.add_super_pacgum()
+            
             for ghost in self.ghosts:
                 ghost.is_edible = True
                 if ghost.is_edible:

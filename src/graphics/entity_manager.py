@@ -16,6 +16,7 @@ class EntityManager:
         self.ghosts: list[Ghost] = []
         self.pellets: list[list[int]] = []
         self.total_pellets: int = 0
+        self.sound = SoundManager()
 
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""

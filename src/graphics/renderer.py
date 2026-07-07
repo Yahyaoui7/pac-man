@@ -64,10 +64,12 @@ class StateManager:
         state.enter()
 
     def push_state(self, state: State) -> None:
+
         self.stack.append(state)
         state.enter()
 
     def pop_state(self) -> None:
+
         if not self.stack:
             return
 
@@ -139,10 +141,10 @@ class HomeState(State):
             self.game.level_manager.current_level_index = 0
             self.game.curr_level = self.game.config.levels[1]
 
-
             self.game.curr_level.height = min(self.game.curr_level.height, 32)
             self.game.curr_level.width = min(self.game.curr_level.width, 60)
 
+            self.game.sound_manager.play_music("game_intro", False)
             self.game.state_manager.change_state(PlayingState(self.game))
 
         elif self.instructions_button.update(input_state):
@@ -249,7 +251,7 @@ class PlayingState(State):
 
     def enter(self) -> None:
 
-        self.game.sound_manager.play_music("game_intro", False)
+        # self.game.sound_manager.play_music("game_intro", False)
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
         )
@@ -278,11 +280,6 @@ class PlayingState(State):
 
         if not pygame.mixer.music.get_busy():
             self.game.sound_manager.play_music("game_music", False)
-        if self.game.entity_manager.player.lives < 1:
-            self.game.state_manager.change_state(
-                GameOverState(self.game, self),
-            )
-            return
 
         if self.game.lives <= 0:
 
@@ -308,8 +305,7 @@ class PlayingState(State):
 
             if ghost.is_eaten:
 
-
-                self.movement.update_bfs_ghost(
+                self.movement.update_ghost_to_target(
                     ghost,
                     ghost.spawn_y,
                     ghost.spawn_x,
@@ -346,6 +342,8 @@ class PlayingState(State):
                 self.msg_timer = 2.0
             return
         if self.game.entity_manager.total_pellets <= 0:
+            self.game.sound_manager.play_sound("level_complete")
+
             next_lvl = self.game.level_manager.current_level_index + 1
 
             if next_lvl >= len(self.game.config.levels):
@@ -430,19 +428,20 @@ class PlayingState(State):
             if distance <= radius * 2 and not ghost.is_eaten:
                 if ghost.is_edible:
                     ghost.is_eaten = True
-
+                    self.game.sound_manager.play_sound("eat_ghost")
 
                 else:
                     if expired(self.player_invincible_until):
-                        self.game.lives -= 1
+                        if self.game.lives > 1:
+                            self.game.sound_manager.play_sound("player_death")
 
+                        self.game.lives -= 1
                         self.player_invincible_until = after(1500)
 
                         player.reset_location()
 
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0
-
 
         self.font_hud.render(self.msg_text, True, "white")
 
@@ -459,6 +458,8 @@ class PauseState(State):
         self.home_button: Optional[Button] = None
 
     def enter(self) -> None:
+        self.game.sound_manager.play_sound("pause")
+
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
 
@@ -519,7 +520,9 @@ class GameOverState(State):
         self.hi_score_button: Optional[Button] = None
 
     def enter(self):
-
+        self.game.sound_manager.play_music(
+            "game_over_music", loop=False
+        )
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
 

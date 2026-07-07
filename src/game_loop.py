@@ -64,15 +64,12 @@ class GameStarter:
         self.state_manager.change_state(HomeState(self))
 
         while self.running:
-            dt = clock.tick(60) / 1000
 
             events = pygame.event.get()
             input_state = input_manager.update(events)
 
             if input_state.quit_requested:
                 self.running = False
-
-            # self.sound_manager.update(dt)
 
             # Update the current state
             self.state_manager.update(input_state, events)
@@ -82,5 +79,5 @@ class GameStarter:
                 self.screen.fill((0, 0, 0))
                 self.state_manager.draw(self.screen)
                 pygame.display.flip()
-
+            clock.tick(60)
         pygame.quit()

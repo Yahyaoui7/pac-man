@@ -18,10 +18,11 @@ class SoundManager:
                 "volume": 0.3,
             },
             "eat_super_pacgum": {
-                "sound": pygame.mixer.Sound("src/sounds/i-got-this-fahhhh.mp3"),
+                "sound": pygame.mixer.Sound(
+                    "src/sounds/mshyn-fyh-y-wldyk.mp3"
+                ),
                 "volume": 0.6,
             },
-
             # Ghost / collision
             "eat_ghost": {
                 "sound": pygame.mixer.Sound("src/sounds/fahhh_KcgAXfs.mp3"),
@@ -31,28 +32,32 @@ class SoundManager:
                 "sound": pygame.mixer.Sound("src/sounds/ayeh-ayeh-ayeh.mp3"),
                 "volume": 0.8,
             },
-
             # Game states
             "level_complete": {
                 "sound": pygame.mixer.Sound("src/sounds/omgwow.mp3"),
                 "volume": 0.7,
             },
             "victory": {
-                "sound": pygame.mixer.Sound("src/sounds/anime-wow-sound-effect.mp3"),
+                "sound": pygame.mixer.Sound(
+                    "src/sounds/anime-wow-sound-effect.mp3"
+                ),
                 "volume": 0.7,
             },
             "game_over": {
-                "sound": pygame.mixer.Sound("src/sounds/man-screaming-aaaah.mp3"),
+                "sound": pygame.mixer.Sound(
+                    "src/sounds/man-screaming-aaaah.mp3"
+                ),
                 "volume": 0.8,
             },
-
             # UI / menu
             "menu_select": {
                 "sound": pygame.mixer.Sound("src/sounds/pop_7e9Is8L.mp3"),
                 "volume": 0.4,
             },
             "menu_confirm": {
-                "sound": pygame.mixer.Sound("src/sounds/punch-gaming-sound-effect-hd_RzlG1GE.mp3"),
+                "sound": pygame.mixer.Sound(
+                    "src/sounds/punch-gaming-sound-effect-hd_RzlG1GE.mp3"
+                ),
                 "volume": 0.5,
             },
             "pause": {
@@ -74,7 +79,6 @@ class SoundManager:
                 "file": "src/sounds/pacmantng.mp3",
                 "volume": 0.3,
             },
-
             # Game
             "game_intro": {
                 "file": "src/sounds/lslm-lykm-b-d-hy-lwl.mp3",
@@ -84,10 +88,9 @@ class SoundManager:
                 "file": "src/sounds/hzym-lr-d_3Kc3wxM.mp3",
                 "volume": 0.15,
             },
-
             # End states
             "game_over_music": {
-                "file": "src/sounds/n-ldhy-smtny-my-hydr.mp3",
+                "file": "src/sounds/n-llh-wd-hmd.mp3",
                 "volume": 0.4,
             },
             "victory_music": {
@@ -124,11 +127,10 @@ class SoundManager:
             pygame.mixer.music.set_volume(self.duck_music_volume)
 
         self.play_sound(name)
-        self.duck_music_timer = self.duck_music_duration
 
-    def update(self, dt: float) -> None:
-        if self.duck_music_timer > 0:
-            self.duck_music_timer -= dt
+    # def update(self, dt: float) -> None:
+    #     if self.duck_music_timer > 0:
+    #         self.duck_music_timer -= dt
 
-            if self.duck_music_timer <= 0:
-                pygame.mixer.music.set_volume(self.current_music_volume)
+    #         if self.duck_music_timer <= 0:
+    #             pygame.mixer.music.set_volume(self.current_music_volume)

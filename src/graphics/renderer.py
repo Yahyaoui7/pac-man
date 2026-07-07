@@ -362,7 +362,7 @@ class PlayingState(State):
         )
 
         score_surf = self.font_hud.render(
-            f"SCORE: {self.game.score_management.score}", True, (255, 238, 0)
+            f"SCORE: {self.game.score_management.get_score()}", True, (255, 238, 0)
         )
         lvl_num = self.game.level_manager.current_level_index + 1
         level_surf = self.font_hud.render(

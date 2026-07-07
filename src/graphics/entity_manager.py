@@ -16,10 +16,11 @@ class EntityManager:
         self.ghosts: list[Ghost] = []
         self.pellets: list[list[int]] = []
         self.total_pellets: int = 0
-        self.sound = SoundManager()
 
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""
+        self.maze = maze
+        self.init_pellets()
         height = len(maze)
         width = len(maze[0])
 
@@ -37,10 +38,11 @@ class EntityManager:
 
         for y in range(height):
             for x in range(width):
+
                 if (x, y) in corners:
                     self.pellets[y][x] = 2
                     self.total_pellets += 1
-                elif (x, y) == center:
+                elif (x, y) == center or maze[y][x] == 15:
                     self.pellets[y][x] = 0
                 else:
                     self.pellets[y][x] = 1
@@ -49,7 +51,7 @@ class EntityManager:
         center_x = width // 2
         center_y = height // 2
 
-        self.player = Player(center_y, center_x, self.config.lives)
+        self.player = Player(center_y, center_x)
 
         self.ghosts = [
             Ghost(0, 0, (255, 0, 0), "Blinky"),
@@ -79,6 +81,34 @@ class EntityManager:
                 if ghost.is_edible:
                     ghost.frightened_timer = 7.0
 
+    def init_pellets(self):
+        height = len(self.maze)
+        width = len(self.maze[0])
+
+        self.pellets = [[0] * width for _ in range(height)]
+        self.total_pellets = 0
+
+        corners = {
+            (0, 0),
+            (width - 1, 0),
+            (0, height - 1),
+            (width - 1, height - 1),
+        }
+
+        center = (width // 2, height // 2)
+
+        for y in range(height):
+            for x in range(width):
+
+                if (x, y) in corners:
+                    self.pellets[y][x] = 2
+                    self.total_pellets += 1
+                elif (x, y) == center or self.maze[y][x] == 15:
+                    self.pellets[y][x] = 0
+                else:
+                    self.pellets[y][x] = 1
+                    self.total_pellets += 1
+
     def draw(self, screen: pygame.Surface) -> None:
         """Draw pellets, player, and Ghosts."""
         height = len(self.pellets)
@@ -104,6 +134,15 @@ class EntityManager:
 
         for ghost in self.ghosts:
             ghost.draw(screen)
+
+    def reset_positions(self):
+        """Reset Pacman and Ghosts to start positions."""
+        self.init_pellets()
+        if self.player:
+            self.player.reset_location()
+
+        for ghost in self.ghosts:
+            ghost.reset()
 
 
 class Entity:
@@ -131,10 +170,9 @@ class Entity:
 
 
 class Player(Entity):
-    def __init__(self, y: int, x: int, lives) -> None:
+    def __init__(self, y: int, x: int) -> None:
         super().__init__(y, x, speed=3)
 
-        self.lives = lives
         self.score = 0
         self.msg_txt = ""
         self.is_invincible = False
@@ -221,3 +259,13 @@ class Ghost(Entity):
             (int(x), int(y)),
             CELL_SIZE // 3,
         )
+
+    def reset(self) -> None:
+
+        self.grid_y = self.spawn_y
+        self.grid_x = self.spawn_x
+
+        self.x = self.spawn_x * CELL_SIZE + CELL_SIZE // 2
+        self.y = self.spawn_y * CELL_SIZE + CELL_SIZE // 2
+        self.is_edible = False
+        self.is_eaten = False

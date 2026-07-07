@@ -34,6 +34,7 @@ class GameStarter:
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
         self.entity_manager = EntityManager(config)
+        self.lives: int = config.lives
 
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""

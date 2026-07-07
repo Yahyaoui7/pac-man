@@ -1,6 +1,7 @@
 """Implements the State Pattern for game screens and UI rendering."""
 
 import math
+from src.logic.utils import expired, after
 
 import pygame
 import pygame.draw as dr
@@ -117,7 +118,11 @@ class HomeState(State):
     def enter(self) -> None:
         """Ensure screen size is set for the main menu."""
         self.game.resize_window(600, 500)
+
         self.game.sound_manager.play_music("menu_intro", False)
+
+        self.game.lives = self.game.config.lives
+        # self.game.sound_manager.play_music("menu")
 
     def update(
         self,
@@ -130,9 +135,10 @@ class HomeState(State):
         if self.play_button.update(input_state):
 
             self.game.score = 0
-            self.game.lives = self.game.config.lives
-            self.game.level_manager.current_level_index = 5
-            self.game.curr_level = self.game.config.levels[5]
+
+            self.game.level_manager.current_level_index = 0
+            self.game.curr_level = self.game.config.levels[1]
+
 
             self.game.curr_level.height = min(self.game.curr_level.height, 32)
             self.game.curr_level.width = min(self.game.curr_level.width, 60)
@@ -237,6 +243,7 @@ class PlayingState(State):
 
         self.font_hud = pygame.font.Font(None, 28)
         self.font_msg = pygame.font.Font(None, 48)
+        self.player_invincible_until = 0
         self.msg_timer: float = 0.0
         self.msg_text: str = ""
 
@@ -249,8 +256,6 @@ class PlayingState(State):
         self.maze = self.game.level_manager.current_maze.maze
         self.game.entity_manager.load_level_entities(self.maze)
 
-        self.movement = MovementSystem(self.maze)
-
         width = self.game.level_manager.get_current_level_config().width
         height = self.game.level_manager.get_current_level_config().height
 
@@ -261,6 +266,7 @@ class PlayingState(State):
         )
 
         curr_idx = self.game.level_manager.current_level_index
+        self.movement = MovementSystem(self.maze)
         self.msg_text = f"LEVEL {curr_idx + 1}"
         self.msg_timer = 2.0
 
@@ -269,9 +275,17 @@ class PlayingState(State):
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
+
         if not pygame.mixer.music.get_busy():
             self.game.sound_manager.play_music("game_music", False)
         if self.game.entity_manager.player.lives < 1:
+            self.game.state_manager.change_state(
+                GameOverState(self.game, self),
+            )
+            return
+
+        if self.game.lives <= 0:
+
             self.game.state_manager.change_state(
                 GameOverState(self.game, self),
             )
@@ -293,8 +307,9 @@ class PlayingState(State):
         for ghost in self.game.entity_manager.ghosts:
 
             if ghost.is_eaten:
-                # Go back to the spawn point
-                self.movement.update_ghost_to_target(
+
+
+                self.movement.update_bfs_ghost(
                     ghost,
                     ghost.spawn_y,
                     ghost.spawn_x,
@@ -326,9 +341,18 @@ class PlayingState(State):
                 self.game.level_manager.remaining_time = float(
                     level_cfg.level_max_time,
                 )
+                self.game.entity_manager.reset_positions()
                 self.msg_text = "TIME'S UP! TRY AGAIN"
                 self.msg_timer = 2.0
             return
+        if self.game.entity_manager.total_pellets <= 0:
+            next_lvl = self.game.level_manager.current_level_index + 1
+
+            if next_lvl >= len(self.game.config.levels):
+                self.game.state_manager.change_state(VictoryState(self.game))
+            else:
+                self.game.level_manager.current_level_index = next_lvl
+                self.game.state_manager.change_state(PlayingState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
 
@@ -403,24 +427,22 @@ class PlayingState(State):
 
             distance = math.hypot(dx, dy)
 
-            if distance <= radius * 2:
+            if distance <= radius * 2 and not ghost.is_eaten:
                 if ghost.is_edible:
-
                     ghost.is_eaten = True
-                    # TO add sound managment
-                    self.msg_text = "fiiiin ghadi"
-                    self.msg_timer = 1.0
+
 
                 else:
-                    player.lives -= 1
-                    player.reset_location()
-                    self.movement.update_ghost_to_target(
-                        ghost,
-                        ghost.spawn_y,
-                        ghost.spawn_x,
-                    )
-                    self.msg_text = "rj3 awa rj3"
-                    self.msg_timer = 1.0
+                    if expired(self.player_invincible_until):
+                        self.game.lives -= 1
+
+                        self.player_invincible_until = after(1500)
+
+                        player.reset_location()
+
+                        self.msg_text = "Be careful!"
+                        self.msg_timer = 1.0
+
 
         self.font_hud.render(self.msg_text, True, "white")
 
@@ -497,6 +519,7 @@ class GameOverState(State):
         self.hi_score_button: Optional[Button] = None
 
     def enter(self):
+
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
 
@@ -531,7 +554,7 @@ class GameOverState(State):
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
-        lives = self.game.entity_manager.player.lives
+        lives = self.game.lives
 
         self.previous_state.draw(screen)
 

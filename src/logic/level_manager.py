@@ -32,15 +32,20 @@ class LevelManager:
             return False
         self.current_level_index = level_index
         level_conf = self.get_current_level_config()
-
         try:
-            width = max(15, min(63, level_conf.width))
-            height = max(15, min(33, level_conf.height))
+
+            width = max(10, min(33, level_conf.width))
+            height = max(10, min(63, level_conf.height))
+
             self.current_maze = self.build_maze(
                 width,
                 height,
                 level_conf.seed,
             )
+            self.remaining_time = float(level_conf.level_max_time)
+
+            return True
+
         except Exception as e:
             print(
                 "faile to load the maze, ",

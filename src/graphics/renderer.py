@@ -343,9 +343,11 @@ class PlayingState(State):
             return
         if self.game.entity_manager.total_pellets <= 0:
             self.game.sound_manager.play_sound("level_complete")
-            self.game.score_management.score += int(
+
+            self.game.score_management.add_time_bonus(int(
                 self.game.level_manager.remaining_time
-            )
+            ))
+            
             next_lvl = self.game.level_manager.current_level_index + 1
 
             if next_lvl >= len(self.game.config.levels):
@@ -694,3 +696,6 @@ class VictoryState(State):
     """The game completed victory screen with Name Input."""
 
     pass
+
+class NameInputState(State):
+

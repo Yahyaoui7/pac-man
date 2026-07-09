@@ -33,8 +33,10 @@ class LevelManager:
         self.current_level_index = level_index
         level_conf = self.get_current_level_config()
         try:
+
             width = max(10, min(33, level_conf.width))
             height = max(10, min(63, level_conf.height))
+
             self.current_maze = self.build_maze(
                 width,
                 height,

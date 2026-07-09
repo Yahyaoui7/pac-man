@@ -17,6 +17,7 @@ from src.logic.level_manager import LevelManager
 from src.sounds.soud_manager import SoundManager
 from .logic.inputmanager import InputManager
 from .logic.config import GameConfig
+from .logic.score import ScoreManager, HighScoreManager
 
 import pygame
 import sys
@@ -33,7 +34,13 @@ class GameStarter:
         self.state_manager = StateManager(self)
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
+
         self.entity_manager = None
+
+        self.score_management = ScoreManager(config)
+
+        self.highscore_manager = HighScoreManager(".highscores.json")
+
         self.lives: int = config.lives
 
     def resize_window(self, width: int, height: int) -> None:
@@ -58,7 +65,7 @@ class GameStarter:
         self.screen = pygame.display.set_mode((1200, 750))
         pygame.display.set_caption("NEON PAC-MAN")
 
-        self.entity_manager = EntityManager(self.config)
+        self.entity_manager = EntityManager(self.config, self.score_management)
 
         clock = pygame.time.Clock()
         input_manager = InputManager()
@@ -66,6 +73,7 @@ class GameStarter:
         self.state_manager.change_state(HomeState(self))
 
         while self.running:
+
             events = pygame.event.get()
             input_state = input_manager.update(events)
 
@@ -80,7 +88,5 @@ class GameStarter:
                 self.screen.fill((0, 0, 0))
                 self.state_manager.draw(self.screen)
                 pygame.display.flip()
-
             clock.tick(60)
-
         pygame.quit()

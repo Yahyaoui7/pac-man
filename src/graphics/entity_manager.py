@@ -5,6 +5,8 @@ import pygame
 
 from src.logic.config import CELL_SIZE, PADDING, TOP_BAR_HEIGHT, GameConfig
 from src.logic.config import NORTH, EAST, SOUTH, WEST
+from src.sounds.soud_manager import SoundManager
+
 from src.graphics.graphic_lib import (
     SpriteLibrary,
     PacmanMode,
@@ -13,7 +15,6 @@ from src.graphics.graphic_lib import (
     GhostState,
 )
 
-# Blinky/Pinky/Inky/Clyde -> the color keys used in assets/ghost_sprites
 NAME_TO_GHOST_COLOR = {
     "Blinky": GhostColor.RED,
     "Pinky": GhostColor.PINK,
@@ -23,14 +24,15 @@ NAME_TO_GHOST_COLOR = {
 
 
 class EntityManager:
-    def __init__(self, config: GameConfig) -> None:
+    def __init__(self, config: GameConfig, score_management) -> None:
         """Initialize systems and settings from configuration."""
         self.config: GameConfig = config
+        self.score_management = score_management
         self.player: Optional[Player] = None
         self.ghosts: list[Ghost] = []
         self.pellets: list[list[int]] = []
         self.total_pellets: int = 0
-        self.maze = None
+        self.sound = SoundManager()
 
         # Sprite frames are loaded once here and shared by every entity.
         self.sprites = SpriteLibrary.instance()
@@ -44,6 +46,31 @@ class EntityManager:
         height = len(maze)
         width = len(maze[0])
 
+        self.pellets = [[0] * width for _ in range(height)]
+        self.total_pellets = 0
+
+        corners = {
+            (0, 0),
+            (width - 1, 0),
+            (0, height - 1),
+            (width - 1, height - 1),
+        }
+
+        center = (width // 2, height // 2)
+
+        for y in range(height):
+            for x in range(width):
+
+                if (x, y) in corners:
+                    self.pellets[y][x] = 2
+                    self.total_pellets += 1
+
+                elif (x, y) == center or maze[y][x] == 15:
+                    self.pellets[y][x] = 0
+                else:
+                    self.pellets[y][x] = 1
+                    self.total_pellets += 1
+
         center_x = width // 2
         center_y = height // 2
 
@@ -56,6 +83,9 @@ class EntityManager:
             Ghost(height - 1, width - 1, (255, 165, 0), "Clyde"),
         ]
 
+    def play_sound(self, name):
+        self.sound.play_sound_with_duck(name)
+
     def update(self, maze: list[list[int]], dt: float) -> None:
 
         px, py = self.player.grid_x, self.player.grid_y
@@ -63,9 +93,15 @@ class EntityManager:
         if self.pellets[py][px] == 1:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
+            self.play_sound("eat_normal_pellet")
+            self.score_management.add_normal_pellet()
+
         elif self.pellets[py][px] == 2:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
+
+            self.play_sound("eat_super_pacgum")
+            self.score_management.add_super_pacgum()
 
             for ghost in self.ghosts:
                 ghost.is_edible = True

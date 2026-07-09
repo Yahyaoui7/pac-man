@@ -33,7 +33,7 @@ class GameStarter:
         self.state_manager = StateManager(self)
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
-        self.entity_manager = EntityManager(config)
+        self.entity_manager = None
         self.lives: int = config.lives
 
     def resize_window(self, width: int, height: int) -> None:
@@ -53,14 +53,16 @@ class GameStarter:
         self.cell_size = max(12, self.cell_size)
 
     def run(self) -> None:
-        """Run the main game loop at 60 FPS."""
         pygame.init()
+
+        self.screen = pygame.display.set_mode((1200, 750))
         pygame.display.set_caption("NEON PAC-MAN")
+
+        self.entity_manager = EntityManager(self.config)
 
         clock = pygame.time.Clock()
         input_manager = InputManager()
 
-        # Initialize to Main Menu
         self.state_manager.change_state(HomeState(self))
 
         while self.running:

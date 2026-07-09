@@ -1,0 +1,67 @@
+{
+  "frame_size": [
+    85,
+    95
+  ],
+  "colors": {
+    "red": {
+      "l": [
+        "red_l-0.png",
+        "red_l-1.png"
+      ],
+      "r": [
+        "red_r-0.png",
+        "red_r-1.png"
+      ]
+    },
+    "pinc": {
+      "l": [
+        "pinc_l-0.png",
+        "pinc_l-1.png"
+      ],
+      "r": [
+        "pinc_r-0.png",
+        "pinc_r-1.png"
+      ]
+    },
+    "cyan": {
+      "l": [
+        "cyan_l-0.png",
+        "cyan_l-1.png"
+      ],
+      "r": [
+        "cyan_r-0.png",
+        "cyan_r-1.png"
+      ]
+    },
+    "orange": {
+      "l": [
+        "orange_l-0.png",
+        "orange_l-1.png"
+      ],
+      "r": [
+        "orange_r-0.png",
+        "orange_r-1.png"
+      ]
+    }
+  },
+  "frightened": [
+    "running_0.png",
+    "running_1.png",
+    "running_2.png"
+  ],
+  "eaten": {
+    "up": [
+      "eye_up-0.png",
+      "eye_up-1.png"
+    ],
+    "down": [
+      "eye_down-0.png",
+      "eye_down-1.png"
+    ],
+    "side": [
+      "eye_side-0.png",
+      "eye_side-1.png"
+    ]
+  }
+}

@@ -125,7 +125,6 @@ class HomeState(State):
 
         self.game.lives = self.game.config.lives
         # self.game.sound_manager.play_music("menu")
-        self.game.score_management.reset()
 
     def update(
         self,
@@ -137,7 +136,7 @@ class HomeState(State):
             self.game.sound_manager.play_music("menu_music")
         if self.play_button.update(input_state):
 
-            self.game.score = 0
+            self.game.score_management.reset()
 
             self.game.level_manager.current_level_index = 0
             self.game.curr_level = self.game.config.levels[0]
@@ -287,6 +286,7 @@ class PlayingState(State):
             self.game.state_manager.change_state(
                 GameOverState(self.game, self),
             )
+            return
         if input_state.pause_pressed:
             self.game.state_manager.push_state(PauseState(self.game, self))
             return
@@ -332,7 +332,9 @@ class PlayingState(State):
         if self.game.level_manager.is_time_out():
 
             if self.game.lives <= 0:
-                self.game.state_manager.change_state(GameOverState(self.game))
+                self.game.state_manager.change_state(
+                    GameOverState(self.game, self)
+                )
             else:
                 level_cfg = self.game.level_manager.get_current_level_config()
                 self.game.level_manager.remaining_time = float(
@@ -421,7 +423,7 @@ class PlayingState(State):
 
                 if cell & WEST:
                     dr.line(screen, "blue", (x, y), (x, y + c), 2)
-            self.game.entity_manager.draw(self.game.screen)
+        self.game.entity_manager.draw(screen)
 
     def check_collision(self, player, ghosts):
         radius = CELL_SIZE // 3
@@ -608,7 +610,12 @@ class GameOverState(State):
 
         # ---------- Scores ----------
         score = self.game.score_management.get_score()
-        high_score = 99999999  # TO Replace
+        top_scores = self.game.highscore_manager.get_top_scores()
+
+        if top_scores:
+            high_score = top_scores[0]["score"]
+        else:
+            high_score = 0
 
         score_label = self.font_btn.render(
             "Your Score:",
@@ -872,7 +879,7 @@ class NameInputState(State):
         self.game.highscore_manager.add_score(
             self.player_name, self.final_score
         )
-        self.game.state_manager.change_state(HighScoreState(self.game, self))
+        self.game.state_manager.change_state(HighScoreState(self.game))
 
     def draw(self, screen):
         screen.fill((10, 10, 20))

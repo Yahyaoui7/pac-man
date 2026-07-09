@@ -17,7 +17,7 @@ from src.logic.level_manager import LevelManager
 from src.sounds.soud_manager import SoundManager
 from .logic.inputmanager import InputManager
 from .logic.config import GameConfig
-from .logic.score import ScoreManager
+from .logic.score import ScoreManager, HighScoreManager
 
 import pygame
 import sys
@@ -36,6 +36,7 @@ class GameStarter:
         self.sound_manager = SoundManager()
         self.score_management = ScoreManager(config)
         self.entity_manager = EntityManager(config, self.score_management)
+        self.highscore_manager = HighScoreManager(".highscores.json")
         self.lives: int = config.lives
 
     def resize_window(self, width: int, height: int) -> None:

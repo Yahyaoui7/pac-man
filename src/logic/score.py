@@ -36,10 +36,11 @@ class ScoreManager:
 
 
 class HighScoreManager:
-    def __inti__(self, file_path):
+    def __init__(self, file_path):
         self.file_path = file_path
         self.highscores = []
         self.max_scores = 10
+        self.load_scores()
 
     def load_scores(self):
         try:
@@ -50,6 +51,31 @@ class HighScoreManager:
         except json.JSONDecodeError:
             self.highscores = []
 
-    def save_score(self):
-        with open(self.file_path, "w") as file:
+    def save_scores(self):
+        with open(self.file_path, "w", encoding="utf-8") as file:
             json.dump(self.highscores, file)
+
+    def add_score(self, name: str, score: int) -> None:
+        name = name.strip()
+
+        if name == "":
+            name = "Player"
+
+        new_score = {
+            "name": name,
+            "score": score,
+        }
+
+        self.highscores.append(new_score)
+
+        self.highscores.sort(
+            key=lambda item: item["score"],
+            reverse=True,
+        )
+
+        self.highscores = self.highscores[:self.max_scores]
+
+        self.save_scores()
+
+    def get_top_scores(self):
+        return self.highscores

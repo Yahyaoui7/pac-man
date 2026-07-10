@@ -12,6 +12,7 @@ class InputState:
     move_right: bool = False
 
     pause_pressed: bool = False
+    action_pressed: bool = False
 
     mouse_pos: tuple[int, int] = (0, 0)
     mouse_pressed: bool = False
@@ -27,6 +28,7 @@ class InputManager:
 
         self.state.quit_requested = False
         self.state.pause_pressed = False
+        self.state.action_pressed = False
         self.state.mouse_clicked = False
 
         keys = pygame.key.get_pressed()
@@ -48,6 +50,8 @@ class InputManager:
 
                 if event.key == pygame.K_ESCAPE:
                     self.state.pause_pressed = True
+                elif event.key == pygame.K_SPACE:
+                    self.state.action_pressed = True
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left mouse button

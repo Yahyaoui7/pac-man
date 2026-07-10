@@ -47,7 +47,10 @@ GHOST_SPRITE_ROOT = os.path.join(ASSET_ROOT, "ghost_sprites")
 # CELL_SIZE. Punch/kick frames include outstretched arms/legs so they're
 # naturally bigger than the plain chomp circle -- this keeps them from
 # overlapping neighboring cells too aggressively. Tune to taste.
-SPRITE_SCALE = 1.8
+SPRITE_SCALE = 0.9
+# Puncher and kicker sprites need to be bigger (outstretched arms/legs)
+# so they read clearly as attacks rather than tiny overlays.
+SPRITE_SCALE_ATTACK = SPRITE_SCALE * 2
 GHOST_SPRITE_SCALE = 1.4
 
 
@@ -141,10 +144,15 @@ class Animation:
 class SpriteLibrary:
     """Singleton cache of scaled Surface frames, keyed by PacmanMode."""
 
+    # Number of walking frames shared by all modes (including NORMAL).
+    WALK_FRAME_COUNT = 3
+
     _instance: Optional["SpriteLibrary"] = None
 
     def __init__(self):
         self._frames: dict[PacmanMode, list[pygame.Surface]] = {}
+        self._walk_frames: dict[PacmanMode, list[pygame.Surface]] = {}
+        self._attack_frames: dict[PacmanMode, list[pygame.Surface]] = {}
         self._loaded = False
 
         # ghost_frames["hunt"][GhostColor][Facing]      -> [Surface, Surface]
@@ -164,9 +172,21 @@ class SpriteLibrary:
     def load(self, cell_size: int) -> None:
         """Load + scale every Pac-Man mode's frames. Safe to call more
         than once (e.g. if CELL_SIZE changes on a resize) -- it just
-        reloads."""
+        reloads.
+
+        Frames are also split into walk (first WALK_FRAME_COUNT) and
+        attack (remaining) subsets for punch/kick powered-mode playback."""
         target = int(cell_size * SPRITE_SCALE)
-        self._frames = {mode: self._load_mode(mode, target) for mode in PacmanMode}
+        target_attack = int(cell_size * SPRITE_SCALE_ATTACK)
+        self._frames = {
+            PacmanMode.NORMAL: self._load_mode(PacmanMode.NORMAL, target),
+            PacmanMode.PUNCH: self._load_mode(PacmanMode.PUNCH, target_attack),
+            PacmanMode.KICK: self._load_mode(PacmanMode.KICK, target_attack),
+        }
+        for mode in PacmanMode:
+            frames = self._frames[mode]
+            self._walk_frames[mode] = frames[: self.WALK_FRAME_COUNT]
+            self._attack_frames[mode] = frames[self.WALK_FRAME_COUNT :]
         self._loaded = True
 
     def _load_mode(self, mode: PacmanMode, target_size: int) -> list[pygame.Surface]:
@@ -198,6 +218,32 @@ class SpriteLibrary:
             frame_duration_ms=timing["frame_duration_ms"],
             loop=timing["loop"],
             overrides=timing["overrides"],
+        )
+
+    def new_walk_animation(self, mode: PacmanMode) -> Animation:
+        """Looping walk animation using the first WALK_FRAME_COUNT frames."""
+        timing = _MODE_TIMING[mode]
+        return Animation(
+            self._walk_frames[mode],
+            frame_duration_ms=timing["frame_duration_ms"],
+            loop=True,
+            overrides={},
+        )
+
+    def new_attack_animation(self, mode: PacmanMode) -> Animation:
+        """One-shot attack animation using frames after the walk subset."""
+        timing = _MODE_TIMING[mode]
+        # Re-key overrides to account for the removed walk-frame prefix
+        rekeyed = {}
+        for idx, dur in timing["overrides"].items():
+            new_idx = idx - self.WALK_FRAME_COUNT
+            if new_idx >= 0:
+                rekeyed[new_idx] = dur
+        return Animation(
+            self._attack_frames[mode],
+            frame_duration_ms=timing["frame_duration_ms"],
+            loop=False,
+            overrides=rekeyed,
         )
 
     # ------------------------------------------------------------- ghosts --

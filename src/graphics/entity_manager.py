@@ -1,4 +1,5 @@
 import math
+import random
 from typing import Optional
 
 import pygame
@@ -22,6 +23,11 @@ NAME_TO_GHOST_COLOR = {
     "Clyde": GhostColor.ORANGE,
 }
 
+# Ability types that can be granted by super gums
+ABILITY_NONE = "none"
+ABILITY_PUNCH = "punch"
+ABILITY_KICK = "kick"
+
 
 class EntityManager:
     def __init__(self, config: GameConfig, score_management) -> None:
@@ -33,6 +39,7 @@ class EntityManager:
         self.pellets: list[list[int]] = []
         self.total_pellets: int = 0
         self.sound = SoundManager()
+        self.super_gum_abilities: dict[tuple[int, int], str] = {}
 
         # Sprite frames are loaded once here and shared by every entity.
         self.sprites = SpriteLibrary.instance()
@@ -42,29 +49,32 @@ class EntityManager:
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""
         self.maze = maze
-        self.init_pellets()
         height = len(maze)
         width = len(maze[0])
 
         self.pellets = [[0] * width for _ in range(height)]
         self.total_pellets = 0
+        self.super_gum_abilities = {}
 
-        corners = {
+        all_corners = [
             (0, 0),
             (width - 1, 0),
             (0, height - 1),
             (width - 1, height - 1),
-        }
+        ]
+
+        # Guarantee exactly one punch and one kick super gum
+        special_abilities = random.sample([ABILITY_PUNCH, ABILITY_KICK], 2)
+        self.super_gum_abilities[all_corners[0]] = special_abilities[0]
+        self.super_gum_abilities[all_corners[1]] = special_abilities[1]
 
         center = (width // 2, height // 2)
 
         for y in range(height):
             for x in range(width):
-
-                if (x, y) in corners:
+                if (x, y) in all_corners:
                     self.pellets[y][x] = 2
                     self.total_pellets += 1
-
                 elif (x, y) == center or maze[y][x] == 15:
                     self.pellets[y][x] = 0
                 else:
@@ -103,14 +113,26 @@ class EntityManager:
             self.play_sound("eat_super_pacgum")
             self.score_management.add_super_pacgum()
 
+            fright_duration = 7.0
             for ghost in self.ghosts:
                 ghost.is_edible = True
-                if ghost.is_edible:
-                    ghost.frightened_timer = 7.0
+                ghost.frightened_timer = fright_duration
 
-        # dt arrives in seconds from the caller (see frightened_timer usage
-        # below) -- Animation.update expects milliseconds.
+            ability = self.super_gum_abilities.pop((px, py), ABILITY_NONE)
+            if ability != ABILITY_NONE:
+                self.player.start_powered_mode(
+                    PacmanMode.PUNCH if ability == ABILITY_PUNCH else PacmanMode.KICK,
+                    fright_duration,
+                )
+
+        # dt arrives in seconds from the caller -- Animation.update expects milliseconds.
         dt_ms = dt * 1000.0
+
+        # Tick powered-mode timer (synced with ghost fright)
+        if self.player.powered_mode is not None:
+            self.player.powered_timer = max(0.0, self.player.powered_timer - dt)
+            if self.player.powered_timer == 0.0:
+                self.player.end_powered_mode()
 
         self.player.update_animation(dt_ms)
 
@@ -127,20 +149,25 @@ class EntityManager:
 
         self.pellets = [[0] * width for _ in range(height)]
         self.total_pellets = 0
+        self.super_gum_abilities = {}
 
-        corners = {
+        all_corners = [
             (0, 0),
             (width - 1, 0),
             (0, height - 1),
             (width - 1, height - 1),
-        }
+        ]
+
+        # Guarantee exactly one punch and one kick super gum
+        special_abilities = random.sample([ABILITY_PUNCH, ABILITY_KICK], 2)
+        self.super_gum_abilities[all_corners[0]] = special_abilities[0]
+        self.super_gum_abilities[all_corners[1]] = special_abilities[1]
 
         center = (width // 2, height // 2)
 
         for y in range(height):
             for x in range(width):
-
-                if (x, y) in corners:
+                if (x, y) in all_corners:
                     self.pellets[y][x] = 2
                     self.total_pellets += 1
                 elif (x, y) == center or self.maze[y][x] == 15:
@@ -167,8 +194,17 @@ class EntityManager:
                     )
                 elif self.pellets[y][x] == 2:
                     pulse = int(math.sin(pygame.time.get_ticks() * 0.01) * 2)
-                    r = max(4, CELL_SIZE // 4) + pulse
-                    pygame.draw.circle(screen, (255, 184, 151), (px, py), r)
+                    ability = self.super_gum_abilities.get((x, y), ABILITY_NONE)
+                    if ability == ABILITY_PUNCH:
+                        color = (255, 100, 100)
+                        r = max(5, CELL_SIZE // 3) + pulse
+                    elif ability == ABILITY_KICK:
+                        color = (100, 180, 255)
+                        r = max(5, CELL_SIZE // 3) + pulse
+                    else:
+                        color = (255, 184, 151)
+                        r = max(4, CELL_SIZE // 4) + pulse
+                    pygame.draw.circle(screen, color, (px, py), r)
 
         self.player.draw(screen)
 
@@ -216,12 +252,12 @@ class Entity:
 
 def _facing_from_direction(direction, current_facing: Facing) -> Facing:
     """
-    Map a movement direction to a horizontal Facing, WITHOUT ever
+    Map a movement direction string to a horizontal Facing, WITHOUT ever
     producing a vertical flip.
 
-    WEST  -> face left
-    EAST  -> face right
-    NORTH/SOUTH/None -> keep whatever horizontal facing we already had
+    "LEFT"  -> face left
+    "RIGHT" -> face right
+    "UP"/"DOWN"/None -> keep whatever horizontal facing we already had
 
     This is the fix for "Pac-Man flips upside down when turning
     up/down": the bug happens when code tries to flip/rotate on both
@@ -231,9 +267,9 @@ def _facing_from_direction(direction, current_facing: Facing) -> Facing:
     without the art looking broken -- we simply keep the last known
     left/right facing and only ever flip on X.
     """
-    if direction == WEST:
+    if direction == "LEFT":
         return Facing.LEFT
-    if direction == EAST:
+    if direction == "RIGHT":
         return Facing.RIGHT
     return current_facing
 
@@ -251,31 +287,97 @@ class Player(Entity):
         self.mode = PacmanMode.NORMAL
         self.is_punching = False
         self.is_kicking = False
+        self.current_ability: str = ABILITY_NONE
         self.animation = self.sprites.new_animation(PacmanMode.NORMAL)
 
+        # Powered-mode state (active while super gum fright lasts)
+        self.powered_mode: Optional[PacmanMode] = None
+        self.powered_timer: float = 0.0
+        self.is_attacking: bool = False
+
     # ------------------------------------------------------------ modes --
-    def activate_punch(self) -> None:
-        """Turn on punch mode. No-op if already mid-special so a mashed
-        input can't cancel/restart the animation partway through."""
-        if self.mode == PacmanMode.NORMAL:
+    def grant_ability(self, ability: str) -> None:
+        """Grant an ability to the player (punch, kick, or none)."""
+        self.current_ability = ability
+
+    def activate_ability(self, ability: str) -> None:
+        """Start powered walk mode (called when eating a powered super gum).
+        The walk animation loops for the duration of the fright timer.
+        Attack animation triggers on ghost collision."""
+        if self.mode != PacmanMode.NORMAL:
+            return
+
+        if ability == ABILITY_PUNCH:
+            self.powered_mode = PacmanMode.PUNCH
+        elif ability == ABILITY_KICK:
+            self.powered_mode = PacmanMode.KICK
+        else:
+            return
+
+        self.mode = self.powered_mode
+        self.animation = self.sprites.new_walk_animation(self.powered_mode)
+
+    def trigger_attack(self) -> None:
+        """Trigger the attack animation on ghost collision during powered mode."""
+        if self.powered_mode is None or self.is_attacking:
+            return
+        self.is_attacking = True
+        self.animation = self.sprites.new_attack_animation(self.powered_mode)
+
+    def start_powered_mode(self, mode: PacmanMode, duration: float) -> None:
+        """Enter powered walk mode for the given duration (fright timer)."""
+        self.powered_mode = mode
+        self.mode = mode
+        self.powered_timer = duration
+        self.is_attacking = False
+        self.animation = self.sprites.new_walk_animation(mode)
+
+    def end_powered_mode(self) -> None:
+        """Exit powered mode and revert to normal."""
+        self.powered_mode = None
+        self.powered_timer = 0.0
+        self.is_attacking = False
+        self.is_punching = False
+        self.is_kicking = False
+        self.mode = PacmanMode.NORMAL
+        self.animation = self.sprites.new_animation(PacmanMode.NORMAL)
+
+    def use_ability(self) -> None:
+        """Activate the current ability if available and not already in a special mode."""
+        if self.mode != PacmanMode.NORMAL or self.current_ability == ABILITY_NONE:
+            return
+
+        if self.current_ability == ABILITY_PUNCH:
             self.mode = PacmanMode.PUNCH
             self.is_punching = True
             self.animation = self.sprites.new_animation(PacmanMode.PUNCH)
-
-    def activate_kick(self) -> None:
-        if self.mode == PacmanMode.NORMAL:
+        elif self.current_ability == ABILITY_KICK:
             self.mode = PacmanMode.KICK
             self.is_kicking = True
             self.animation = self.sprites.new_animation(PacmanMode.KICK)
+
+        self.current_ability = ABILITY_NONE
 
     def update_animation(self, dt_ms: float) -> None:
         self.facing = _facing_from_direction(self.direction, self.facing)
 
         self.animation.update(dt_ms)
-        if self.mode != PacmanMode.NORMAL and self.animation.finished:
-            self.mode = PacmanMode.NORMAL
+
+        # Powered mode: attack finished -> return to walk loop
+        if self.is_attacking and self.animation.finished:
+            self.is_attacking = False
+            self.animation = self.sprites.new_walk_animation(self.powered_mode)
+
+        # Powered mode expired (handled by EntityManager via powered_timer)
+        # Normal punch/kick one-shot finish (legacy fallback)
+        if (
+            self.mode != PacmanMode.NORMAL
+            and self.powered_mode is None
+            and self.animation.finished
+        ):
             self.is_punching = False
             self.is_kicking = False
+            self.mode = PacmanMode.NORMAL
             self.animation = self.sprites.new_animation(PacmanMode.NORMAL)
 
     # ------------------------------------------------------------- draw --
@@ -329,6 +431,10 @@ class Player(Entity):
         self.mode = PacmanMode.NORMAL
         self.is_punching = False
         self.is_kicking = False
+        self.is_attacking = False
+        self.current_ability = ABILITY_NONE
+        self.powered_mode = None
+        self.powered_timer = 0.0
         self.animation = self.sprites.new_animation(PacmanMode.NORMAL)
 
 
@@ -352,6 +458,7 @@ class Ghost(Entity):
         self.is_edible = False
         self.is_eaten = False
         self.frightened_timer = 0.0
+        self.runaway_target = None
 
         self.sprites = SpriteLibrary.instance()
         self.state = GhostState.HUNT
@@ -372,8 +479,6 @@ class Ghost(Entity):
         old_facing = self.facing
         self.facing = _facing_from_direction(self.direction, self.facing)
 
-        # eaten-eyes get proper up/down art since it exists; everyone else
-        # only ever changes horizontal facing (see _facing_from_direction)
         vertical = None
         if self.direction == NORTH:
             vertical = "up"
@@ -382,11 +487,6 @@ class Ghost(Entity):
 
         new_state = self._current_state()
 
-        # Rebuild the (cheap, index-reset) Animation only when something
-        # that actually changes which frame-set we should show has
-        # changed -- state, horizontal facing, or (for EATEN) vertical
-        # direction. Rebuilding every tick would reset the frame index
-        # each time and the wiggle/blink would never animate.
         changed = (
             new_state != self.state
             or self.facing != old_facing
@@ -402,7 +502,6 @@ class Ghost(Entity):
 
         self.animation.update(dt_ms)
 
-    # ------------------------------------------------------------- draw --
     def draw(self, screen: pygame.Surface) -> None:
         x = PADDING // 2 + self.x
         y = TOP_BAR_HEIGHT + PADDING // 2 + self.y
@@ -420,6 +519,7 @@ class Ghost(Entity):
         self.is_edible = False
         self.is_eaten = False
         self.frightened_timer = 0.0
+        self.runaway_target = None
 
         self.facing = Facing.RIGHT
         self.state = GhostState.HUNT

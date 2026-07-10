@@ -212,6 +212,8 @@ class InstructionsState(State):
             "- Use ARROWS or WASD keys to move Pacman.",
             "- Eat all Pacgums (small dots) to clear the level.",
             "- Eat Super Pacgums (corner pellets) to make ghosts edible.",
+            "- Some Super Pacgums grant special abilities!",
+            "- Press SPACE to use your ability (Punch or Kick).",
             "- Avoid Ghosts. If they touch you, you lose a life.",
             "- Press ESC to pause the game.",
             "",
@@ -299,6 +301,9 @@ class PlayingState(State):
             self.game.entity_manager.player.next_direction = "UP"
         elif input_state.move_down:
             self.game.entity_manager.player.next_direction = "DOWN"
+
+        if input_state.action_pressed:
+            self.game.entity_manager.player.use_ability()
 
         self.movement.update_entity(self.game.entity_manager.player)
 
@@ -439,6 +444,7 @@ class PlayingState(State):
                     ghost.is_eaten = True
                     self.game.sound_manager.play_sound("eat_ghost")
                     self.game.score_management.add_ghost()
+                    player.trigger_attack()
 
                 else:
                     if expired(self.player_invincible_until):

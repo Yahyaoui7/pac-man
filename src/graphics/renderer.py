@@ -119,7 +119,7 @@ class HomeState(State):
 
     def enter(self) -> None:
         """Ensure screen size is set for the main menu."""
-        self.game.resize_window(600, 500)
+        self.game.resize_window(1200, 750)
 
         self.game.sound_manager.play_music("menu_intro", False)
 
@@ -301,7 +301,8 @@ class PlayingState(State):
             self.game.entity_manager.player.next_direction = "UP"
         elif input_state.move_down:
             self.game.entity_manager.player.next_direction = "DOWN"
-
+        elif input_state.skip_level:
+            self.game.entity_manager.total_pellets = 0
         if input_state.action_pressed:
             self.game.entity_manager.player.use_ability()
 
@@ -323,23 +324,20 @@ class PlayingState(State):
                     self.game.entity_manager.player,
                 )
             else:
-                self.movement.update_bfs_ghost(
-                    ghost, self.game.entity_manager.player
-                )
-        self.game.entity_manager.update(
-            self.game.level_manager.current_maze.maze, 1 / 60.0
-        )
+                self.movement.update_bfs_ghost(ghost, self.game.entity_manager.player)
+
         self.check_collision(
             self.game.entity_manager.player,
             self.game.entity_manager.ghosts,
+        )
+        self.game.entity_manager.update(
+            self.game.level_manager.current_maze.maze, 1 / 60.0
         )
         self.game.level_manager.update_time(1 / 60.0)
         if self.game.level_manager.is_time_out():
 
             if self.game.lives <= 0:
-                self.game.state_manager.change_state(
-                    GameOverState(self.game, self)
-                )
+                self.game.state_manager.change_state(GameOverState(self.game, self))
             else:
                 level_cfg = self.game.level_manager.get_current_level_config()
                 self.game.level_manager.remaining_time = float(
@@ -367,9 +365,7 @@ class PlayingState(State):
     def draw(self, screen: pygame.Surface) -> None:
 
         pygame.draw.rect(screen, (10, 10, 20), (0, 0, screen.get_width(), 40))
-        pygame.draw.line(
-            screen, (0, 238, 255), (0, 40), (screen.get_width(), 40), 2
-        )
+        pygame.draw.line(screen, (0, 238, 255), (0, 40), (screen.get_width(), 40), 2)
 
         score_surf = self.font_hud.render(
             f"SCORE: {self.game.score_management.get_score()}",
@@ -377,17 +373,13 @@ class PlayingState(State):
             (255, 238, 0),
         )
         lvl_num = self.game.level_manager.current_level_index + 1
-        level_surf = self.font_hud.render(
-            f"LEVEL: {lvl_num}", True, (255, 255, 255)
-        )
+        level_surf = self.font_hud.render(f"LEVEL: {lvl_num}", True, (255, 255, 255))
         lives_surf = self.font_hud.render(
             f"LIVES: {self.game.lives}", True, (255, 0, 0)
         )
 
         time_rem = max(0, int(self.game.level_manager.remaining_time))
-        time_surf = self.font_hud.render(
-            f"TIME: {time_rem}s", True, (0, 255, 0)
-        )
+        time_surf = self.font_hud.render(f"TIME: {time_rem}s", True, (0, 255, 0))
 
         screen.blit(score_surf, (15, 10))
         screen.blit(level_surf, (screen.get_width() // 3, 10))
@@ -575,9 +567,7 @@ class GameOverState(State):
             self.game.state_manager.change_state(NameInputState(self.game))
 
         elif self.hi_score_button and self.hi_score_button.update(input_state):
-            self.game.state_manager.change_state(
-                HighScoreState(self.game, self)
-            )
+            self.game.state_manager.change_state(HighScoreState(self.game, self))
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
 
@@ -634,9 +624,7 @@ class GameOverState(State):
             (255, 238, 0),
         )
 
-        score_label_rect = score_label.get_rect(
-            center=(center_x - 40, center_y - 65)
-        )
+        score_label_rect = score_label.get_rect(center=(center_x - 40, center_y - 65))
         score_value_rect = score_value.get_rect(
             midleft=(score_label_rect.right + 10, score_label_rect.centery)
         )
@@ -655,9 +643,7 @@ class GameOverState(State):
             (255, 238, 0),
         )
 
-        high_label_rect = high_label.get_rect(
-            center=(center_x - 40, center_y - 25)
-        )
+        high_label_rect = high_label.get_rect(center=(center_x - 40, center_y - 25))
         high_value_rect = high_value.get_rect(
             midleft=(high_label_rect.right + 10, high_label_rect.centery)
         )
@@ -736,9 +722,7 @@ class HighScoreState(State):
                 True,
                 "white",
             )
-            empty_rect = empty_surf.get_rect(
-                center=(screen.get_width() // 2, 180)
-            )
+            empty_rect = empty_surf.get_rect(center=(screen.get_width() // 2, 180))
             screen.blit(empty_surf, empty_rect)
         else:
             start_y = 150
@@ -807,9 +791,7 @@ class VictoryState(State):
         )
 
     def update(self, input_state, events):
-        if self.save_score_button and self.save_score_button.update(
-            input_state
-        ):
+        if self.save_score_button and self.save_score_button.update(input_state):
             self.game.state_manager.change_state(NameInputState(self.game))
 
         elif self.home_button and self.home_button.update(input_state):
@@ -882,24 +864,16 @@ class NameInputState(State):
                         self.player_name += event.unicode
 
     def confirm_name(self):
-        self.game.highscore_manager.add_score(
-            self.player_name, self.final_score
-        )
+        self.game.highscore_manager.add_score(self.player_name, self.final_score)
         self.game.state_manager.change_state(HighScoreState(self.game))
 
     def draw(self, screen):
         screen.fill((10, 10, 20))
 
-        title_surface = self.font_title.render(
-            self.title_text,
-            True,
-            "white",
-        )
+        title_surface = self.font_title.render(self.title_text, True, "white")
 
         score_surface = self.font_input.render(
-            f"Final Score: {self.final_score}",
-            True,
-            "yellow",
+            f"Final Score: {self.final_score}", True, "yellow"
         )
 
         input_surface = self.font_input.render(
@@ -916,32 +890,20 @@ class NameInputState(State):
 
         screen.blit(
             title_surface,
-            (
-                screen.get_width() // 2 - title_surface.get_width() // 2,
-                120,
-            ),
+            (screen.get_width() // 2 - title_surface.get_width() // 2, 120),
         )
 
         screen.blit(
             score_surface,
-            (
-                screen.get_width() // 2 - score_surface.get_width() // 2,
-                190,
-            ),
+            (screen.get_width() // 2 - score_surface.get_width() // 2, 190),
         )
 
         screen.blit(
             input_surface,
-            (
-                screen.get_width() // 2 - input_surface.get_width() // 2,
-                260,
-            ),
+            (screen.get_width() // 2 - input_surface.get_width() // 2, 260),
         )
 
         screen.blit(
             help_surface,
-            (
-                screen.get_width() // 2 - help_surface.get_width() // 2,
-                330,
-            ),
+            (screen.get_width() // 2 - help_surface.get_width() // 2, 330),
         )

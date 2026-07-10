@@ -66,6 +66,8 @@ class MovementSystem:
 
         if self.is_centered(entity):
             self.update_cell_position(entity)
+            entity.grid_y = entity.row
+            entity.grid_x = entity.col
 
             if entity.next_direction is not None:
                 if self.can_move(
@@ -76,15 +78,11 @@ class MovementSystem:
                     self.set_direction(entity, entity.next_direction)
                     entity.next_direction = None
 
-            # If entity has no direction, it does not move.
             if entity.direction is None:
                 return
 
-            # If there is a wall in front, stop moving.
             if not self.can_move(entity.row, entity.col, entity.direction):
                 return
-        entity.grid_y = entity.row
-        entity.grid_x = entity.col
 
         entity.x += entity.col_direction * entity.speed
         entity.y += entity.row_direction * entity.speed
@@ -253,9 +251,7 @@ class MovementSystem:
         while safe_zones:
             random_zone = self.rng.choice(safe_zones)
 
-            (row_min, row_max), (col_min, col_max) = self.get_zone_bounds(
-                random_zone
-            )
+            (row_min, row_max), (col_min, col_max) = self.get_zone_bounds(random_zone)
 
             valid_cells = []
 
@@ -310,14 +306,10 @@ class MovementSystem:
             self.update_cell_position(ghost)
 
             if ghost.runaway_target is None:
-                ghost.runaway_target = self.choose_runaway_target_by_zone(
-                    player
-                )
+                ghost.runaway_target = self.choose_runaway_target_by_zone(player)
 
             if ghost.runaway_target == (ghost.row, ghost.col):
-                ghost.runaway_target = self.choose_runaway_target_by_zone(
-                    player
-                )
+                ghost.runaway_target = self.choose_runaway_target_by_zone(player)
 
             if ghost.runaway_target is not None:
                 start = (ghost.row, ghost.col)

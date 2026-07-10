@@ -31,15 +31,13 @@ class GameStarter:
         self.running = True
         self.config = config
         self.screen = None
+
         self.state_manager = StateManager(self)
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
-
-        self.entity_manager = None
-
         self.score_management = ScoreManager(config)
-
         self.highscore_manager = HighScoreManager(".highscores.json")
+        self.entity_manager = None
 
         self.lives: int = config.lives
 

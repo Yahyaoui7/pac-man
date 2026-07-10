@@ -17,6 +17,7 @@ class InputState:
     mouse_pos: tuple[int, int] = (0, 0)
     mouse_pressed: bool = False
     mouse_clicked: bool = False
+    skip_level: bool = False
 
 
 class InputManager:
@@ -41,6 +42,8 @@ class InputManager:
         self.state.mouse_pos = pygame.mouse.get_pos()
         self.state.mouse_pressed = pygame.mouse.get_pressed()[0]
 
+        self.state.skip_level = False
+
         for event in events:
 
             if event.type == pygame.QUIT or keys[pygame.K_q]:
@@ -52,9 +55,10 @@ class InputManager:
                     self.state.pause_pressed = True
                 elif event.key == pygame.K_SPACE:
                     self.state.action_pressed = True
-
+                if event.key == pygame.K_l and (event.mod & pygame.KMOD_CTRL):
+                    self.state.skip_level = True
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left mouse button
+                if event.button == 1:
                     self.state.mouse_clicked = True
 
         return self.state

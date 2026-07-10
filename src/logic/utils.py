@@ -14,3 +14,4 @@ def after(ms: int) -> int:
 def expired(end_time: int) -> bool:
     """True if the timer has expired."""
     return now() >= end_time
+

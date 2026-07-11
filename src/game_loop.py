@@ -13,10 +13,11 @@
 
 from src.graphics.entity_manager import EntityManager
 from src.graphics.renderer import HomeState, StateManager
+from src.graphics.ui_helpers import _init_fonts
 from src.logic.level_manager import LevelManager
 from src.sounds.soud_manager import SoundManager
 from .logic.inputmanager import InputManager
-from .logic.config import GameConfig
+from .logic.config import CELL_SIZE, GameConfig
 from .logic.score import ScoreManager, HighScoreManager
 
 import pygame
@@ -51,7 +52,7 @@ class GameStarter:
         max_screen_width = 1200
         max_screen_height = 750
         self.cell_size = min(
-            30,
+            CELL_SIZE,
             max_screen_width // width,
             (max_screen_height - 100) // height,
         )
@@ -59,6 +60,7 @@ class GameStarter:
 
     def run(self) -> None:
         pygame.init()
+        _init_fonts()
 
         self.screen = pygame.display.set_mode((1200, 750))
         pygame.display.set_caption("NEON PAC-MAN")

@@ -159,40 +159,23 @@ class MovementSystem:
 
         return None
 
-    def update_ghost_to_target(self, ghost, target_row, target_col):
+    def _navigate_bfs(self, ghost, target_row: int, target_col: int) -> None:
+        """Move ghost toward target using BFS pathfinding."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
-
-            start = (ghost.row, ghost.col)
-            target = (target_row, target_col)
-
-            path = self.bfs_path(start, target)
-
-            if len(path) >= 2:
-                next_cell = path[1]
-                direction = self.direction_to_next_cell(start, next_cell)
-
-                if direction is not None:
-                    self.set_direction(ghost, direction)
-
-        self.update_entity(ghost)
-
-    def update_bfs_ghost(self, ghost, player) -> None:
-        """Move ghost toward player when ghost is not edible."""
-        if self.is_centered(ghost):
-            self.update_cell_position(ghost)
-
-            start = (ghost.row, ghost.col)
-            target = (player.row, player.col)
-
-            path = self.bfs_path(start, target)
-
+            path = self.bfs_path((ghost.row, ghost.col), (target_row, target_col))
             if len(path) >= 2:
                 direction = self.direction_to_next_cell(path[0], path[1])
                 if direction is not None:
                     self.set_direction(ghost, direction)
-
         self.update_entity(ghost)
+
+    def update_ghost_to_target(self, ghost, target_row, target_col):
+        self._navigate_bfs(ghost, target_row, target_col)
+
+    def update_bfs_ghost(self, ghost, player) -> None:
+        """Move ghost toward player when ghost is not edible."""
+        self._navigate_bfs(ghost, player.row, player.col)
 
     # ----------------------------
     # EDIBLE GHOST MOVEMENT

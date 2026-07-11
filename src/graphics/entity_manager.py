@@ -4,8 +4,10 @@ from typing import Optional
 
 import pygame
 
-from src.logic.config import CELL_SIZE, PADDING, TOP_BAR_HEIGHT, GameConfig
+from src.logic.config import CELL_SIZE, GameConfig
 from src.logic.config import NORTH, EAST, SOUTH, WEST
+from src.logic.helpers import grid_to_pixel, pixel_to_screen, pellet_screen_pos
+from src.graphics.ui_helpers import COLOR_PELLET
 from src.sounds.soud_manager import SoundManager
 
 from src.graphics.graphic_lib import (
@@ -46,33 +48,22 @@ class EntityManager:
         self.sprites.load(CELL_SIZE)
         self.sprites.load_ghosts(CELL_SIZE)
 
-    def load_level_entities(self, maze: list[list[int]]) -> None:
-        """Setup maze grid, pellets, and spawn entities."""
-        self.maze = maze
-        height = len(maze)
-        width = len(maze[0])
-
+    def _init_pellet_grid(self, maze: list[list[int]]) -> None:
+        """Initialize pellet grid, super-gum abilities, and counts from maze."""
+        height, width = len(maze), len(maze[0])
         self.pellets = [[0] * width for _ in range(height)]
         self.total_pellets = 0
         self.super_gum_abilities = {}
 
-        all_corners = [
-            (0, 0),
-            (width - 1, 0),
-            (0, height - 1),
-            (width - 1, height - 1),
-        ]
-
-        # Guarantee exactly one punch and one kick super gum
-        special_abilities = random.sample([ABILITY_PUNCH, ABILITY_KICK], 2)
-        self.super_gum_abilities[all_corners[0]] = special_abilities[0]
-        self.super_gum_abilities[all_corners[1]] = special_abilities[1]
+        corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+        abilities = random.sample([ABILITY_PUNCH, ABILITY_KICK], 2)
+        self.super_gum_abilities[corners[0]] = abilities[0]
+        self.super_gum_abilities[corners[1]] = abilities[1]
 
         center = (width // 2, height // 2)
-
         for y in range(height):
             for x in range(width):
-                if (x, y) in all_corners:
+                if (x, y) in corners:
                     self.pellets[y][x] = 2
                     self.total_pellets += 1
                 elif (x, y) == center or maze[y][x] == 15:
@@ -81,6 +72,13 @@ class EntityManager:
                     self.pellets[y][x] = 1
                     self.total_pellets += 1
 
+    def load_level_entities(self, maze: list[list[int]]) -> None:
+        """Setup maze grid, pellets, and spawn entities."""
+        self.maze = maze
+        self._init_pellet_grid(maze)
+
+        height = len(maze)
+        width = len(maze[0])
         center_x = width // 2
         center_y = height // 2
 
@@ -99,17 +97,17 @@ class EntityManager:
     def update(self, maze: list[list[int]], dt: float) -> None:
 
         px, py = self.player.grid_x, self.player.grid_y
+        pellet = self.pellets[py][px]
 
-        if self.pellets[py][px] == 1:
+        if pellet != 0:
             self.pellets[py][px] = 0
             self.total_pellets -= 1
+
+        if pellet == 1:
             self.play_sound("eat_normal_pellet")
             self.score_management.add_normal_pellet()
 
-        elif self.pellets[py][px] == 2:
-            self.pellets[py][px] = 0
-            self.total_pellets -= 1
-
+        elif pellet == 2:
             self.play_sound("eat_super_pacgum")
             self.score_management.add_super_pacgum()
 
@@ -144,37 +142,7 @@ class EntityManager:
             ghost.update_animation(dt_ms)
 
     def init_pellets(self):
-        height = len(self.maze)
-        width = len(self.maze[0])
-
-        self.pellets = [[0] * width for _ in range(height)]
-        self.total_pellets = 0
-        self.super_gum_abilities = {}
-
-        all_corners = [
-            (0, 0),
-            (width - 1, 0),
-            (0, height - 1),
-            (width - 1, height - 1),
-        ]
-
-        # Guarantee exactly one punch and one kick super gum
-        special_abilities = random.sample([ABILITY_PUNCH, ABILITY_KICK], 2)
-        self.super_gum_abilities[all_corners[0]] = special_abilities[0]
-        self.super_gum_abilities[all_corners[1]] = special_abilities[1]
-
-        center = (width // 2, height // 2)
-
-        for y in range(height):
-            for x in range(width):
-                if (x, y) in all_corners:
-                    self.pellets[y][x] = 2
-                    self.total_pellets += 1
-                elif (x, y) == center or self.maze[y][x] == 15:
-                    self.pellets[y][x] = 0
-                else:
-                    self.pellets[y][x] = 1
-                    self.total_pellets += 1
+        self._init_pellet_grid(self.maze)
 
     def draw(self, screen: pygame.Surface) -> None:
         """Draw pellets, player, and Ghosts."""
@@ -183,12 +151,11 @@ class EntityManager:
 
         for y in range(height):
             for x in range(width):
-                px = int(PADDING // 2 + x * CELL_SIZE + CELL_SIZE // 2)
-                py = int(PADDING // 2 + y * CELL_SIZE + CELL_SIZE // 2 + 30)
+                px, py = pellet_screen_pos(x, y)
                 if self.pellets[y][x] == 1:
                     pygame.draw.circle(
                         screen,
-                        (255, 184, 151),
+                        COLOR_PELLET,
                         (px, py),
                         max(2, CELL_SIZE // 8),
                     )
@@ -202,7 +169,7 @@ class EntityManager:
                         color = (100, 180, 255)
                         r = max(5, CELL_SIZE // 3) + pulse
                     else:
-                        color = (255, 184, 151)
+                        color = COLOR_PELLET
                         r = max(4, CELL_SIZE // 4) + pulse
                     pygame.draw.circle(screen, color, (px, py), r)
 
@@ -233,8 +200,7 @@ class Entity:
         self.grid_y = y
         self.grid_x = x
 
-        self.x = x * CELL_SIZE + CELL_SIZE // 2
-        self.y = y * CELL_SIZE + CELL_SIZE // 2
+        self.x, self.y = grid_to_pixel(y, x)
 
         self.speed = speed
 
@@ -382,13 +348,9 @@ class Player(Entity):
 
     # ------------------------------------------------------------- draw --
     def draw(self, screen: pygame.Surface) -> None:
-        x = PADDING // 2 + self.x
-        y = TOP_BAR_HEIGHT + PADDING // 2 + self.y
+        x, y = pixel_to_screen(self.x, self.y)
 
         frame = self.animation.current_frame
-        # Horizontal-only mirror. flip(frame, True, False) -- the second
-        # argument (vertical flip) must always stay False here, or turning
-        # to face up/down will flip Pac-Man upside down.
         if self.facing == Facing.LEFT:
             frame = pygame.transform.flip(frame, True, False)
 
@@ -418,8 +380,7 @@ class Player(Entity):
         return 0, 0
 
     def reset_location(self):
-        self.x = self.spawn_x * CELL_SIZE + CELL_SIZE // 2
-        self.y = self.spawn_y * CELL_SIZE + CELL_SIZE // 2
+        self.x, self.y = grid_to_pixel(self.spawn_y, self.spawn_x)
 
         self.direction = None
         self.next_direction = None
@@ -503,8 +464,7 @@ class Ghost(Entity):
         self.animation.update(dt_ms)
 
     def draw(self, screen: pygame.Surface) -> None:
-        x = PADDING // 2 + self.x
-        y = TOP_BAR_HEIGHT + PADDING // 2 + self.y
+        x, y = pixel_to_screen(self.x, self.y)
 
         frame = self.animation.current_frame
         rect = frame.get_rect(center=(int(x), int(y)))
@@ -514,8 +474,7 @@ class Ghost(Entity):
         self.grid_y = self.spawn_y
         self.grid_x = self.spawn_x
 
-        self.x = self.spawn_x * CELL_SIZE + CELL_SIZE // 2
-        self.y = self.spawn_y * CELL_SIZE + CELL_SIZE // 2
+        self.x, self.y = grid_to_pixel(self.spawn_y, self.spawn_x)
         self.is_edible = False
         self.is_eaten = False
         self.frightened_timer = 0.0

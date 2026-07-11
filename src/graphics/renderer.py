@@ -9,24 +9,23 @@ from typing import Any, List, Optional
 from src.UI.button import Button
 
 
-from src.logic.config import CELL_SIZE, PADDING, TOP_BAR_HEIGHT
+from src.logic.config import CELL_SIZE, PADDING
 from src.logic.config import EAST, NORTH, SOUTH, WEST
+from src.logic.helpers import cell_to_screen, pixel_to_screen
 from src.logic.movement import MovementSystem
+from src.graphics import ui_helpers as ui
 
 
 class State:
     """Base class for all screen states."""
 
     def __init__(self, game: Any) -> None:
-        """Initialize with a reference to the main game object."""
         self.game = game
 
     def enter(self) -> None:
-        """Called when this state becomes active."""
         pass
 
     def exit(self) -> None:
-        """Called when leaving this state."""
         pass
 
     def update(
@@ -34,11 +33,9 @@ class State:
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
-        """Process logic and events."""
         pass
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Render to the screen."""
         pass
 
 
@@ -46,7 +43,6 @@ class StateManager:
     """Manages switching and updating the active screen state."""
 
     def __init__(self, game: Any) -> None:
-        """Initialize the state manager."""
         self.game = game
         self.stack: list[State] = []
 
@@ -59,20 +55,16 @@ class StateManager:
     def change_state(self, state: State):
         while self.stack:
             self.stack.pop().exit()
-
         self.stack.append(state)
         state.enter()
 
     def push_state(self, state: State) -> None:
-
         self.stack.append(state)
         state.enter()
 
     def pop_state(self) -> None:
-
         if not self.stack:
             return
-
         state = self.stack.pop()
         state.exit()
 
@@ -81,7 +73,6 @@ class StateManager:
             self.current.update(input_state, events)
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Forward draw calls to the active state."""
         if self.current:
             self.current.draw(screen)
 
@@ -90,60 +81,30 @@ class HomeState(State):
     """The Main Menu screen state."""
 
     def __init__(self, game: Any) -> None:
-        """Initialize buttons for the main menu."""
         super().__init__(game)
-        self.font_title = pygame.font.Font(None, 64)
-        self.font_btn = pygame.font.Font(None, 36)
-
-        # Center buttons on a 600x500 screen
-        self.play_button = Button(
-            200,
-            180,
-            200,
-            50,
-            "START GAME",
-            self.font_btn,
-        )
-        self.instructions_button = Button(
-            200, 245, 200, 50, "INSTRUCTIONS", self.font_btn
-        )
-        self.scores_button = Button(
-            200,
-            310,
-            200,
-            50,
-            "HIGHSCORES",
-            self.font_btn,
-        )
-        self.quit_button = Button(200, 375, 200, 50, "EXIT", self.font_btn)
+        self.play_button = Button(200, 180, 200, 50, "START GAME", ui.FONT_BTN)
+        self.instructions_button = Button(200, 245, 200, 50, "INSTRUCTIONS", ui.FONT_BTN)
+        self.scores_button = Button(200, 310, 200, 50, "HIGHSCORES", ui.FONT_BTN)
+        self.quit_button = Button(200, 375, 200, 50, "EXIT", ui.FONT_BTN)
 
     def enter(self) -> None:
-        """Ensure screen size is set for the main menu."""
         self.game.resize_window(1200, 750)
-
         self.game.sound_manager.play_music("menu_intro", False)
-
         self.game.lives = self.game.config.lives
-        # self.game.sound_manager.play_music("menu")
 
     def update(
         self,
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
-        """Check button clicks."""
         if not pygame.mixer.music.get_busy():
             self.game.sound_manager.play_music("menu_music")
         if self.play_button.update(input_state):
-
             self.game.score_management.reset()
-
             self.game.level_manager.current_level_index = 0
             self.game.curr_level = self.game.config.levels[0]
-
             self.game.curr_level.height = min(self.game.curr_level.height, 32)
             self.game.curr_level.width = min(self.game.curr_level.width, 60)
-
             self.game.sound_manager.play_music("game_intro", False)
             self.game.state_manager.change_state(PlayingState(self.game))
 
@@ -159,22 +120,16 @@ class HomeState(State):
             self.game.running = False
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Render the main menu elements."""
-        screen.fill((5, 5, 10))
+        screen.fill(ui.COLOR_BG_DARK)
 
-        title_surf = self.font_title.render("PAC-MAN", True, (255, 238, 0))
+        title_surf = ui.FONT_TITLE_LARGE.render("PAC-MAN", True, ui.COLOR_NEON_YELLOW)
         title_rect = title_surf.get_rect(center=(300, 80))
         screen.blit(title_surf, title_rect)
 
-        subtitle_surf = self.font_btn.render(
-            "NEON RETRO EDITION",
-            True,
-            (0, 238, 255),
-        )
+        subtitle_surf = ui.FONT_BTN.render("NEON RETRO EDITION", True, ui.COLOR_NEON_CYAN)
         subtitle_rect = subtitle_surf.get_rect(center=(300, 125))
         screen.blit(subtitle_surf, subtitle_rect)
 
-        # Draw buttons
         self.play_button.draw(screen)
         self.instructions_button.draw(screen)
         self.scores_button.draw(screen)
@@ -185,27 +140,21 @@ class InstructionsState(State):
     """The game rules and controls instructions screen."""
 
     def __init__(self, game: Any) -> None:
-        """Initialize buttons and text fonts."""
         super().__init__(game)
-        self.font_title = pygame.font.Font(None, 48)
-        self.font_text = pygame.font.Font(None, 24)
-        self.font_btn = pygame.font.Font(None, 36)
-        self.back_button = Button(200, 420, 200, 45, "BACK", self.font_btn)
+        self.back_button = Button(200, 420, 200, 45, "BACK", ui.FONT_BTN)
 
     def update(
         self,
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
-        """Check back button click."""
         if self.back_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Render instructions text."""
-        screen.fill((5, 5, 10))
+        screen.fill(ui.COLOR_BG_DARK)
 
-        title_surf = self.font_title.render("HOW TO PLAY", True, (0, 238, 255))
+        title_surf = ui.FONT_TITLE.render("HOW TO PLAY", True, ui.COLOR_NEON_CYAN)
         screen.blit(title_surf, (200, 40))
 
         lines = [
@@ -227,11 +176,8 @@ class InstructionsState(State):
 
         y_offset = 110
         for line in lines:
-            if "CHEAT" in line or line.startswith("- Press"):
-                color = (255, 238, 0)
-            else:
-                color = (255, 255, 255)
-            line_surf = self.font_text.render(line, True, color)
+            color = ui.COLOR_NEON_YELLOW if "CHEAT" in line or line.startswith("- Press") else ui.COLOR_WHITE
+            line_surf = ui.FONT_TEXT.render(line, True, color)
             screen.blit(line_surf, (50, y_offset))
             y_offset += 24
 
@@ -242,18 +188,12 @@ class PlayingState(State):
     """The active gameplay state handling movements, collisions, timers."""
 
     def __init__(self, game: Any) -> None:
-        """Initialize playing parameters."""
         super().__init__(game)
-
-        self.font_hud = pygame.font.Font(None, 28)
-        self.font_msg = pygame.font.Font(None, 48)
         self.player_invincible_until = 0
         self.msg_timer: float = 0.0
         self.msg_text: str = ""
 
     def enter(self) -> None:
-
-        # self.game.sound_manager.play_music("game_intro", False)
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
         )
@@ -279,12 +219,10 @@ class PlayingState(State):
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
-
         if not pygame.mixer.music.get_busy():
             self.game.sound_manager.play_music("game_music", False)
 
         if self.game.lives <= 0:
-
             self.game.state_manager.change_state(
                 GameOverState(self.game, self),
             )
@@ -293,49 +231,45 @@ class PlayingState(State):
             self.game.state_manager.push_state(PauseState(self.game, self))
             return
 
+        self._handle_input(input_state)
+        self._update_entities()
+        self._check_level_end()
+
+    def _handle_input(self, input_state) -> None:
+        player = self.game.entity_manager.player
         if input_state.move_left:
-            self.game.entity_manager.player.next_direction = "LEFT"
+            player.next_direction = "LEFT"
         elif input_state.move_right:
-            self.game.entity_manager.player.next_direction = "RIGHT"
+            player.next_direction = "RIGHT"
         elif input_state.move_up:
-            self.game.entity_manager.player.next_direction = "UP"
+            player.next_direction = "UP"
         elif input_state.move_down:
-            self.game.entity_manager.player.next_direction = "DOWN"
+            player.next_direction = "DOWN"
         elif input_state.skip_level:
             self.game.entity_manager.total_pellets = 0
         if input_state.action_pressed:
-            self.game.entity_manager.player.use_ability()
+            player.use_ability()
 
-        self.movement.update_entity(self.game.entity_manager.player)
+    def _update_entities(self) -> None:
+        em = self.game.entity_manager
+        self.movement.update_entity(em.player)
 
-        for ghost in self.game.entity_manager.ghosts:
-
+        for ghost in em.ghosts:
             if ghost.is_eaten:
-
                 self.movement.update_ghost_to_target(
-                    ghost,
-                    ghost.spawn_y,
-                    ghost.spawn_x,
+                    ghost, ghost.spawn_y, ghost.spawn_x,
                 )
-
             elif ghost.is_edible:
-                self.movement.update_runaway_ghost(
-                    ghost,
-                    self.game.entity_manager.player,
-                )
+                self.movement.update_runaway_ghost(ghost, em.player)
             else:
-                self.movement.update_bfs_ghost(ghost, self.game.entity_manager.player)
+                self.movement.update_bfs_ghost(ghost, em.player)
 
-        self.check_collision(
-            self.game.entity_manager.player,
-            self.game.entity_manager.ghosts,
-        )
-        self.game.entity_manager.update(
-            self.game.level_manager.current_maze.maze, 1 / 60.0
-        )
+        self.check_collision(em.player, em.ghosts)
+        em.update(self.maze, 1 / 60.0)
+
+    def _check_level_end(self) -> None:
         self.game.level_manager.update_time(1 / 60.0)
         if self.game.level_manager.is_time_out():
-
             if self.game.lives <= 0:
                 self.game.state_manager.change_state(GameOverState(self.game, self))
             else:
@@ -347,15 +281,13 @@ class PlayingState(State):
                 self.msg_text = "TIME'S UP! TRY AGAIN"
                 self.msg_timer = 2.0
             return
+
         if self.game.entity_manager.total_pellets <= 0:
             self.game.sound_manager.play_sound("level_complete")
-
             self.game.score_management.add_time_bonus(
                 int(self.game.level_manager.remaining_time)
             )
-
             next_lvl = self.game.level_manager.current_level_index + 1
-
             if next_lvl >= len(self.game.config.levels):
                 self.game.state_manager.change_state(VictoryState(self.game))
             else:
@@ -363,28 +295,25 @@ class PlayingState(State):
                 self.game.state_manager.change_state(PlayingState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
+        # HUD bar
+        pygame.draw.rect(screen, ui.COLOR_BG_PANEL, (0, 0, screen.get_width(), 40))
+        pygame.draw.line(screen, ui.COLOR_NEON_CYAN, (0, 40), (screen.get_width(), 40), 2)
 
-        pygame.draw.rect(screen, (10, 10, 20), (0, 0, screen.get_width(), 40))
-        pygame.draw.line(screen, (0, 238, 255), (0, 40), (screen.get_width(), 40), 2)
-
-        score_surf = self.font_hud.render(
-            f"SCORE: {self.game.score_management.get_score()}",
-            True,
-            (255, 238, 0),
+        score_surf = ui.FONT_HUD.render(
+            f"SCORE: {self.game.score_management.get_score()}", True, ui.COLOR_NEON_YELLOW,
         )
         lvl_num = self.game.level_manager.current_level_index + 1
-        level_surf = self.font_hud.render(f"LEVEL: {lvl_num}", True, (255, 255, 255))
-        lives_surf = self.font_hud.render(
-            f"LIVES: {self.game.lives}", True, (255, 0, 0)
-        )
-
+        level_surf = ui.FONT_HUD.render(f"LEVEL: {lvl_num}", True, ui.COLOR_WHITE)
+        lives_surf = ui.FONT_HUD.render(f"LIVES: {self.game.lives}", True, ui.COLOR_RED)
         time_rem = max(0, int(self.game.level_manager.remaining_time))
-        time_surf = self.font_hud.render(f"TIME: {time_rem}s", True, (0, 255, 0))
+        time_surf = ui.FONT_HUD.render(f"TIME: {time_rem}s", True, ui.COLOR_GREEN)
 
         screen.blit(score_surf, (15, 10))
         screen.blit(level_surf, (screen.get_width() // 3, 10))
         screen.blit(lives_surf, (2 * screen.get_width() // 3, 10))
         screen.blit(time_surf, (screen.get_width() - 110, 10))
+
+        # Floating message
         if self.msg_timer > 0:
             self.msg_timer -= 1 / 60
         else:
@@ -392,34 +321,28 @@ class PlayingState(State):
 
         player = self.game.entity_manager.player
         if self.msg_timer > 0:
-            text_surface = self.font_hud.render(self.msg_text, True, "white")
+            px, py = pixel_to_screen(player.x, player.y)
+            text_surface = ui.FONT_HUD.render(self.msg_text, True, ui.COLOR_WHITE)
             screen.blit(
                 text_surface,
-                (
-                    PADDING // 2 + player.x - text_surface.get_width() // 2,
-                    TOP_BAR_HEIGHT + PADDING // 2 + player.y - 40,
-                ),
+                (px - text_surface.get_width() // 2, py - 40),
             )
 
+        # Maze walls
         c = CELL_SIZE
-
         for row, cells in enumerate(self.maze):
-
             for col, cell in enumerate(cells):
-                x = PADDING // 2 + col * CELL_SIZE
-                y = PADDING // 2 + row * CELL_SIZE + TOP_BAR_HEIGHT
+                x, y = cell_to_screen(row, col)
 
                 if cell & NORTH:
                     dr.line(screen, "blue", (x, y), (x + c, y), 2)
-
                 if cell & EAST:
                     dr.line(screen, "blue", (x + c, y), (x + c, y + c), 2)
-
                 if cell & SOUTH:
                     dr.line(screen, "blue", (x, y + c), (x + c, y + c), 2)
-
                 if cell & WEST:
                     dr.line(screen, "blue", (x, y), (x, y + c), 2)
+
         self.game.entity_manager.draw(screen)
 
     def check_collision(self, player, ghosts):
@@ -428,7 +351,6 @@ class PlayingState(State):
         for ghost in ghosts:
             dx = player.x - ghost.x
             dy = player.y - ghost.y
-
             distance = math.hypot(dx, dy)
 
             if distance <= radius * 2 and not ghost.is_eaten:
@@ -437,21 +359,15 @@ class PlayingState(State):
                     self.game.sound_manager.play_sound("eat_ghost")
                     self.game.score_management.add_ghost()
                     player.trigger_attack()
-
                 else:
                     if expired(self.player_invincible_until):
                         if self.game.lives > 1:
                             self.game.sound_manager.play_sound("player_death")
-
                         self.game.lives -= 1
                         self.player_invincible_until = after(1500)
-
                         player.reset_location()
-
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0
-
-        self.font_hud.render(self.msg_text, True, "white")
 
 
 class PauseState(State):
@@ -460,23 +376,15 @@ class PauseState(State):
     def __init__(self, game: Any, previous_state: PlayingState) -> None:
         super().__init__(game)
         self.previous_state = previous_state
-        self.font_title = pygame.font.Font(None, 48)
-        self.font_btn = pygame.font.Font(None, 36)
         self.resume_button: Optional[Button] = None
         self.home_button: Optional[Button] = None
 
     def enter(self) -> None:
         self.game.sound_manager.play_sound("pause")
-
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
-
-        self.resume_button = Button(
-            w // 2 - 100, h // 2 - 40, 200, 45, "RESUME", self.font_btn
-        )
-        self.home_button = Button(
-            w // 2 - 100, h // 2 + 25, 200, 45, "Home MENU", self.font_btn
-        )
+        self.resume_button = Button(w // 2 - 100, h // 2 - 40, 200, 45, "RESUME", ui.FONT_BTN)
+        self.home_button = Button(w // 2 - 100, h // 2 + 25, 200, 45, "Home MENU", ui.FONT_BTN)
 
     def update(
         self,
@@ -486,28 +394,18 @@ class PauseState(State):
         if input_state.pause_pressed:
             self.game.state_manager.pop_state()
             return
-
         if self.resume_button and self.resume_button.update(input_state):
             self.game.state_manager.pop_state()
-
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
         self.previous_state.draw(screen)
-
-        overlay = pygame.Surface(
-            (screen.get_width(), screen.get_height()), pygame.SRCALPHA
+        ui.draw_overlay(screen, 150)
+        ui.draw_text_centered(
+            screen, ui.FONT_TITLE, "GAME PAUSED",
+            screen.get_height() // 2 - 100, ui.COLOR_NEON_CYAN,
         )
-        overlay.fill((0, 0, 0, 150))
-        screen.blit(overlay, (0, 0))
-
-        title_surf = self.font_title.render("GAME PAUSED", True, (0, 238, 255))
-        title_rect = title_surf.get_rect(
-            center=(screen.get_width() // 2, screen.get_height() // 2 - 100)
-        )
-        screen.blit(title_surf, title_rect)
-
         if self.resume_button and self.home_button:
             self.resume_button.draw(screen)
             self.home_button.draw(screen)
@@ -519,11 +417,6 @@ class GameOverState(State):
     def __init__(self, game, previous_state: PlayingState):
         super().__init__(game)
         self.previous_state = previous_state
-        self.font_title = pygame.font.Font(None, 48)
-        self.losing_cause = pygame.font.Font(None, 42)
-
-        self.font_btn = pygame.font.Font(None, 36)
-
         self.name_button: Optional[Button] = None
         self.home_button: Optional[Button] = None
         self.hi_score_button: Optional[Button] = None
@@ -532,126 +425,61 @@ class GameOverState(State):
         self.game.sound_manager.play_music("game_over_music", loop=False)
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
+        center_x, center_y = w // 2, h // 2
 
-        center_x = w // 2
-        center_y = h // 2
-        self.name_button = Button(
-            center_x - 100,
-            center_y + 20,
-            200,
-            45,
-            "Enter Your Name",
-            self.font_btn,
-        )
-
-        self.hi_score_button = Button(
-            center_x - 100,
-            center_y + 85,
-            200,
-            45,
-            "Highest Score",
-            self.font_btn,
-        )
-
-        self.home_button = Button(
-            center_x - 100,
-            center_y + 150,
-            200,
-            45,
-            "Home Menu",
-            self.font_btn,
-        )
+        self.name_button = Button(center_x - 100, center_y + 20, 200, 45, "Enter Your Name", ui.FONT_BTN)
+        self.hi_score_button = Button(center_x - 100, center_y + 85, 200, 45, "Highest Score", ui.FONT_BTN)
+        self.home_button = Button(center_x - 100, center_y + 150, 200, 45, "Home Menu", ui.FONT_BTN)
 
     def update(self, input_state, events):
         if self.name_button and self.name_button.update(input_state):
             self.game.state_manager.change_state(NameInputState(self.game))
-
         elif self.hi_score_button and self.hi_score_button.update(input_state):
             self.game.state_manager.change_state(HighScoreState(self.game, self))
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
-        lives = self.game.lives
-
         self.previous_state.draw(screen)
-
-        # Overlay
-        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
-        screen.blit(overlay, (0, 0))
+        ui.draw_overlay(screen, 150)
 
         center_x = screen.get_width() // 2
         center_y = screen.get_height() // 2
 
-        # ---------- Title ----------
-        title_surf = self.font_title.render(
-            "GAME OVER",
-            True,
-            (0, 238, 255),
-        )
-        title_rect = title_surf.get_rect(center=(center_x, center_y - 170))
-        screen.blit(title_surf, title_rect)
+        # Title
+        ui.draw_text_centered(screen, ui.FONT_TITLE, "GAME OVER", center_y - 170, ui.COLOR_NEON_CYAN)
 
-        # ---------- Losing Cause ----------
+        # Losing cause
+        lives = self.game.lives
         cause = "You were caught by a ghost!" if lives == 0 else "Time's Up!"
-
-        losing_surf = self.losing_cause.render(
-            cause,
-            True,
-            (255, 80, 80),
-        )
+        losing_surf = ui.FONT_LOSING.render(cause, True, (255, 80, 80))
         losing_rect = losing_surf.get_rect(center=(center_x, center_y - 125))
         screen.blit(losing_surf, losing_rect)
 
-        # ---------- Scores ----------
+        # Scores
         score = self.game.score_management.get_score()
         top_scores = self.game.highscore_manager.get_top_scores()
+        high_score = top_scores[0]["score"] if top_scores else 0
 
-        if top_scores:
-            high_score = top_scores[0]["score"]
-        else:
-            high_score = 0
-
-        score_label = self.font_btn.render(
-            "Your Score:",
-            True,
-            (220, 220, 220),
-        )
-        score_value = self.font_btn.render(
-            str(score),
-            True,
-            (255, 238, 0),
-        )
-
+        score_label = ui.FONT_BTN.render("Your Score:", True, (220, 220, 220))
+        score_value = ui.FONT_BTN.render(str(score), True, ui.COLOR_NEON_YELLOW)
         score_label_rect = score_label.get_rect(center=(center_x - 40, center_y - 65))
         score_value_rect = score_value.get_rect(
             midleft=(score_label_rect.right + 10, score_label_rect.centery)
         )
-
         screen.blit(score_label, score_label_rect)
         screen.blit(score_value, score_value_rect)
 
-        high_label = self.font_btn.render(
-            "Highest Score:",
-            True,
-            (220, 220, 220),
-        )
-        high_value = self.font_btn.render(
-            str(high_score),
-            True,
-            (255, 238, 0),
-        )
-
+        high_label = ui.FONT_BTN.render("Highest Score:", True, (220, 220, 220))
+        high_value = ui.FONT_BTN.render(str(high_score), True, ui.COLOR_NEON_YELLOW)
         high_label_rect = high_label.get_rect(center=(center_x - 40, center_y - 25))
         high_value_rect = high_value.get_rect(
             midleft=(high_label_rect.right + 10, high_label_rect.centery)
         )
-
         screen.blit(high_label, high_label_rect)
         screen.blit(high_value, high_value_rect)
 
-        # ---------- Buttons ----------
+        # Buttons
         if self.hi_score_button and self.home_button and self.name_button:
             self.name_button.draw(screen)
             self.hi_score_button.draw(screen)
@@ -663,27 +491,13 @@ class HighScoreState(State):
 
     def __init__(self, game: Any, previous_state=None) -> None:
         super().__init__(game)
-
         self.previous_state = previous_state
-
-        self.font_title = pygame.font.Font(None, 48)
-        self.font_score = pygame.font.Font(None, 32)
-        self.font_btn = pygame.font.Font(None, 36)
-
         self.home_button: Optional[Button] = None
 
     def enter(self) -> None:
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
-
-        self.home_button = Button(
-            w // 2 - 100,
-            h - 90,
-            200,
-            45,
-            "Home MENU",
-            self.font_btn,
-        )
+        self.home_button = Button(w // 2 - 100, h - 90, 200, 45, "Home MENU", ui.FONT_BTN)
 
     def update(
         self,
@@ -697,52 +511,23 @@ class HighScoreState(State):
         if self.previous_state:
             self.previous_state.draw(screen)
         else:
-            screen.fill((10, 10, 20))
+            screen.fill(ui.COLOR_BG_PANEL)
 
-        overlay = pygame.Surface(
-            (screen.get_width(), screen.get_height()),
-            pygame.SRCALPHA,
-        )
-        overlay.fill((0, 0, 0, 180))
-        screen.blit(overlay, (0, 0))
-
-        title_surf = self.font_title.render(
-            "HIGH SCORES",
-            True,
-            (0, 238, 255),
-        )
-        title_rect = title_surf.get_rect(center=(screen.get_width() // 2, 90))
-        screen.blit(title_surf, title_rect)
+        ui.draw_overlay(screen, 180)
+        ui.draw_text_centered(screen, ui.FONT_TITLE, "HIGH SCORES", 90, ui.COLOR_NEON_CYAN)
 
         highscores = self.game.highscore_manager.get_top_scores()
 
         if not highscores:
-            empty_surf = self.font_score.render(
-                "No scores yet",
-                True,
-                "white",
-            )
-            empty_rect = empty_surf.get_rect(center=(screen.get_width() // 2, 180))
-            screen.blit(empty_surf, empty_rect)
+            ui.draw_text_centered(screen, ui.FONT_SCORE, "No scores yet", 180, ui.COLOR_WHITE)
         else:
             start_y = 150
-
             for index, item in enumerate(highscores):
-                name = item["name"]
-                score = item["score"]
-
-                score_text = f"{index + 1}. {name}  -  {score}"
-
-                score_surf = self.font_score.render(
-                    score_text,
-                    True,
-                    "white",
-                )
-
+                score_text = f"{index + 1}. {item['name']}  -  {item['score']}"
+                score_surf = ui.FONT_SCORE.render(score_text, True, ui.COLOR_WHITE)
                 score_rect = score_surf.get_rect(
                     center=(screen.get_width() // 2, start_y + index * 35)
                 )
-
                 screen.blit(score_surf, score_rect)
 
         if self.home_button:
@@ -754,83 +539,36 @@ class VictoryState(State):
 
     def __init__(self, game):
         super().__init__(game)
-
-        self.font_title = pygame.font.Font(None, 64)
-        self.font_score = pygame.font.Font(None, 38)
-        self.font_btn = pygame.font.Font(None, 36)
-
         self.save_score_button: Optional[Button] = None
         self.home_button: Optional[Button] = None
 
     def enter(self):
-        # If you do not have this sound, remove this line.
         self.game.sound_manager.play_music("victory_music", loop=False)
-
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
+        center_x, center_y = w // 2, h // 2
 
-        center_x = w // 2
-        center_y = h // 2
-
-        self.save_score_button = Button(
-            center_x - 100,
-            center_y + 40,
-            200,
-            45,
-            "Save Score",
-            self.font_btn,
-        )
-
-        self.home_button = Button(
-            center_x - 100,
-            center_y + 105,
-            200,
-            45,
-            "Home Menu",
-            self.font_btn,
-        )
+        self.save_score_button = Button(center_x - 100, center_y + 40, 200, 45, "Save Score", ui.FONT_BTN)
+        self.home_button = Button(center_x - 100, center_y + 105, 200, 45, "Home Menu", ui.FONT_BTN)
 
     def update(self, input_state, events):
         if self.save_score_button and self.save_score_button.update(input_state):
             self.game.state_manager.change_state(NameInputState(self.game))
-
         elif self.home_button and self.home_button.update(input_state):
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen):
-        screen.fill((10, 10, 20))
+        screen.fill(ui.COLOR_BG_PANEL)
 
-        title_surface = self.font_title.render(
-            "YOU WIN!",
-            True,
-            "yellow",
-        )
-
-        score_surface = self.font_score.render(
+        ui.draw_text_centered(screen, ui.FONT_TITLE_LARGE, "YOU WIN!", 130, ui.COLOR_NEON_YELLOW)
+        ui.draw_text_centered(
+            screen, ui.FONT_SCORE,
             f"Final Score: {self.game.score_management.get_score()}",
-            True,
-            "white",
-        )
-
-        screen.blit(
-            title_surface,
-            (
-                screen.get_width() // 2 - title_surface.get_width() // 2,
-                130,
-            ),
-        )
-
-        screen.blit(
-            score_surface,
-            (
-                screen.get_width() // 2 - score_surface.get_width() // 2,
-                210,
-            ),
+            210, ui.COLOR_WHITE,
         )
 
         if self.save_score_button:
             self.save_score_button.draw(screen)
-
         if self.home_button:
             self.home_button.draw(screen)
 
@@ -838,14 +576,9 @@ class VictoryState(State):
 class NameInputState(State):
     def __init__(self, game):
         super().__init__(game)
-
         self.player_name = ""
         self.final_score = 0
-
         self.title_text = "ENTER YOUR NAME"
-        self.font_title = pygame.font.Font(None, 48)
-        self.font_input = pygame.font.Font(None, 36)
-
         self.max_name_length = 10
 
     def enter(self) -> None:
@@ -868,42 +601,21 @@ class NameInputState(State):
         self.game.state_manager.change_state(HighScoreState(self.game))
 
     def draw(self, screen):
-        screen.fill((10, 10, 20))
+        screen.fill(ui.COLOR_BG_PANEL)
 
-        title_surface = self.font_title.render(self.title_text, True, "white")
-
-        score_surface = self.font_input.render(
-            f"Final Score: {self.final_score}", True, "yellow"
+        ui.draw_text_centered(screen, ui.FONT_TITLE, self.title_text, 120, ui.COLOR_WHITE)
+        ui.draw_text_centered(
+            screen, ui.FONT_INPUT,
+            f"Final Score: {self.final_score}",
+            190, ui.COLOR_NEON_YELLOW,
         )
 
-        input_surface = self.font_input.render(
-            self.player_name + "_",
-            True,
-            "cyan",
-        )
+        # Name input
+        input_surf = ui.FONT_INPUT.render(self.player_name + "_", True, ui.COLOR_NEON_CYAN)
+        input_rect = input_surf.get_rect(center=(screen.get_width() // 2, 260))
+        screen.blit(input_surf, input_rect)
 
-        help_surface = self.font_input.render(
-            "Press ENTER to save",
-            True,
-            "gray",
-        )
-
-        screen.blit(
-            title_surface,
-            (screen.get_width() // 2 - title_surface.get_width() // 2, 120),
-        )
-
-        screen.blit(
-            score_surface,
-            (screen.get_width() // 2 - score_surface.get_width() // 2, 190),
-        )
-
-        screen.blit(
-            input_surface,
-            (screen.get_width() // 2 - input_surface.get_width() // 2, 260),
-        )
-
-        screen.blit(
-            help_surface,
-            (screen.get_width() // 2 - help_surface.get_width() // 2, 330),
+        ui.draw_text_centered(
+            screen, ui.FONT_INPUT, "Press ENTER to save",
+            330, (128, 128, 128),
         )

@@ -35,16 +35,23 @@ class MovementSystem:
             entity.col_direction = 0
 
     def is_centered(self, entity) -> bool:
-        """Check if entity is exactly in the center of a maze cell."""
+        tolerance = 5
+
+        cell_col = int(entity.x // CELL_SIZE)
+        cell_row = int(entity.y // CELL_SIZE)
+
+        center_x = cell_col * CELL_SIZE + CELL_SIZE // 2
+        center_y = cell_row * CELL_SIZE + CELL_SIZE // 2
+
         return (
-            entity.x % CELL_SIZE == CELL_SIZE // 2
-            and entity.y % CELL_SIZE == CELL_SIZE // 2
+            abs(entity.x - center_x) <= tolerance
+            and abs(entity.y - center_y) <= tolerance
         )
 
     def update_cell_position(self, entity) -> None:
         """Update row/col using the current pixel position x/y."""
-        entity.row = int(entity.y // CELL_SIZE)
-        entity.col = int(entity.x // CELL_SIZE)
+        entity.grid_y = int(entity.y // CELL_SIZE)
+        entity.grid_x = int(entity.x // CELL_SIZE)
 
     def can_move(self, row: int, col: int, direction: str) -> bool:
         """Check if there is no wall in the wanted direction."""
@@ -61,18 +68,33 @@ class MovementSystem:
 
         return False
 
+    def is_opposite_direction(self, entity) -> bool:
+        opposite_direction = {
+            "LEFT": "RIGHT",
+            "RIGHT": "LEFT",
+            "UP": "DOWN",
+            "DOWN": "UP",
+        }
+
+        if entity.direction is None or entity.next_direction is None:
+            return False
+
+        return opposite_direction[entity.direction] == entity.next_direction
+
     def update_entity(self, entity) -> None:
         """Move an entity by pixels, only change direction at cell center."""
 
+        if self.is_opposite_direction(entity):
+            self.set_direction(entity, entity.next_direction)
+            entity.next_direction = None
+
         if self.is_centered(entity):
             self.update_cell_position(entity)
-            entity.grid_y = entity.row
-            entity.grid_x = entity.col
 
             if entity.next_direction is not None:
                 if self.can_move(
-                    entity.row,
-                    entity.col,
+                    entity.grid_y,
+                    entity.grid_x,
                     entity.next_direction,
                 ):
                     self.set_direction(entity, entity.next_direction)
@@ -81,7 +103,7 @@ class MovementSystem:
             if entity.direction is None:
                 return
 
-            if not self.can_move(entity.row, entity.col, entity.direction):
+            if not self.can_move(entity.grid_y, entity.grid_x, entity.direction):
                 return
 
         entity.x += entity.col_direction * entity.speed
@@ -163,7 +185,31 @@ class MovementSystem:
         """Move ghost toward target using BFS pathfinding."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
-            path = self.bfs_path((ghost.row, ghost.col), (target_row, target_col))
+
+            start = (ghost.grid_y, ghost.grid_x)
+            target = (target_row, target_col)
+
+            path = self.bfs_path(start, target)
+
+            if len(path) >= 2:
+                next_cell = path[1]
+                direction = self.direction_to_next_cell(start, next_cell)
+
+                if direction is not None:
+                    self.set_direction(ghost, direction)
+
+        self.update_entity(ghost)
+
+    def update_bfs_ghost(self, ghost, player) -> None:
+        """Move ghost toward player when ghost is not edible."""
+        if self.is_centered(ghost):
+            self.update_cell_position(ghost)
+
+            start = (ghost.grid_y, ghost.grid_x)
+            target = (player.grid_y, player.grid_x)
+
+            path = self.bfs_path(start, target)
+
             if len(path) >= 2:
                 direction = self.direction_to_next_cell(path[0], path[1])
                 if direction is not None:
@@ -216,7 +262,7 @@ class MovementSystem:
         return False
 
     def choose_runaway_target_by_zone(self, player):
-        player_zone = self.get_zone(player.row, player.col)
+        player_zone = self.get_zone(player.grid_y, player.grid_x)
 
         zones = [
             "TOP_LEFT",
@@ -291,11 +337,11 @@ class MovementSystem:
             if ghost.runaway_target is None:
                 ghost.runaway_target = self.choose_runaway_target_by_zone(player)
 
-            if ghost.runaway_target == (ghost.row, ghost.col):
+            if ghost.runaway_target == (ghost.grid_y, ghost.grid_x):
                 ghost.runaway_target = self.choose_runaway_target_by_zone(player)
 
             if ghost.runaway_target is not None:
-                start = (ghost.row, ghost.col)
+                start = (ghost.grid_y, ghost.grid_x)
                 path = self.bfs_path(
                     start,
                     ghost.runaway_target,

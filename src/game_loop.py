@@ -12,7 +12,8 @@
 
 
 from src.graphics.entity_manager import EntityManager
-from src.graphics.renderer import HomeState, StateManager
+from src.graphics.renderer import StateManager
+from src.graphics.states.home import HomeState
 from src.graphics.ui_helpers import _init_fonts
 from src.logic.level_manager import LevelManager
 from src.sounds.soud_manager import SoundManager

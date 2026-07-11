@@ -18,30 +18,30 @@ class MovementSystem:
     # ----------------------------
 
     def set_direction(self, entity, direction: str) -> None:
-        """Set entity direction and convert it to row/col movement."""
+        """Set entity direction and convert it to grid_y/grid_x movement."""
         entity.direction = direction
 
         if direction == "LEFT":
-            entity.row_direction = 0
-            entity.col_direction = -1
+            entity.grid_y_direction = 0
+            entity.grid_x_direction = -1
         elif direction == "RIGHT":
-            entity.row_direction = 0
-            entity.col_direction = 1
+            entity.grid_y_direction = 0
+            entity.grid_x_direction = 1
         elif direction == "UP":
-            entity.row_direction = -1
-            entity.col_direction = 0
+            entity.grid_y_direction = -1
+            entity.grid_x_direction = 0
         elif direction == "DOWN":
-            entity.row_direction = 1
-            entity.col_direction = 0
+            entity.grid_y_direction = 1
+            entity.grid_x_direction = 0
 
     def is_centered(self, entity) -> bool:
         tolerance = 5
 
-        cell_col = int(entity.x // CELL_SIZE)
-        cell_row = int(entity.y // CELL_SIZE)
+        cell_grid_x = int(entity.x // CELL_SIZE)
+        cell_grid_y = int(entity.y // CELL_SIZE)
 
-        center_x = cell_col * CELL_SIZE + CELL_SIZE // 2
-        center_y = cell_row * CELL_SIZE + CELL_SIZE // 2
+        center_x = cell_grid_x * CELL_SIZE + CELL_SIZE // 2
+        center_y = cell_grid_y * CELL_SIZE + CELL_SIZE // 2
 
         return (
             abs(entity.x - center_x) <= tolerance
@@ -49,22 +49,22 @@ class MovementSystem:
         )
 
     def update_cell_position(self, entity) -> None:
-        """Update row/col using the current pixel position x/y."""
+        """Update grid_y/grid_x using the current pixel position x/y."""
         entity.grid_y = int(entity.y // CELL_SIZE)
         entity.grid_x = int(entity.x // CELL_SIZE)
 
-    def can_move(self, row: int, col: int, direction: str) -> bool:
+    def can_move(self, grid_y: int, grid_x: int, direction: str) -> bool:
         """Check if there is no wall in the wanted direction."""
-        cell = self.maze[row][col]
+        cell = self.maze[grid_y][grid_x]
 
         if direction == "LEFT":
-            return col > 0 and not (cell & WEST)
+            return grid_x > 0 and not (cell & WEST)
         if direction == "RIGHT":
-            return col < len(self.maze[0]) - 1 and not (cell & EAST)
+            return grid_x < len(self.maze[0]) - 1 and not (cell & EAST)
         if direction == "UP":
-            return row > 0 and not (cell & NORTH)
+            return grid_y > 0 and not (cell & NORTH)
         if direction == "DOWN":
-            return row < len(self.maze) - 1 and not (cell & SOUTH)
+            return grid_y < len(self.maze) - 1 and not (cell & SOUTH)
 
         return False
 
@@ -106,15 +106,15 @@ class MovementSystem:
             if not self.can_move(entity.grid_y, entity.grid_x, entity.direction):
                 return
 
-        entity.x += entity.col_direction * entity.speed
-        entity.y += entity.row_direction * entity.speed
+        entity.x += entity.grid_x_direction * entity.speed
+        entity.y += entity.grid_y_direction * entity.speed
 
     # ----------------------------
     # NOT EDIBLE GHOST MOVEMENT
     # Ghost chases player using BFS
     # ----------------------------
 
-    def get_neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
+    def get_neighbors(self, grid_y: int, grid_x: int) -> list[tuple[int, int]]:
         """Return all cells the ghost can move to from current cell."""
         neighbors = []
 
@@ -125,9 +125,9 @@ class MovementSystem:
             "DOWN": (1, 0),
         }
 
-        for direction, (d_row, d_col) in directions.items():
-            if self.can_move(row, col, direction):
-                neighbors.append((row + d_row, col + d_col))
+        for direction, (d_grid_y, d_grid_x) in directions.items():
+            if self.can_move(grid_y, grid_x, direction):
+                neighbors.append((grid_y + d_grid_y, grid_x + d_grid_x))
 
         return neighbors
 
@@ -167,27 +167,27 @@ class MovementSystem:
         next_cell: tuple[int, int],
     ) -> str | None:
         """Convert next cell into a direction string."""
-        row, col = current
-        next_row, next_col = next_cell
+        grid_y, grid_x = current
+        next_grid_y, next_grid_x = next_cell
 
-        if next_row == row and next_col == col - 1:
+        if next_grid_y == grid_y and next_grid_x == grid_x - 1:
             return "LEFT"
-        if next_row == row and next_col == col + 1:
+        if next_grid_y == grid_y and next_grid_x == grid_x + 1:
             return "RIGHT"
-        if next_row == row - 1 and next_col == col:
+        if next_grid_y == grid_y - 1 and next_grid_x == grid_x:
             return "UP"
-        if next_row == row + 1 and next_col == col:
+        if next_grid_y == grid_y + 1 and next_grid_x == grid_x:
             return "DOWN"
 
         return None
 
-    def _navigate_bfs(self, ghost, target_row: int, target_col: int) -> None:
+    def _navigate_bfs(self, ghost, target_grid_y: int, target_grid_x: int) -> None:
         """Move ghost toward target using BFS pathfinding."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
 
             start = (ghost.grid_y, ghost.grid_x)
-            target = (target_row, target_col)
+            target = (target_grid_y, target_grid_x)
 
             path = self.bfs_path(start, target)
 
@@ -216,47 +216,47 @@ class MovementSystem:
                     self.set_direction(ghost, direction)
         self.update_entity(ghost)
 
-    def update_ghost_to_target(self, ghost, target_row, target_col):
-        self._navigate_bfs(ghost, target_row, target_col)
+    def update_ghost_to_target(self, ghost, target_grid_y, target_grid_x):
+        self._navigate_bfs(ghost, target_grid_y, target_grid_x)
 
     def update_bfs_ghost(self, ghost, player) -> None:
         """Move ghost toward player when ghost is not edible."""
-        self._navigate_bfs(ghost, player.row, player.col)
+        self._navigate_bfs(ghost, player.grid_y, player.grid_x)
 
     # ----------------------------
     # EDIBLE GHOST MOVEMENT
     # Ghost runs away from player
     # ----------------------------
 
-    def get_zone(self, row, col):
-        middle_row = len(self.maze) // 2
-        middle_col = len(self.maze[0]) // 2
-        if row < middle_row and col < middle_col:
+    def get_zone(self, grid_y, grid_x):
+        middle_grid_y = len(self.maze) // 2
+        middle_grid_x = len(self.maze[0]) // 2
+        if grid_y < middle_grid_y and grid_x < middle_grid_x:
             return "TOP_LEFT"
-        if row < middle_row and col >= middle_col:
+        if grid_y < middle_grid_y and grid_x >= middle_grid_x:
             return "TOP_RIGHT"
-        if row >= middle_row and col < middle_col:
+        if grid_y >= middle_grid_y and grid_x < middle_grid_x:
             return "BOTTOM_LEFT"
 
         return "BOTTOM_RIGHT"
 
     def get_zone_bounds(self, zone: str):
-        middle_row = len(self.maze) // 2
-        middle_col = len(self.maze[0]) // 2
-        max_row = len(self.maze) - 1
-        max_col = len(self.maze[0]) - 1
+        middle_grid_y = len(self.maze) // 2
+        middle_grid_x = len(self.maze[0]) // 2
+        max_grid_y = len(self.maze) - 1
+        max_grid_x = len(self.maze[0]) - 1
 
         if zone == "TOP_LEFT":
-            return (0, middle_row - 1), (0, middle_col - 1)
+            return (0, middle_grid_y - 1), (0, middle_grid_x - 1)
         if zone == "TOP_RIGHT":
-            return (0, middle_row - 1), (middle_col, max_col)
+            return (0, middle_grid_y - 1), (middle_grid_x, max_grid_x)
         if zone == "BOTTOM_LEFT":
-            return (middle_row, max_row), (0, middle_col - 1)
-        return (middle_row, max_row), (middle_col, max_col)
+            return (middle_grid_y, max_grid_y), (0, middle_grid_x - 1)
+        return (middle_grid_y, max_grid_y), (middle_grid_x, max_grid_x)
 
-    def is_valid_cell(self, row, col):
+    def is_valid_cell(self, grid_y, grid_x):
         for direction in ["LEFT", "RIGHT", "UP", "DOWN"]:
-            if self.can_move(row, col, direction):
+            if self.can_move(grid_y, grid_x, direction):
                 return True
 
         return False
@@ -280,14 +280,16 @@ class MovementSystem:
         while safe_zones:
             random_zone = self.rng.choice(safe_zones)
 
-            (row_min, row_max), (col_min, col_max) = self.get_zone_bounds(random_zone)
+            (grid_y_min, grid_y_max), (grid_x_min, grid_x_max) = self.get_zone_bounds(
+                random_zone
+            )
 
             valid_cells = []
 
-            for row in range(row_min, row_max + 1):
-                for col in range(col_min, col_max + 1):
-                    if self.is_valid_cell(row, col):
-                        valid_cells.append((row, col))
+            for grid_y in range(grid_y_min, grid_y_max + 1):
+                for grid_x in range(grid_x_min, grid_x_max + 1):
+                    if self.is_valid_cell(grid_y, grid_x):
+                        valid_cells.append((grid_y, grid_x))
 
             if valid_cells:
                 return self.rng.choice(valid_cells)
@@ -296,19 +298,19 @@ class MovementSystem:
 
         return None
 
-    # def distance(self, row1: int, col1: int, row2: int, col2: int) -> int:
-    #     return abs(row1 - row2) + abs(col1 - col2)
+    # def distance(self, grid_y1: int, grid_x1: int, grid_y2: int, grid_x2: int) -> int:
+    #     return abs(grid_y1 - grid_y2) + abs(grid_x1 - grid_x2)
 
     # def choose_runaway_target(self, player) -> tuple[int, int]:
     #     """Choose the corner farthest from the player."""
-    #     max_row = len(self.maze) - 1
-    #     max_col = len(self.maze[0]) - 1
+    #     max_grid_y = len(self.maze) - 1
+    #     max_grid_x = len(self.maze[0]) - 1
 
     #     corners = [
     #         (0, 0),
-    #         (0, max_col),
-    #         (max_row, 0),
-    #         (max_row, max_col),
+    #         (0, max_grid_x),
+    #         (max_grid_y, 0),
+    #         (max_grid_y, max_grid_x),
     #     ]
 
     #     best_corner = corners[0]
@@ -318,8 +320,8 @@ class MovementSystem:
     #         dist = self.distance(
     #             corner[0],
     #             corner[1],
-    #             player.row,
-    #             player.col,
+    #             player.grid_y,
+    #             player.grid_x,
     #         )
 
     #         if dist > best_distance:

@@ -138,8 +138,8 @@ class HomeState(State):
 
             self.game.score_management.reset()
 
-            self.game.level_manager.current_level_index = 0
-            self.game.curr_level = self.game.config.levels[0]
+            self.game.level_manager.current_level_index = 2
+            self.game.curr_level = self.game.config.levels[2]
 
             self.game.curr_level.height = min(self.game.curr_level.height, 32)
             self.game.curr_level.width = min(self.game.curr_level.width, 60)

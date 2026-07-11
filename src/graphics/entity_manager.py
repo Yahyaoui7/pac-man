@@ -526,3 +526,5 @@ class Ghost(Entity):
         self.animation = self.sprites.new_ghost_animation(
             GhostState.HUNT, color=self.ghost_color, facing=self.facing
         )
+
+

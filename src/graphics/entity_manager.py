@@ -135,6 +135,15 @@ class EntityManager:
         self.player.update_animation(dt_ms)
 
         for ghost in self.ghosts:
+            if ghost.is_eaten:
+                if ghost.grid_x == ghost.spawn_x and ghost.grid_y == ghost.spawn_y:
+                    if ghost.respawn_timer < 0:
+                        ghost.respawn_timer = 5.0  # wait 2 seconds
+                    else:
+                        ghost.respawn_timer -= dt
+                        if ghost.respawn_timer <= 0:
+                            ghost.reset()
+
             if ghost.is_edible:
                 ghost.frightened_timer = max(0.0, ghost.frightened_timer - dt)
                 if ghost.frightened_timer == 0.0:
@@ -419,6 +428,7 @@ class Ghost(Entity):
         self.is_edible = False
         self.is_eaten = False
         self.frightened_timer = 0.0
+        self.respawn_timer = 0.0
         self.runaway_target = None
 
         self.sprites = SpriteLibrary.instance()

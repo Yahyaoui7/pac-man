@@ -194,6 +194,10 @@ class PlayingState(State):
             if distance <= radius * 2 and not ghost.is_eaten:
                 if ghost.is_edible:
                     ghost.is_eaten = True
+                    ghost.is_edible = False
+                    ghost.frightened_timer = 0.0
+                    ghost.respawn_timer = -1.0
+                    
                     self.game.sound_manager.play_sound("eat_ghost")
                     self.game.score_management.add_ghost()
                     self.msg_text = f"+{self.game.config.points_per_ghost}"

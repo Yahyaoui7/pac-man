@@ -15,24 +15,29 @@ class VictoryState(State):
         self.home_button: Optional[Button] = None
 
     def enter(self):
+        self.game.resize_window(1200, 750)
         self.game.sound_manager.play_music("victory_music", loop=False)
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
-        center_x, center_y = w // 2, h // 2
+        x, y = w // 2, h // 2
 
         self.save_score_button = Button(
-            center_x - 100, center_y + 40, 200, 45, "Save Score", ui.FONT_BTN
+            (x - 100, y + 40),
+            "Save Score",
         )
         self.home_button = Button(
-            center_x - 100, center_y + 105, 200, 45, "Home Menu", ui.FONT_BTN
+            (x - 100, y + 105),
+            "Home Menu",
         )
 
     def update(self, input_state, events):
         if self.save_score_button and self.save_score_button.update(input_state):
             from src.graphics.states.name_input import NameInputState
+
             self.game.state_manager.change_state(NameInputState(self.game))
         elif self.home_button and self.home_button.update(input_state):
             from src.graphics.states.home import HomeState
+
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen):

@@ -4,6 +4,7 @@ from typing import Any, List
 from src.UI.button import Button
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
+from src.logic.helpers import screen_center
 
 
 class HomeState(State):
@@ -11,12 +12,10 @@ class HomeState(State):
 
     def __init__(self, game: Any) -> None:
         super().__init__(game)
-        self.play_button = Button(200, 180, 200, 50, "START GAME", ui.FONT_BTN)
-        self.instructions_button = Button(
-            200, 245, 200, 50, "INSTRUCTIONS", ui.FONT_BTN
-        )
-        self.scores_button = Button(200, 310, 200, 50, "HIGHSCORES", ui.FONT_BTN)
-        self.quit_button = Button(200, 375, 200, 50, "EXIT", ui.FONT_BTN)
+        self.play_button = Button((0, 0), "hold")
+        self.instructions_button = Button((0, 0), "hold")
+        self.scores_button = Button((0, 0), "hold")
+        self.quit_button = Button((0, 0), "hold")
 
     def enter(self) -> None:
         self.game.resize_window(1200, 750)
@@ -38,14 +37,17 @@ class HomeState(State):
             self.game.curr_level.width = min(self.game.curr_level.width, 60)
             self.game.sound_manager.play_music("game_intro", False)
             from src.graphics.states.playing import PlayingState
+
             self.game.state_manager.change_state(PlayingState(self.game))
 
         elif self.instructions_button.update(input_state):
             from src.graphics.states.instructions import InstructionsState
+
             self.game.state_manager.change_state(InstructionsState(self.game))
 
         elif self.scores_button.update(input_state):
             from src.graphics.states.high_score import HighScoreState
+
             self.game.state_manager.change_state(
                 HighScoreState(self.game, self),
             )
@@ -54,16 +56,39 @@ class HomeState(State):
             self.game.running = False
 
     def draw(self, screen: pygame.Surface) -> None:
+        x, y = screen_center(screen.get_width(), screen.get_height())
+
+        self.play_button = Button(
+            (x - 100, y - 200),
+            "START GAME",
+        )
+        self.instructions_button = Button(
+            (x - 100, y - 130),
+            "INSTRUCTIONS",
+        )
+        self.scores_button = Button(
+            (x - 100, y - 60),
+            "HIGHSCORES",
+        )
+        self.quit_button = Button(
+            (x - 100, y + 10),
+            "EXIT",
+        )
+
         screen.fill(ui.COLOR_BG_DARK)
 
-        title_surf = ui.FONT_TITLE_LARGE.render("PAC-MAN", True, ui.COLOR_NEON_YELLOW)
-        title_rect = title_surf.get_rect(center=(300, 80))
+        title_surf = ui.FONT_TITLE_LARGE.render(
+            "PAC-MAN",
+            True,
+            ui.COLOR_NEON_YELLOW,
+        )
+        title_rect = title_surf.get_rect(center=(x, y - 300))
         screen.blit(title_surf, title_rect)
 
         subtitle_surf = ui.FONT_BTN.render(
             "NEON RETRO EDITION", True, ui.COLOR_NEON_CYAN
         )
-        subtitle_rect = subtitle_surf.get_rect(center=(300, 125))
+        subtitle_rect = subtitle_surf.get_rect(center=(x, y - 250))
         screen.blit(subtitle_surf, subtitle_rect)
 
         self.play_button.draw(screen)

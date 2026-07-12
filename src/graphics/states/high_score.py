@@ -17,9 +17,7 @@ class HighScoreState(State):
     def enter(self) -> None:
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
-        self.home_button = Button(
-            w // 2 - 100, h - 90, 200, 45, "Home MENU", ui.FONT_BTN
-        )
+        self.home_button = Button((w // 2 - 100, h - 90), "Home MENU", ui.FONT_BTN)
 
     def update(
         self,
@@ -28,6 +26,7 @@ class HighScoreState(State):
     ) -> None:
         if self.home_button and self.home_button.update(input_state):
             from src.graphics.states.home import HomeState
+
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:

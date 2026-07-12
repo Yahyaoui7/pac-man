@@ -25,13 +25,13 @@ class GameOverState(State):
         center_x, center_y = w // 2, h // 2
 
         self.name_button = Button(
-            center_x - 100, center_y + 20, 200, 45, "Enter Your Name", ui.FONT_BTN
+            (center_x - 100, center_y + 20), "Enter Your Name", ui.FONT_BTN
         )
         self.hi_score_button = Button(
-            center_x - 100, center_y + 85, 200, 45, "Highest Score", ui.FONT_BTN
+            (center_x - 100, center_y + 85), "Highest Score", ui.FONT_BTN
         )
         self.home_button = Button(
-            center_x - 100, center_y + 150, 200, 45, "Home Menu", ui.FONT_BTN
+            (center_x - 100, center_y + 150), "Home Menu", ui.FONT_BTN
         )
 
     def update(self, input_state, events):

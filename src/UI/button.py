@@ -1,10 +1,24 @@
 import pygame
 
+from src.logic.config import BUTTON_SIZE
+
+button_font = None
+
+
+def get_button_font():
+    global button_font
+    if button_font is None:
+        button_font = pygame.font.Font(None, 36)
+    return button_font
+
 
 class Button:
 
-    def __init__(self, x, y, width, height, text, font):
-
+    def __init__(self, cord, text, font=None, size=BUTTON_SIZE):
+        if font is None:
+            font = get_button_font()
+        width, height = size
+        x, y = cord
         self.rect = pygame.Rect(x, y, width, height)
 
         self.text = text

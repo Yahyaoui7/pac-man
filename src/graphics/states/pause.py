@@ -22,10 +22,12 @@ class PauseState(State):
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
         self.resume_button = Button(
-            w // 2 - 100, h // 2 - 40, 200, 45, "RESUME", ui.FONT_BTN
+            (w // 2 - 100, h // 2 - 40),
+            "RESUME",
         )
         self.home_button = Button(
-            w // 2 - 100, h // 2 + 25, 200, 45, "Home MENU", ui.FONT_BTN
+            (w // 2 - 100, h // 2 + 25),
+            "Home MENU",
         )
 
     def update(
@@ -40,6 +42,7 @@ class PauseState(State):
             self.game.state_manager.pop_state()
         elif self.home_button and self.home_button.update(input_state):
             from src.graphics.states.home import HomeState
+
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:

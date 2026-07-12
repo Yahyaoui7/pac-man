@@ -2,11 +2,6 @@
 
 import pygame
 
-from src.UI.button import Button
-
-# ---------------------------------------------------------------------------
-# Color constants
-# ---------------------------------------------------------------------------
 COLOR_NEON_YELLOW = (255, 238, 0)
 COLOR_NEON_CYAN = (0, 238, 255)
 COLOR_BG_DARK = (5, 5, 10)
@@ -16,16 +11,13 @@ COLOR_RED = (255, 0, 0)
 COLOR_WHITE = (255, 255, 255)
 COLOR_GREEN = (0, 255, 0)
 
-# ---------------------------------------------------------------------------
-# Font constants — lazily created after pygame.init()
-# ---------------------------------------------------------------------------
-_fonts: dict[int, pygame.font.Font] = {}
+fonts: dict[int, pygame.font.Font] = {}
 
 
 def _get_font(size: int) -> pygame.font.Font:
-    if size not in _fonts:
-        _fonts[size] = pygame.font.Font(None, size)
-    return _fonts[size]
+    if size not in fonts:
+        fonts[size] = pygame.font.Font(None, size)
+    return fonts[size]
 
 
 def _font_attr(name: str, size: int) -> pygame.font.Font:
@@ -59,10 +51,6 @@ def _init_fonts():
     FONT_LOSING = _get_font(42)
 
 
-# ---------------------------------------------------------------------------
-# Drawing helpers
-# ---------------------------------------------------------------------------
-
 def draw_overlay(screen: pygame.Surface, alpha: int = 150) -> None:
     """Draw a semi-transparent dark overlay over the full screen."""
     overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
@@ -82,18 +70,3 @@ def draw_text_centered(
     rect = surf.get_rect(center=(screen.get_width() // 2, y))
     screen.blit(surf, rect)
     return rect
-
-
-def make_button_centered(
-    screen: pygame.Surface,
-    label: str,
-    y: int,
-    font: pygame.font.Font | None = None,
-    width: int = 200,
-    height: int = 45,
-) -> Button:
-    """Create a Button centered horizontally on screen."""
-    if font is None:
-        font = FONT_BTN
-    cx = screen.get_width() // 2
-    return Button(cx - width // 2, y, width, height, label, font)

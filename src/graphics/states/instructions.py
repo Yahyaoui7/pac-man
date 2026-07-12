@@ -11,7 +11,7 @@ class InstructionsState(State):
 
     def __init__(self, game: Any) -> None:
         super().__init__(game)
-        self.back_button = Button(200, 420, 200, 45, "BACK", ui.FONT_BTN)
+        self.back_button = Button((200, 420), "BACK", ui.FONT_BTN)
 
     def update(
         self,
@@ -20,6 +20,7 @@ class InstructionsState(State):
     ) -> None:
         if self.back_button.update(input_state):
             from src.graphics.states.home import HomeState
+
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:

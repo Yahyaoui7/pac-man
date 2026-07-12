@@ -19,6 +19,14 @@ class InputState:
     mouse_clicked: bool = False
     skip_level: bool = False
 
+    move_up_pressed: bool = False
+    move_down_pressed: bool = False
+    move_left_pressed: bool = False
+    move_right_pressed: bool = False
+
+    confirm_pressed: bool = False
+    cancel_pressed: bool = False
+
 
 class InputManager:
 
@@ -31,13 +39,19 @@ class InputManager:
         self.state.pause_pressed = False
         self.state.action_pressed = False
         self.state.mouse_clicked = False
+        self.state.move_up_pressed = False
+        self.state.move_down_pressed = False
+        self.state.move_left_pressed = False
+        self.state.move_right_pressed = False
 
+        self.state.confirm_pressed = False
+        self.state.cancel_pressed = False
         keys = pygame.key.get_pressed()
 
-        self.state.move_up = keys[pygame.K_UP]
-        self.state.move_down = keys[pygame.K_DOWN]
-        self.state.move_left = keys[pygame.K_LEFT]
-        self.state.move_right = keys[pygame.K_RIGHT]
+        self.state.move_up = keys[pygame.K_UP] or keys[pygame.K_w]
+        self.state.move_down = keys[pygame.K_DOWN] or keys[pygame.K_s]
+        self.state.move_left = keys[pygame.K_LEFT] or keys[pygame.K_a]
+        self.state.move_right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
 
         self.state.mouse_pos = pygame.mouse.get_pos()
         self.state.mouse_pressed = pygame.mouse.get_pressed()[0]
@@ -51,11 +65,27 @@ class InputManager:
 
             elif event.type == pygame.KEYDOWN:
 
-                if event.key == pygame.K_ESCAPE:
-                    self.state.pause_pressed = True
-                elif event.key == pygame.K_SPACE:
+                if event.key in (pygame.K_UP, pygame.K_w):
+                    self.state.move_up_pressed = True
+
+                elif event.key in (pygame.K_DOWN, pygame.K_s):
+                    self.state.move_down_pressed = True
+
+                elif event.key in (pygame.K_LEFT, pygame.K_a):
+                    self.state.move_left_pressed = True
+
+                elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                    self.state.move_right_pressed = True
+
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    self.state.confirm_pressed = True
                     self.state.action_pressed = True
-                if event.key == pygame.K_l and (event.mod & pygame.KMOD_CTRL):
+
+                elif event.key == pygame.K_ESCAPE:
+                    self.state.pause_pressed = True
+                    self.state.cancel_pressed = True
+
+                elif event.key == pygame.K_l and (event.mod & pygame.KMOD_CTRL):
                     self.state.skip_level = True
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:

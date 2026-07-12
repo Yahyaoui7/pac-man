@@ -50,8 +50,8 @@ class GameStarter:
 
     def recalculate_cell_size(self, width: int, height: int) -> None:
         """Dynamically resize cells so the maze fits nicely on screen."""
-        max_screen_width = 1200
-        max_screen_height = 750
+        max_screen_width = 1000
+        max_screen_height = 600
         self.cell_size = min(
             CELL_SIZE,
             max_screen_width // width,
@@ -63,7 +63,7 @@ class GameStarter:
         pygame.init()
         _init_fonts()
 
-        self.screen = pygame.display.set_mode((1200, 750))
+        self.screen = pygame.display.set_mode((1000, 600))
         pygame.display.set_caption("NEON PAC-MAN")
 
         self.entity_manager = EntityManager(self.config, self.score_management)

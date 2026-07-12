@@ -1,4 +1,3 @@
-import pygame
 from typing import Optional
 
 from src.UI.button import Button
@@ -15,7 +14,7 @@ class VictoryState(State):
         self.home_button: Optional[Button] = None
 
     def enter(self):
-        self.game.resize_window(1200, 750)
+        self.game.resize_window(1000, 600)
         self.game.sound_manager.play_music("victory_music", loop=False)
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()

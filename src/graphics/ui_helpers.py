@@ -10,6 +10,9 @@ COLOR_PELLET = (255, 184, 151)
 COLOR_RED = (255, 0, 0)
 COLOR_WHITE = (255, 255, 255)
 COLOR_GREEN = (0, 255, 0)
+COLOR_DIM_CYAN = (0, 70, 80)
+COLOR_HUD_TOP = (16, 16, 30)
+COLOR_HUD_BOTTOM = (8, 8, 16)
 
 fonts: dict[int, pygame.font.Font] = {}
 
@@ -18,6 +21,24 @@ def _get_font(size: int) -> pygame.font.Font:
     if size not in fonts:
         fonts[size] = pygame.font.Font(None, size)
     return fonts[size]
+
+
+def get_scaled_font(
+    text: str,
+    max_width: int,
+    base_size: int = 28,
+    min_size: int = 14,
+    step: int = 2,
+) -> pygame.font.Font:
+    """Return the largest cached font (<= base_size, >= min_size) that renders
+    *text* within *max_width* pixels. Prevents HUD text from overlapping on
+    narrow/small windows."""
+    size = base_size
+    font = _get_font(size)
+    while size > min_size and font.size(text)[0] > max_width:
+        size -= step
+        font = _get_font(size)
+    return font
 
 
 def _font_attr(name: str, size: int) -> pygame.font.Font:

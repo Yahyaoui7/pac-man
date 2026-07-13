@@ -6,7 +6,15 @@ from typing import Any, List
 
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
-from src.logic.config import CELL_SIZE, PADDING, EAST, NORTH, SOUTH, WEST
+from src.logic.config import (
+    CELL_SIZE,
+    PADDING,
+    TOP_BAR_HEIGHT,
+    EAST,
+    NORTH,
+    SOUTH,
+    WEST,
+)
 from src.logic.helpers import cell_to_screen, pixel_to_screen, expired, after
 from src.logic.movement import MovementSystem
 
@@ -106,7 +114,9 @@ class PlayingState(State):
             if self.game.lives <= 0:
                 from src.graphics.states.game_over import GameOverState
 
-                self.game.state_manager.change_state(GameOverState(self.game, self))
+                self.game.state_manager.change_state(
+                    GameOverState(self.game, self),
+                )
             else:
                 level_cfg = self.game.level_manager.get_current_level_config()
                 self.game.level_manager.remaining_time = float(
@@ -132,59 +142,211 @@ class PlayingState(State):
                 self.game.state_manager.change_state(PlayingState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
-        # HUD bar
-        pygame.draw.rect(screen, ui.COLOR_BG_PANEL, (0, 0, screen.get_width(), 40))
-        pygame.draw.line(
-            screen, ui.COLOR_NEON_CYAN, (0, 40), (screen.get_width(), 40), 2
-        )
+        self._draw_maze_panel(screen)
+        self._draw_maze_walls(screen)
+        self.game.entity_manager.draw(screen)
+        self._draw_hud(screen)
+        self._draw_message(screen)
 
-        score_surf = ui.FONT_HUD.render(
-            f"SCORE: {self.game.score_management.get_score()}",
-            True,
-            ui.COLOR_NEON_YELLOW,
-        )
-        lvl_num = self.game.level_manager.current_level_index + 1
-        level_surf = ui.FONT_HUD.render(f"LEVEL: {lvl_num}", True, ui.COLOR_WHITE)
-        lives_surf = ui.FONT_HUD.render(f"LIVES: {self.game.lives}", True, ui.COLOR_RED)
-        time_rem = max(0, int(self.game.level_manager.remaining_time))
-        time_surf = ui.FONT_HUD.render(f"TIME: {time_rem}s", True, ui.COLOR_GREEN)
+    # ------------------------------------------------------------------
+    # HUD
+    # ------------------------------------------------------------------
 
-        screen.blit(score_surf, (15, 10))
-        screen.blit(level_surf, (screen.get_width() // 3, 10))
-        screen.blit(lives_surf, (2 * screen.get_width() // 3, 10))
-        screen.blit(time_surf, (screen.get_width() - 110, 10))
+    def _draw_hud(self, screen: pygame.Surface) -> None:
+        w = screen.get_width()
+        hud_h = TOP_BAR_HEIGHT + PADDING // 2  # matches the maze's top offset
 
-        # Floating message
-        if self.msg_timer > 0:
-            self.msg_timer -= 1 / 60
-        else:
-            self.msg_text = ""
-
-        player = self.game.entity_manager.player
-        if self.msg_timer > 0:
-            px, py = pixel_to_screen(player.x, player.y)
-            text_surface = ui.FONT_HUD.render(self.msg_text, True, ui.COLOR_WHITE)
-            screen.blit(
-                text_surface,
-                (px - text_surface.get_width() // 2, py - 40),
+        # Vertical gradient panel instead of a flat fill.
+        top_c = ui.COLOR_HUD_TOP
+        bot_c = ui.COLOR_HUD_BOTTOM
+        for y in range(hud_h):
+            t = y / max(hud_h - 1, 1)
+            color = (
+                int(top_c[0] + (bot_c[0] - top_c[0]) * t),
+                int(top_c[1] + (bot_c[1] - top_c[1]) * t),
+                int(top_c[2] + (bot_c[2] - top_c[2]) * t),
             )
+            pygame.draw.line(screen, color, (0, y), (w, y))
 
-        # Maze walls
+        # Double-stroke neon edge along the bottom of the bar.
+        pygame.draw.line(screen, ui.COLOR_DIM_CYAN, (0, hud_h + 1), (w, hud_h + 1), 3)
+        pygame.draw.line(screen, ui.COLOR_NEON_CYAN, (0, hud_h), (w, hud_h), 2)
+
+        # Small corner brackets, arcade-cabinet style.
+        bracket = 12
+        for x, direction in ((6, 1), (w - 6, -1)):
+            pygame.draw.line(
+                screen, ui.COLOR_NEON_YELLOW, (x, 4), (x + direction * bracket, 4), 2
+            )
+            pygame.draw.line(screen, ui.COLOR_NEON_YELLOW, (x, 4), (x, 4 + bracket), 2)
+
+        seg_w = w / 4
+        cy = hud_h // 2
+
+        score_text = f"{self.game.score_management.get_score():,}"
+        self._draw_hud_stat(
+            screen, seg_w * 0.5, cy, "\u2605", score_text, ui.COLOR_NEON_YELLOW, seg_w
+        )
+
+        lvl_num = self.game.level_manager.current_level_index + 1
+        self._draw_hud_stat(
+            screen, seg_w * 1.5, cy, "LV", str(lvl_num), ui.COLOR_WHITE, seg_w
+        )
+
+        self._draw_lives(screen, seg_w * 2.5, cy, seg_w)
+
+        level_cfg = self.game.level_manager.get_current_level_config()
+        time_rem = max(0, int(self.game.level_manager.remaining_time))
+        frac = time_rem / max(level_cfg.level_max_time, 1)
+        if frac < 0.2:
+            time_color = ui.COLOR_RED
+        elif frac < 0.5:
+            time_color = ui.COLOR_NEON_YELLOW
+        else:
+            time_color = ui.COLOR_GREEN
+        self._draw_hud_stat(
+            screen, seg_w * 3.5, cy, "\u23f1", f"{time_rem}s", time_color, seg_w
+        )
+
+        # Thin time-remaining drain bar right under the HUD.
+        bar_h = 3
+        pygame.draw.rect(screen, (30, 30, 40), (0, hud_h - bar_h, w, bar_h))
+        pygame.draw.rect(screen, time_color, (0, hud_h - bar_h, int(w * frac), bar_h))
+
+    def _draw_hud_stat(
+        self,
+        screen: pygame.Surface,
+        cx: float,
+        cy: float,
+        icon: str,
+        value: str,
+        color,
+        seg_w: float,
+    ) -> None:
+        text = f"{icon} {value}"
+        font = ui.get_scaled_font(text, max_width=seg_w - 8, base_size=26)
+        surf = font.render(text, True, color)
+        rect = surf.get_rect(center=(cx, cy))
+        screen.blit(surf, rect)
+
+    def _draw_lives(
+        self, screen: pygame.Surface, cx: float, cy: float, seg_w: float
+    ) -> None:
+        lives = self.game.lives
+        max_icons = 4
+        shown = max(min(lives, max_icons), 0)
+        icon_r = 6
+        spacing = icon_r * 2 + 5
+        total_w = shown * spacing
+        start_x = cx - total_w / 2 + icon_r
+
+        for i in range(shown):
+            x = start_x + i * spacing
+            self._draw_pacman_icon(screen, (x, cy), icon_r, ui.COLOR_NEON_YELLOW)
+
+        if lives > max_icons:
+            extra = f"+{lives - max_icons}"
+            font = ui.get_scaled_font(extra, max_width=seg_w * 0.3, base_size=20)
+            surf = font.render(extra, True, ui.COLOR_WHITE)
+            screen.blit(surf, (start_x + total_w + 6, cy - surf.get_height() // 2))
+        elif lives <= 0:
+            surf = ui.get_scaled_font("0", seg_w - 8, base_size=22).render(
+                "0", True, ui.COLOR_RED
+            )
+            screen.blit(surf, surf.get_rect(center=(cx, cy)))
+
+    @staticmethod
+    def _draw_pacman_icon(screen: pygame.Surface, center, radius: int, color) -> None:
+        x, y = center
+        mouth = 40
+        start = math.radians(mouth / 2)
+        end = math.radians(360 - mouth / 2)
+        steps = 10
+        points = [center]
+        for i in range(steps + 1):
+            a = start + (end - start) * i / steps
+            points.append((x + radius * math.cos(a), y - radius * math.sin(a)))
+        pygame.draw.polygon(screen, color, points)
+
+    # ------------------------------------------------------------------
+    # Maze
+    # ------------------------------------------------------------------
+
+    def _draw_maze_panel(self, screen: pygame.Surface) -> None:
+        """Dark rounded backdrop with a glowing frame behind the maze."""
+        rows = len(self.maze)
+        cols = len(self.maze[0]) if rows else 0
+        x0, y0 = cell_to_screen(0, 0)
+        panel_rect = pygame.Rect(
+            x0 - 6, y0 - 6, cols * CELL_SIZE + 12, rows * CELL_SIZE + 12
+        )
+
+        pygame.draw.rect(screen, ui.COLOR_BG_DARK, panel_rect, border_radius=10)
+        pygame.draw.rect(
+            screen, ui.COLOR_DIM_CYAN, panel_rect, width=3, border_radius=10
+        )
+        pygame.draw.rect(
+            screen, ui.COLOR_NEON_CYAN, panel_rect, width=1, border_radius=10
+        )
+
+    def _draw_maze_walls(self, screen: pygame.Surface) -> None:
         c = CELL_SIZE
         for row, cells in enumerate(self.maze):
             for col, cell in enumerate(cells):
                 x, y = cell_to_screen(row, col)
 
                 if cell & NORTH:
-                    dr.line(screen, "blue", (x, y), (x + c, y), 2)
+                    self._draw_wall_segment(screen, (x, y), (x + c, y))
                 if cell & EAST:
-                    dr.line(screen, "blue", (x + c, y), (x + c, y + c), 2)
+                    self._draw_wall_segment(screen, (x + c, y), (x + c, y + c))
                 if cell & SOUTH:
-                    dr.line(screen, "blue", (x, y + c), (x + c, y + c), 2)
+                    self._draw_wall_segment(screen, (x, y + c), (x + c, y + c))
                 if cell & WEST:
-                    dr.line(screen, "blue", (x, y), (x, y + c), 2)
+                    self._draw_wall_segment(screen, (x, y), (x, y + c))
 
-        self.game.entity_manager.draw(screen)
+    @staticmethod
+    def _draw_wall_segment(screen: pygame.Surface, p1, p2) -> None:
+        """Two-tone glowing wall: a soft dim outer stroke plus a bright core,
+        with rounded joints so segments read as continuous walls."""
+        glow_w, core_w = 6, 2
+        dr.line(screen, ui.COLOR_DIM_CYAN, p1, p2, glow_w)
+        dr.circle(screen, ui.COLOR_DIM_CYAN, p1, glow_w // 2)
+        dr.circle(screen, ui.COLOR_DIM_CYAN, p2, glow_w // 2)
+
+        dr.line(screen, ui.COLOR_NEON_CYAN, p1, p2, core_w)
+        dr.circle(screen, ui.COLOR_NEON_CYAN, p1, core_w // 2 + 1)
+        dr.circle(screen, ui.COLOR_NEON_CYAN, p2, core_w // 2 + 1)
+
+    # ------------------------------------------------------------------
+    # Floating message
+    # ------------------------------------------------------------------
+
+    def _draw_message(self, screen: pygame.Surface) -> None:
+        if self.msg_timer > 0:
+            self.msg_timer -= 1 / 60
+        else:
+            self.msg_text = ""
+
+        if self.msg_timer <= 0:
+            return
+
+        player = self.game.entity_manager.player
+        px, py = pixel_to_screen(player.x, player.y)
+        text_surface = ui.FONT_HUD.render(self.msg_text, True, ui.COLOR_WHITE)
+        text_rect = text_surface.get_rect(center=(px, py - 40))
+
+        bubble_rect = text_rect.inflate(16, 10)
+        bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(bubble, (0, 0, 0, 160), bubble.get_rect(), border_radius=8)
+        pygame.draw.rect(
+            bubble,
+            (*ui.COLOR_NEON_CYAN, 200),
+            bubble.get_rect(),
+            width=1,
+            border_radius=8,
+        )
+        screen.blit(bubble, bubble_rect.topleft)
+        screen.blit(text_surface, text_rect)
 
     def check_collision(self, player, ghosts):
         radius = CELL_SIZE // 3

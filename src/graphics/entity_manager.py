@@ -55,7 +55,12 @@ class EntityManager:
         self.total_pellets = 0
         self.super_gum_abilities = {}
 
-        corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+        corners = [
+            (0, 0),
+            (width - 1, 0),
+            (0, height - 1),
+            (width - 1, height - 1),
+        ]
         abilities = random.sample([ABILITY_PUNCH, ABILITY_KICK], 2)
         self.super_gum_abilities[corners[0]] = abilities[0]
         self.super_gum_abilities[corners[1]] = abilities[1]
@@ -119,7 +124,11 @@ class EntityManager:
             ability = self.super_gum_abilities.pop((px, py), ABILITY_NONE)
             if ability != ABILITY_NONE:
                 self.player.start_powered_mode(
-                    PacmanMode.PUNCH if ability == ABILITY_PUNCH else PacmanMode.KICK,
+                    (
+                        PacmanMode.PUNCH
+                        if ability == ABILITY_PUNCH
+                        else PacmanMode.KICK
+                    ),
                     fright_duration,
                 )
 
@@ -128,7 +137,9 @@ class EntityManager:
 
         # Tick powered-mode timer (synced with ghost fright)
         if self.player.powered_mode is not None:
-            self.player.powered_timer = max(0.0, self.player.powered_timer - dt)
+            self.player.powered_timer = max(
+                0.0, self.player.powered_timer - dt
+            )
             if self.player.powered_timer == 0.0:
                 self.player.end_powered_mode()
 
@@ -136,7 +147,10 @@ class EntityManager:
 
         for ghost in self.ghosts:
             if ghost.is_eaten:
-                if ghost.grid_x == ghost.spawn_x and ghost.grid_y == ghost.spawn_y:
+                if (
+                    ghost.grid_x == ghost.spawn_x
+                    and ghost.grid_y == ghost.spawn_y
+                ):
                     if ghost.respawn_timer < 0:
                         ghost.respawn_timer = 5.0  # wait 2 seconds
                     else:
@@ -170,7 +184,9 @@ class EntityManager:
                     )
                 elif self.pellets[y][x] == 2:
                     pulse = int(math.sin(pygame.time.get_ticks() * 0.01) * 2)
-                    ability = self.super_gum_abilities.get((x, y), ABILITY_NONE)
+                    ability = self.super_gum_abilities.get(
+                        (x, y), ABILITY_NONE
+                    )
                     if ability == ABILITY_PUNCH:
                         color = (255, 100, 100)
                         r = max(5, CELL_SIZE // 3) + pulse
@@ -319,7 +335,10 @@ class Player(Entity):
 
     def use_ability(self) -> None:
         """Activate the current ability if available and not already in a special mode."""
-        if self.mode != PacmanMode.NORMAL or self.current_ability == ABILITY_NONE:
+        if (
+            self.mode != PacmanMode.NORMAL
+            or self.current_ability == ABILITY_NONE
+        ):
             return
 
         if self.current_ability == ABILITY_PUNCH:
@@ -461,14 +480,20 @@ class Ghost(Entity):
         changed = (
             new_state != self.state
             or self.facing != old_facing
-            or (new_state == GhostState.EATEN and vertical != self._last_vertical)
+            or (
+                new_state == GhostState.EATEN
+                and vertical != self._last_vertical
+            )
         )
 
         if changed:
             self.state = new_state
             self._last_vertical = vertical
             self.animation = self.sprites.new_ghost_animation(
-                new_state, color=self.ghost_color, facing=self.facing, vertical=vertical
+                new_state,
+                color=self.ghost_color,
+                facing=self.facing,
+                vertical=vertical,
             )
 
         self.animation.update(dt_ms)
@@ -477,8 +502,17 @@ class Ghost(Entity):
         x, y = pixel_to_screen(self.x, self.y)
 
         frame = self.animation.current_frame
-        rect = frame.get_rect(center=(int(x), int(y)))
-        screen.blit(frame, rect)
+
+        # Draw two pairs of eyes symmetrically offset from the cell center
+        if self.state == GhostState.EATEN:
+            rect = frame.get_rect(center=(int(x) - 8, int(y)))
+            screen.blit(frame, rect)
+
+            second_rect = frame.get_rect(center=(int(x) + 8, int(y)))
+            screen.blit(frame, second_rect)
+        else:
+            rect = frame.get_rect(center=(int(x), int(y)))
+            screen.blit(frame, rect)
 
     def reset(self) -> None:
         self.grid_y = self.spawn_y
@@ -495,5 +529,3 @@ class Ghost(Entity):
         self.animation = self.sprites.new_ghost_animation(
             GhostState.HUNT, color=self.ghost_color, facing=self.facing
         )
-
-

@@ -274,7 +274,6 @@ class SpriteLibrary:
             }
 
         frightened = load_list(meta["frightened"])
-
         eaten_side_r = load_list(meta["eaten"]["side"])
         eaten_side_l = [pygame.transform.flip(s, True, False) for s in eaten_side_r]
 
@@ -318,11 +317,19 @@ class SpriteLibrary:
             return Animation(frames, frame_duration_ms=150, loop=True)
 
         if state == GhostState.EATEN:
-            if vertical in ("up", "down"):
-                frames = self._ghost_frames["eaten"][vertical]
-            else:
-                frames = self._ghost_frames["eaten"]["side"][facing]
-            return Animation(frames, frame_duration_ms=250, loop=True)
+            up_frames = self._ghost_frames["eaten"]["up"]
+            down_frames = self._ghost_frames["eaten"]["down"]
+            right_frames = self._ghost_frames["eaten"]["side"][Facing.RIGHT]
+            left_frames = self._ghost_frames["eaten"]["side"][Facing.LEFT]
+            
+            # Combine the frames to cycle: Up -> Right -> Down -> Left
+            frames = [
+                up_frames[0],
+                right_frames[0],
+                down_frames[0],
+                left_frames[0],
+            ]
+            return Animation(frames, frame_duration_ms=150, loop=True)
 
         raise ValueError(f"Unknown ghost state: {state}")
 

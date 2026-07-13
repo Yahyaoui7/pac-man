@@ -30,23 +30,14 @@ class PauseState(State):
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
 
-        self.resume_button.rect.topleft = (
-            w // 2 - 100,
-            h // 2 - 40,
-        )
-
-        self.home_button.rect.topleft = (
-            w // 2 - 100,
-            h // 2 + 25,
-        )
+        self.resume_button.rect.topleft = (w // 2 - 100, h // 2 - 40)
+        self.home_button.rect.topleft = (w // 2 - 100, h // 2 + 25)
 
     def activate_selected_button(self):
         if self.button_index == 0:
-            print(self.button_index, "selected")
             self.game.state_manager.pop_state()
 
         elif self.button_index == 1:
-            print(self.button_index, "selected")
 
             from src.graphics.states.home import HomeState
 

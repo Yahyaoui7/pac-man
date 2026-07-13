@@ -7,9 +7,8 @@ from typing import Any, List
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
 from src.logic.config import CELL_SIZE, PADDING, EAST, NORTH, SOUTH, WEST
-from src.logic.helpers import cell_to_screen, pixel_to_screen
+from src.logic.helpers import cell_to_screen, pixel_to_screen, expired, after
 from src.logic.movement import MovementSystem
-from src.logic.utils import expired, after
 
 
 class PlayingState(State):
@@ -52,12 +51,14 @@ class PlayingState(State):
 
         if self.game.lives <= 0:
             from src.graphics.states.game_over import GameOverState
+
             self.game.state_manager.change_state(
                 GameOverState(self.game, self),
             )
             return
         if input_state.pause_pressed:
             from src.graphics.states.pause import PauseState
+
             self.game.state_manager.push_state(PauseState(self.game, self))
             return
 
@@ -104,6 +105,7 @@ class PlayingState(State):
         if self.game.level_manager.is_time_out():
             if self.game.lives <= 0:
                 from src.graphics.states.game_over import GameOverState
+
                 self.game.state_manager.change_state(GameOverState(self.game, self))
             else:
                 level_cfg = self.game.level_manager.get_current_level_config()
@@ -123,6 +125,7 @@ class PlayingState(State):
             next_lvl = self.game.level_manager.current_level_index + 1
             if next_lvl >= len(self.game.config.levels):
                 from src.graphics.states.vectory import VictoryState
+
                 self.game.state_manager.change_state(VictoryState(self.game))
             else:
                 self.game.level_manager.current_level_index = next_lvl
@@ -197,7 +200,7 @@ class PlayingState(State):
                     ghost.is_edible = False
                     ghost.frightened_timer = 0.0
                     ghost.respawn_timer = -1.0
-                    
+
                     self.game.sound_manager.play_sound("eat_ghost")
                     self.game.score_management.add_ghost()
                     self.msg_text = f"+{self.game.config.points_per_ghost}"

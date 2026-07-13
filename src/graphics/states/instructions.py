@@ -4,6 +4,7 @@ from typing import Any, List
 from src.UI.button import Button
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
+from src.graphics.states.home import HomeState
 
 
 class InstructionsState(State):
@@ -11,22 +12,32 @@ class InstructionsState(State):
 
     def __init__(self, game: Any) -> None:
         super().__init__(game)
-        self.back_button = Button((200, 420), "BACK", ui.FONT_BTN)
+        self.back_button = Button((200, 420), "BACK")
 
     def update(
         self,
         input_state: Any,
         events: List[pygame.event.Event],
     ) -> None:
-        if self.back_button.update(input_state):
-            from src.graphics.states.home import HomeState
 
+        if (
+            self.back_button
+            and self.back_button.update(input_state)
+            or self.back_button
+            and input_state.confirm_pressed
+            or self.back_button
+            and input_state.pause_pressed
+        ):
             self.game.state_manager.change_state(HomeState(self.game))
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(ui.COLOR_BG_DARK)
 
-        title_surf = ui.FONT_TITLE.render("HOW TO PLAY", True, ui.COLOR_NEON_CYAN)
+        title_surf = ui.FONT_TITLE.render(
+            "HOW TO PLAY",
+            True,
+            ui.COLOR_NEON_CYAN,
+        )
         screen.blit(title_surf, (200, 40))
 
         lines = [

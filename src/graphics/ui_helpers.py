@@ -66,7 +66,7 @@ def _init_fonts():
     FONT_TITLE_LARGE = _get_font(64)
     FONT_BTN = _get_font(36)
     FONT_TEXT = _get_font(24)
-    FONT_HUD = _get_font(28)
+    FONT_HUD = _get_font(20)
     FONT_SCORE = _get_font(32)
     FONT_INPUT = _get_font(36)
     FONT_LOSING = _get_font(42)
@@ -91,3 +91,36 @@ def draw_text_centered(
     rect = surf.get_rect(center=(screen.get_width() // 2, y))
     screen.blit(surf, rect)
     return rect
+
+
+def draw_bubble(text, padding=(20, 12)):
+    text_surface = FONT_HUD.render(text, True, COLOR_WHITE)
+
+    pad_x, pad_y = padding
+
+    bubble_width = text_surface.get_width() + pad_x * 2
+    bubble_height = text_surface.get_height() + pad_y * 2
+
+    bubble = pygame.Surface((bubble_width, bubble_height), pygame.SRCALPHA)
+
+    # Background
+    pygame.draw.rect(
+        bubble,
+        (0, 0, 0, 180),
+        bubble.get_rect(),
+        border_radius=12,
+    )
+
+    # Border
+    pygame.draw.rect(
+        bubble,
+        COLOR_NEON_YELLOW,
+        bubble.get_rect(),
+        width=2,
+        border_radius=12,
+    )
+
+    # Text
+    bubble.blit(text_surface, (pad_x, pad_y))
+
+    return bubble

@@ -31,15 +31,15 @@ class VictoryState(State):
         self.home_button.rect.topleft = (x - 100, y + 105)
 
     def activate_selected_button(self):
-        if self.button_index == 1:
-            from src.graphics.states.name_input import NameInputState
-
-            self.game.state_manager.change_state(NameInputState(self.game))
-
-        elif self.button_index == 2:
+        if self.button_index == 0:
             from src.graphics.states.home import HomeState
 
             self.game.state_manager.change_state(HomeState(self.game))
+
+        elif self.button_index == 1:
+            from src.graphics.states.name_input import NameInputState
+
+            self.game.state_manager.change_state(NameInputState(self.game))
 
     def update(self, input_state, events):
         self.button_index, clicked_index = self.buttons_manager.update(

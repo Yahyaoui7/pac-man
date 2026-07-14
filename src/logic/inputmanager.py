@@ -85,7 +85,7 @@ class InputManager:
                     self.state.pause_pressed = True
                     self.state.cancel_pressed = True
 
-                elif event.key == pygame.K_l and (event.mod & pygame.KMOD_CTRL):
+                elif event.key == pygame.K_k:
                     self.state.skip_level = True
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:

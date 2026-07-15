@@ -23,6 +23,7 @@ from .logic.score import ScoreManager, HighScoreManager
 
 import pygame
 import sys
+import os
 
 sys.setrecursionlimit(99999999)
 
@@ -46,6 +47,7 @@ class GameStarter:
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""
         if self.screen is None or self.screen.get_size() != (width, height):
+            os.environ["SDL_VIDEO_WINDOW_POS"] = "center"
             self.screen = pygame.display.set_mode((width, height))
 
     def recalculate_cell_size(self, width: int, height: int) -> None:

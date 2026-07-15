@@ -1,5 +1,5 @@
 from typing import Optional
-from mazegenerator import MazeGenerator
+from mazegenerator import MazeGenerator  # type: ignore
 from src.logic.config import GameConfig, LevelConfig
 
 
@@ -27,6 +27,11 @@ class LevelManager:
         )
         return maze
 
+    @staticmethod
+    def clamp_dimensions(width: int, height: int) -> tuple[int, int]:
+        """Force any configured size into the range the game can render."""
+        return max(10, min(37, width)), max(10, min(24, height))
+
     def load_level(self, level_index: int) -> bool:
         if level_index >= len(self.config.levels):
             return False
@@ -34,8 +39,7 @@ class LevelManager:
         level_conf = self.get_current_level_config()
         try:
 
-            width = max(10, min(33, level_conf.width))
-            height = max(10, min(63, level_conf.height))
+            width, height = self.clamp_dimensions(level_conf.width, level_conf.height)
 
             self.current_maze = self.build_maze(
                 width,
@@ -43,7 +47,6 @@ class LevelManager:
                 level_conf.seed,
             )
             self.remaining_time = float(level_conf.level_max_time)
-
             return True
 
         except Exception as e:
@@ -53,9 +56,10 @@ class LevelManager:
                 e,
             )
             level_conf = self.config.levels[0]
+            width, height = self.clamp_dimensions(level_conf.width, level_conf.height)
             self.current_maze = self.build_maze(
-                level_conf.width,
-                level_conf.height,
+                width,
+                height,
                 level_conf.seed,
             )
             self.remaining_time = float(level_conf.level_max_time)

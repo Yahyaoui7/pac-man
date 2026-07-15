@@ -38,9 +38,9 @@ class PlayingState(State):
         self.maze = self.game.level_manager.current_maze.maze
         self.game.entity_manager.load_level_entities(self.maze)
 
-        width = self.game.level_manager.get_current_level_config().width
-        height = self.game.level_manager.get_current_level_config().height
-
+        height = len(self.maze)
+        width = len(self.maze[0]) if height else 0
+        print(f"level loaded wiht the size {height} x {width}")
         self.game.recalculate_cell_size(width, height)
         self.game.resize_window(
             width * CELL_SIZE + PADDING,
@@ -120,9 +120,7 @@ class PlayingState(State):
             self.player_invincible_until = 999999999999 if turning_on else 0
         elif name == "speed boost":
             player = self.game.entity_manager.player
-            player.speed = (
-                self.player_speed * 2 if turning_on else self.player_speed
-                )
+            player.speed = self.player_speed * 2 if turning_on else self.player_speed
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager

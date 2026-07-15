@@ -83,6 +83,7 @@ class EntityManager:
 
         height = len(maze)
         width = len(maze[0])
+        print(height, "x", width)
         center_x = width // 2
         center_y = height // 2
 
@@ -262,7 +263,7 @@ def _facing_from_direction(direction, current_facing: Facing) -> Facing:
 
 class Player(Entity):
     def __init__(self, y: int, x: int) -> None:
-        super().__init__(y, x, speed=3)
+        super().__init__(y, x, speed=4)
 
         self.score = 0
         self.msg_txt = ""
@@ -420,7 +421,7 @@ class Ghost(Entity):
         color,
         name: str,
     ) -> None:
-        super().__init__(y, x, speed=1)
+        super().__init__(y, x, speed=2)
 
         self.name = name
         self.color = color

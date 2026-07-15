@@ -17,8 +17,8 @@
             "level_max_time": 1000
         },
                 {
-            "width": 31,
-            "height": 31,
+            "width": 40,
+            "height": 32,
             "seed": 42,
             "level_max_time": 1000
         }

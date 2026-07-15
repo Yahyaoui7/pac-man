@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 
 TOP_BAR_HEIGHT = 30
-CELL_SIZE = 30
+CELL_SIZE = 40
 PADDING = 20
 BUTTON_SIZE = (200, 50)
 NORTH = 1 << 0

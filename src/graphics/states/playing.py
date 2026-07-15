@@ -28,6 +28,9 @@ class PlayingState(State):
         self.msg_timer: float = 0.0
         self.msg_text: str = ""
 
+        self.active_cheats: set[str] = set()
+        self.player_base_speed: float = 0.0
+
     def enter(self) -> None:
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
@@ -48,6 +51,9 @@ class PlayingState(State):
         self.movement = MovementSystem(self.maze)
         self.msg_text = f"LEVEL {curr_idx + 1}"
         self.msg_timer = 2.0
+
+        self.player_base_speed = self.game.entity_manager.player.speed
+        self.active_cheats = set()
 
     def update(
         self,
@@ -86,24 +92,56 @@ class PlayingState(State):
             player.next_direction = "DOWN"
         elif input_state.skip_level:
             self.game.entity_manager.total_pellets = 0
+        elif input_state.extra_life:
+            self.game.lives = min(
+                self.game.config.lives,
+                self.game.lives + 1,
+            )
+        elif input_state.invinciblity:
+            self._toggle_cheat("invincible")
+        elif input_state.speed_boost:
+            self._toggle_cheat("speed boost")
+        elif input_state.ghost_freez:
+            self._toggle_cheat("ghost freeze")
+
         if input_state.action_pressed:
             player.use_ability()
+
+    def _toggle_cheat(self, name: str) -> None:
+        """Flip a named cheat on/off and apply its side effects."""
+        if name in self.active_cheats:
+            self.active_cheats.discard(name)
+            turning_on = False
+        else:
+            self.active_cheats.add(name)
+            turning_on = True
+
+        if name == "invincible":
+            self.player_invincible_until = 999999999999 if turning_on else 0
+        elif name == "speed boost":
+            player = self.game.entity_manager.player
+            player.speed = (
+                self.player_base_speed * 2 if turning_on else self.player_base_speed
+            )
+        # "ghost freeze" has no side effect here; _update_entities checks
+        # self.active_cheats directly each frame.
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
         self.movement.update_entity(em.player)
 
-        for ghost in em.ghosts:
-            if ghost.is_eaten:
-                self.movement.update_ghost_to_target(
-                    ghost,
-                    ghost.spawn_y,
-                    ghost.spawn_x,
-                )
-            elif ghost.is_edible:
-                self.movement.update_runaway_ghost(ghost, em.player)
-            else:
-                self.movement.update_bfs_ghost(ghost, em.player)
+        if "ghost freeze" not in self.active_cheats:
+            for ghost in em.ghosts:
+                if ghost.is_eaten:
+                    self.movement.update_ghost_to_target(
+                        ghost,
+                        ghost.spawn_y,
+                        ghost.spawn_x,
+                    )
+                elif ghost.is_edible:
+                    self.movement.update_runaway_ghost(ghost, em.player)
+                else:
+                    self.movement.update_bfs_ghost(ghost, em.player)
 
         self.check_collision(em.player, em.ghosts)
         em.update(self.maze, 1 / 60.0)
@@ -147,6 +185,7 @@ class PlayingState(State):
         self.game.entity_manager.draw(screen)
         self._draw_hud(screen)
         self._draw_message(screen)
+        self._draw_cheat_banner(screen)
 
     # ------------------------------------------------------------------
     # HUD
@@ -347,6 +386,36 @@ class PlayingState(State):
         )
         screen.blit(bubble, bubble_rect.topleft)
         screen.blit(text_surface, text_rect)
+
+    # ------------------------------------------------------------------
+    # Cheat banner
+    # ------------------------------------------------------------------
+
+    def _draw_cheat_banner(self, screen: pygame.Surface) -> None:
+        if not self.active_cheats:
+            return
+
+        label = " + ".join(sorted(self.active_cheats)).upper()
+        text = f"CHEATS ACTIVE: {label}"
+
+        font = ui.get_scaled_font(text, max_width=screen.get_width() - 24, base_size=18)
+        surf = font.render(text, True, ui.COLOR_NEON_YELLOW)
+        rect = surf.get_rect(
+            midbottom=(screen.get_width() // 2, screen.get_height() - 8)
+        )
+
+        bubble_rect = rect.inflate(20, 10)
+        bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(bubble, (0, 0, 0, 170), bubble.get_rect(), border_radius=8)
+        pygame.draw.rect(
+            bubble,
+            (*ui.COLOR_NEON_YELLOW, 200),
+            bubble.get_rect(),
+            width=1,
+            border_radius=8,
+        )
+        screen.blit(bubble, bubble_rect.topleft)
+        screen.blit(surf, rect)
 
     def check_collision(self, player, ghosts):
         radius = CELL_SIZE // 3

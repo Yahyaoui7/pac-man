@@ -98,7 +98,7 @@ class InstructionsState(State):
         cheats = [
             ("I", "Invincibility"),
             ("F", "Freeze Ghosts"),
-            ("S", "Speed Boost"),
+            ("B", "Speed Boost"),
             ("L", "Extra Life"),
             ("K", "Skip Level"),
         ]

@@ -17,7 +17,6 @@ class InputState:
     mouse_pos: tuple[int, int] = (0, 0)
     mouse_pressed: bool = False
     mouse_clicked: bool = False
-    skip_level: bool = False
 
     move_up_pressed: bool = False
     move_down_pressed: bool = False
@@ -26,6 +25,12 @@ class InputState:
 
     confirm_pressed: bool = False
     cancel_pressed: bool = False
+
+    invinciblity: bool = False
+    ghost_freez: bool = False
+    speed_boost: bool = False
+    extra_life: bool = False
+    skip_level: bool = False
 
 
 class InputManager:
@@ -56,6 +61,10 @@ class InputManager:
         self.state.mouse_pos = pygame.mouse.get_pos()
         self.state.mouse_pressed = pygame.mouse.get_pressed()[0]
 
+        self.state.invinciblity = False
+        self.state.ghost_freez = False
+        self.state.speed_boost = False
+        self.state.extra_life = False
         self.state.skip_level = False
 
         for event in events:
@@ -87,6 +96,14 @@ class InputManager:
 
                 elif event.key == pygame.K_k:
                     self.state.skip_level = True
+                elif event.key == pygame.K_l:
+                    self.state.extra_life = True
+                elif event.key == pygame.K_f:
+                    self.state.ghost_freez = True
+                elif event.key == pygame.K_b:
+                    self.state.speed_boost = True
+                elif event.key == pygame.K_i:
+                    self.state.invinciblity = True
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.state.mouse_clicked = True

@@ -42,7 +42,9 @@ class GameOverState(State):
         elif self.hi_score_button and self.hi_score_button.update(input_state):
             from src.graphics.states.high_score import HighScoreState
 
-            self.game.state_manager.change_state(HighScoreState(self.game, self))
+            self.game.state_manager.change_state(
+                HighScoreState(self.game, self),
+            )
         elif self.home_button and self.home_button.update(input_state):
             from src.graphics.states.home import HomeState
 
@@ -57,7 +59,11 @@ class GameOverState(State):
 
         # Title
         ui.draw_text_centered(
-            screen, ui.FONT_TITLE, "GAME OVER", center_y - 170, ui.COLOR_NEON_CYAN
+            screen,
+            ui.FONT_TITLE,
+            "GAME OVER",
+            center_y - 170,
+            ui.COLOR_NEON_CYAN,
         )
 
         # Losing cause
@@ -73,17 +79,33 @@ class GameOverState(State):
         high_score = top_scores[0]["score"] if top_scores else 0
 
         score_label = ui.FONT_BTN.render("Your Score:", True, (220, 220, 220))
-        score_value = ui.FONT_BTN.render(str(score), True, ui.COLOR_NEON_YELLOW)
-        score_label_rect = score_label.get_rect(center=(center_x - 40, center_y - 65))
+        score_value = ui.FONT_BTN.render(
+            str(score),
+            True,
+            ui.COLOR_NEON_YELLOW,
+        )
+        score_label_rect = score_label.get_rect(
+            center=(center_x - 40, center_y - 65),
+        )
         score_value_rect = score_value.get_rect(
             midleft=(score_label_rect.right + 10, score_label_rect.centery)
         )
         screen.blit(score_label, score_label_rect)
         screen.blit(score_value, score_value_rect)
 
-        high_label = ui.FONT_BTN.render("Highest Score:", True, (220, 220, 220))
-        high_value = ui.FONT_BTN.render(str(high_score), True, ui.COLOR_NEON_YELLOW)
-        high_label_rect = high_label.get_rect(center=(center_x - 40, center_y - 25))
+        high_label = ui.FONT_BTN.render(
+            "Highest Score:",
+            True,
+            (220, 220, 220),
+        )
+        high_value = ui.FONT_BTN.render(
+            str(high_score),
+            True,
+            ui.COLOR_NEON_YELLOW,
+        )
+        high_label_rect = high_label.get_rect(
+            center=(center_x - 40, center_y - 25),
+        )
         high_value_rect = high_value.get_rect(
             midleft=(high_label_rect.right + 10, high_label_rect.centery)
         )

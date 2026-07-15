@@ -34,7 +34,8 @@ class Parser:
 
             if not isinstance(data, dict):
                 print(
-                    "Config error: config must be a JSON object. Using default config."
+                    "Config error: config must be a ",
+                    "JSON object. Using default config.",
                 )
                 return self.convert_to_config(DEFAULT_CONFIG)
 
@@ -52,9 +53,7 @@ class Parser:
             return self.convert_to_config(DEFAULT_CONFIG)
 
         except OSError:
-            print(
-                "Config error: cannot read config file. Using default config."
-            )
+            print("Config error: cannot read config file using default config")
             return self.convert_to_config(DEFAULT_CONFIG)
 
     def remove_ignore_lines(self, lines: list[str]) -> list[str]:
@@ -81,9 +80,7 @@ class Parser:
         for raw_level in raw_levels:
 
             if not isinstance(raw_level, dict):
-                print(
-                    "Config error: one level is invalid. Using default level."
-                )
+                print("Config error: one level is invalid using default level")
                 raw_level = DEFAULT_CONFIG["levels"][0]
 
             levels.append(
@@ -102,7 +99,12 @@ class Parser:
         if not levels:
             print("Config error: no levels found. Using default level.")
             levels = [
-                LevelConfig(width=21, height=21, seed=42, level_max_time=90)
+                LevelConfig(
+                    width=21,
+                    height=21,
+                    seed=42,
+                    level_max_time=90,
+                )
             ]
 
         return GameConfig(
@@ -141,7 +143,10 @@ class Parser:
         return default
 
     def get_positive_int(
-        self, data: dict[str, Any], key: str, default: int
+        self,
+        data: dict[str, Any],
+        key: str,
+        default: int,
     ) -> int:
         """Return a positive integer value or a default value."""
         value = data.get(key, default)
@@ -149,9 +154,7 @@ class Parser:
         if isinstance(value, int) and value > 0:
             return value
 
-        print(
-            f"Config error: {key} must be a positive integer. Using {default}."
-        )
+        print(f"Config error:{key} must be a positive integer using {default}")
         return default
 
     def get_string(self, data: dict[str, Any], key: str, default: str) -> str:

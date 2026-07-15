@@ -1,5 +1,7 @@
 import pygame
 
+path = "assets/sounds"
+
 
 class SoundManager:
     def __init__(self):
@@ -14,48 +16,48 @@ class SoundManager:
         self.sounds = {
             # Pacgum / food
             "eat_normal_pellet": {
-                "sound": pygame.mixer.Sound("assets/sounds/munch_pac_man.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/munch_pac_man.mp3"),
                 "volume": 0.3,
             },
             "eat_super_pacgum": {
-                "sound": pygame.mixer.Sound("assets/sounds/mshyn-fyh-y-wldyk.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/mshyn-fyh-y-wldyk.mp3"),
                 "volume": 0.6,
             },
             # Ghost / collision
             "eat_ghost": {
-                "sound": pygame.mixer.Sound("assets/sounds/fahhh_KcgAXfs.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/fahhh_KcgAXfs.mp3"),
                 "volume": 0.7,
             },
             "player_death": {
-                "sound": pygame.mixer.Sound("assets/sounds/ayeh-ayeh-ayeh.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/ayeh-ayeh-ayeh.mp3"),
                 "volume": 0.8,
             },
             # Game states
             "level_complete": {
-                "sound": pygame.mixer.Sound("assets/sounds/omgwow.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/omgwow.mp3"),
                 "volume": 0.7,
             },
             "victory": {
-                "sound": pygame.mixer.Sound("assets/sounds/anime-wow-sound-effect.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/anime-wow.mp3"),
                 "volume": 0.7,
             },
             "game_over": {
-                "sound": pygame.mixer.Sound("assets/sounds/man-screaming-aaaah.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/man-screaming-aaaah.mp3"),
                 "volume": 0.8,
             },
             # UI / menu
             "menu_select": {
-                "sound": pygame.mixer.Sound("assets/sounds/pop_7e9Is8L.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/pop_7e9Is8L.mp3"),
                 "volume": 0.4,
             },
             "menu_confirm": {
                 "sound": pygame.mixer.Sound(
-                    "assets/sounds/punch-gaming-sound-effect-hd_RzlG1GE.mp3"
+                    f"{path}/punch-gaming-sound-effect-hd_RzlG1GE.mp3"
                 ),
                 "volume": 0.5,
             },
             "pause": {
-                "sound": pygame.mixer.Sound("assets/sounds/w9af-3and-hadek.mp3"),
+                "sound": pygame.mixer.Sound(f"{path}/w9af-3and-hadek.mp3"),
                 "volume": 0.5,
             },
         }
@@ -66,29 +68,29 @@ class SoundManager:
         self.music = {
             # Menus
             "menu_intro": {
-                "file": "assets/sounds/merhba-biiiik.mp3",
+                "file": f"{path}/merhba-biiiik.mp3",
                 "volume": 0.3,
             },
             "menu_music": {
-                "file": "assets/sounds/pacmantng.mp3",
+                "file": f"{path}/pacmantng.mp3",
                 "volume": 0.3,
             },
             # Game
             "game_intro": {
-                "file": "assets/sounds/lslm-lykm-b-d-hy-lwl.mp3",
+                "file": f"{path}/lslm-lykm-b-d-hy-lwl.mp3",
                 "volume": 0.4,
             },
             "game_music": {
-                "file": "assets/sounds/hzym-lr-d_3Kc3wxM.mp3",
+                "file": f"{path}/hzym-lr-d_3Kc3wxM.mp3",
                 "volume": 0.15,
             },
             # End states
             "game_over_music": {
-                "file": "assets/sounds/n-llh-wd-hmd.mp3",
+                "file": f"{path}/n-llh-wd-hmd.mp3",
                 "volume": 0.4,
             },
             "victory_music": {
-                "file": "assets/sounds/b9afiya-lhal.mp3",
+                "file": f"{path}/b9afiya-lhal.mp3",
                 "volume": 0.4,
             },
         }

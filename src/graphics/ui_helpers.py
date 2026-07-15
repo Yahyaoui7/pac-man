@@ -42,7 +42,7 @@ def get_scaled_font(
 
 
 def _font_attr(name: str, size: int) -> pygame.font.Font:
-    """Return a cached font; also set it as a module-level attr on first call."""
+    """Return a cached font also set it as a module-level attr on first call"""
     f = _get_font(size)
     globals()[name] = f
     return f

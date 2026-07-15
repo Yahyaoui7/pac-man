@@ -57,7 +57,11 @@ class HighScoreState(State):
             start_y = 150
             for index, item in enumerate(highscores):
                 score_text = f"{index + 1}. {item['name']}  -  {item['score']}"
-                score_surf = ui.FONT_SCORE.render(score_text, True, ui.COLOR_WHITE)
+                score_surf = ui.FONT_SCORE.render(
+                    score_text,
+                    True,
+                    ui.COLOR_WHITE,
+                )
                 score_rect = score_surf.get_rect(
                     center=(screen.get_width() // 2, start_y + index * 35)
                 )

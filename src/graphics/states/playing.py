@@ -29,7 +29,7 @@ class PlayingState(State):
         self.msg_text: str = ""
 
         self.active_cheats: set[str] = set()
-        self.player_base_speed: float = 0.0
+        self.player_speed: float = 0.0
 
     def enter(self) -> None:
         self.game.level_manager.load_level(
@@ -52,7 +52,7 @@ class PlayingState(State):
         self.msg_text = f"LEVEL {curr_idx + 1}"
         self.msg_timer = 2.0
 
-        self.player_base_speed = self.game.entity_manager.player.speed
+        self.player_speed = self.game.entity_manager.player.speed
         self.active_cheats = set()
 
     def update(
@@ -121,10 +121,8 @@ class PlayingState(State):
         elif name == "speed boost":
             player = self.game.entity_manager.player
             player.speed = (
-                self.player_base_speed * 2 if turning_on else self.player_base_speed
-            )
-        # "ghost freeze" has no side effect here; _update_entities checks
-        # self.active_cheats directly each frame.
+                self.player_speed * 2 if turning_on else self.player_speed
+                )
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
@@ -207,24 +205,44 @@ class PlayingState(State):
             )
             pygame.draw.line(screen, color, (0, y), (w, y))
 
-        # Double-stroke neon edge along the bottom of the bar.
-        pygame.draw.line(screen, ui.COLOR_DIM_CYAN, (0, hud_h + 1), (w, hud_h + 1), 3)
+        pygame.draw.line(
+            screen,
+            ui.COLOR_DIM_CYAN,
+            (0, hud_h + 1),
+            (w, hud_h + 1),
+            3,
+        )
         pygame.draw.line(screen, ui.COLOR_NEON_CYAN, (0, hud_h), (w, hud_h), 2)
 
-        # Small corner brackets, arcade-cabinet style.
         bracket = 12
         for x, direction in ((6, 1), (w - 6, -1)):
             pygame.draw.line(
-                screen, ui.COLOR_NEON_YELLOW, (x, 4), (x + direction * bracket, 4), 2
+                screen,
+                ui.COLOR_NEON_YELLOW,
+                (x, 4),
+                (x + direction * bracket, 4),
+                2,
             )
-            pygame.draw.line(screen, ui.COLOR_NEON_YELLOW, (x, 4), (x, 4 + bracket), 2)
+            pygame.draw.line(
+                screen,
+                ui.COLOR_NEON_YELLOW,
+                (x, 4),
+                (x, 4 + bracket),
+                2,
+            )
 
         seg_w = w / 4
         cy = hud_h // 2
 
         score_text = f"{self.game.score_management.get_score():,}"
         self._draw_hud_stat(
-            screen, seg_w * 0.5, cy, "\u2605", score_text, ui.COLOR_NEON_YELLOW, seg_w
+            screen,
+            seg_w * 0.5,
+            cy,
+            "\u2605",
+            score_text,
+            ui.COLOR_NEON_YELLOW,
+            seg_w,
         )
 
         lvl_num = self.game.level_manager.current_level_index + 1
@@ -244,13 +262,28 @@ class PlayingState(State):
         else:
             time_color = ui.COLOR_GREEN
         self._draw_hud_stat(
-            screen, seg_w * 3.5, cy, "\u23f1", f"{time_rem}s", time_color, seg_w
+            screen,
+            seg_w * 3.5,
+            cy,
+            "\u23f1",
+            f"{time_rem}s",
+            time_color,
+            seg_w,
         )
 
         # Thin time-remaining drain bar right under the HUD.
         bar_h = 3
         pygame.draw.rect(screen, (30, 30, 40), (0, hud_h - bar_h, w, bar_h))
-        pygame.draw.rect(screen, time_color, (0, hud_h - bar_h, int(w * frac), bar_h))
+        pygame.draw.rect(
+            screen,
+            time_color,
+            (
+                0,
+                hud_h - bar_h,
+                int(w * frac),
+                bar_h,
+            ),
+        )
 
     def _draw_hud_stat(
         self,
@@ -281,13 +314,25 @@ class PlayingState(State):
 
         for i in range(shown):
             x = start_x + i * spacing
-            self._draw_pacman_icon(screen, (x, cy), icon_r, ui.COLOR_NEON_YELLOW)
+            self._draw_pacman_icon(
+                screen,
+                (x, cy),
+                icon_r,
+                ui.COLOR_NEON_YELLOW,
+            )
 
         if lives > max_icons:
             extra = f"+{lives - max_icons}"
-            font = ui.get_scaled_font(extra, max_width=seg_w * 0.3, base_size=20)
+            font = ui.get_scaled_font(
+                extra,
+                max_width=seg_w * 0.3,
+                base_size=20,
+            )
             surf = font.render(extra, True, ui.COLOR_WHITE)
-            screen.blit(surf, (start_x + total_w + 6, cy - surf.get_height() // 2))
+            screen.blit(
+                surf,
+                (start_x + total_w + 6, cy - surf.get_height() // 2),
+            )
         elif lives <= 0:
             surf = ui.get_scaled_font("0", seg_w - 8, base_size=22).render(
                 "0", True, ui.COLOR_RED
@@ -295,7 +340,12 @@ class PlayingState(State):
             screen.blit(surf, surf.get_rect(center=(cx, cy)))
 
     @staticmethod
-    def _draw_pacman_icon(screen: pygame.Surface, center, radius: int, color) -> None:
+    def _draw_pacman_icon(
+        screen: pygame.Surface,
+        center,
+        radius: int,
+        color,
+    ) -> None:
         x, y = center
         mouth = 40
         start = math.radians(mouth / 2)
@@ -320,7 +370,12 @@ class PlayingState(State):
             x0 - 6, y0 - 6, cols * CELL_SIZE + 12, rows * CELL_SIZE + 12
         )
 
-        pygame.draw.rect(screen, ui.COLOR_BG_DARK, panel_rect, border_radius=10)
+        pygame.draw.rect(
+            screen,
+            ui.COLOR_BG_DARK,
+            panel_rect,
+            border_radius=10,
+        )
         pygame.draw.rect(
             screen, ui.COLOR_DIM_CYAN, panel_rect, width=3, border_radius=10
         )
@@ -376,7 +431,12 @@ class PlayingState(State):
 
         bubble_rect = text_rect.inflate(16, 10)
         bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
-        pygame.draw.rect(bubble, (0, 0, 0, 160), bubble.get_rect(), border_radius=8)
+        pygame.draw.rect(
+            bubble,
+            (0, 0, 0, 160),
+            bubble.get_rect(),
+            border_radius=8,
+        )
         pygame.draw.rect(
             bubble,
             (*ui.COLOR_NEON_CYAN, 200),
@@ -398,7 +458,11 @@ class PlayingState(State):
         label = " + ".join(sorted(self.active_cheats)).upper()
         text = f"CHEATS ACTIVE: {label}"
 
-        font = ui.get_scaled_font(text, max_width=screen.get_width() - 24, base_size=18)
+        font = ui.get_scaled_font(
+            text,
+            max_width=screen.get_width() - 24,
+            base_size=18,
+        )
         surf = font.render(text, True, ui.COLOR_NEON_YELLOW)
         rect = surf.get_rect(
             midbottom=(screen.get_width() // 2, screen.get_height() - 8)
@@ -406,7 +470,12 @@ class PlayingState(State):
 
         bubble_rect = rect.inflate(20, 10)
         bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
-        pygame.draw.rect(bubble, (0, 0, 0, 170), bubble.get_rect(), border_radius=8)
+        pygame.draw.rect(
+            bubble,
+            (0, 0, 0, 170),
+            bubble.get_rect(),
+            border_radius=8,
+        )
         pygame.draw.rect(
             bubble,
             (*ui.COLOR_NEON_YELLOW, 200),

@@ -28,8 +28,12 @@ class NameInputState(State):
                         self.player_name += event.unicode
 
     def confirm_name(self):
-        self.game.highscore_manager.add_score(self.player_name, self.final_score)
+        self.game.highscore_manager.add_score(
+            self.player_name,
+            self.final_score,
+        )
         from src.graphics.states.high_score import HighScoreState
+
         self.game.state_manager.change_state(HighScoreState(self.game))
 
     def draw(self, screen):

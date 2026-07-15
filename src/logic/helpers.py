@@ -12,7 +12,7 @@ def grid_to_pixel(row: int, col: int) -> tuple[int, int]:
 
 
 def pixel_to_screen(px: int, py: int) -> tuple[int, int]:
-    """Convert entity pixel position to screen position (adds padding + top bar)."""
+    """Convert entity pixel position to screen position."""
     sx = PADDING // 2 + px
     sy = TOP_BAR_HEIGHT + PADDING // 2 + py
     return sx, sy

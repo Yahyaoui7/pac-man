@@ -95,16 +95,34 @@ class GhostState(Enum):
 # frame indices that should be held longer (impact frames read much
 # better on screen with an extra beat -- "hit stop").
 _MODE_TIMING = {
-    PacmanMode.NORMAL: dict(frame_duration_ms=160, loop=True, overrides={}),
-    PacmanMode.PUNCH: dict(frame_duration_ms=70, loop=False, overrides={7: 220}),
-    PacmanMode.KICK: dict(frame_duration_ms=80, loop=False, overrides={4: 220}),
+    PacmanMode.NORMAL: dict(
+        frame_duration_ms=160,
+        loop=True,
+        overrides={},
+    ),
+    PacmanMode.PUNCH: dict(
+        frame_duration_ms=70,
+        loop=False,
+        overrides={7: 220},
+    ),
+    PacmanMode.KICK: dict(
+        frame_duration_ms=80,
+        loop=False,
+        overrides={4: 220},
+    ),
 }
 
 
 class Animation:
     """Per-entity playback state over a shared list of Surfaces."""
 
-    def __init__(self, frames, frame_duration_ms=90, loop=True, overrides=None):
+    def __init__(
+        self,
+        frames,
+        frame_duration_ms=90,
+        loop=True,
+        overrides=None,
+    ):
         self.frames = frames
         self.default_duration = frame_duration_ms
         self.overrides = overrides or {}
@@ -155,10 +173,10 @@ class SpriteLibrary:
         self._attack_frames: dict[PacmanMode, list[pygame.Surface]] = {}
         self._loaded = False
 
-        # ghost_frames["hunt"][GhostColor][Facing]      -> [Surface, Surface]
-        # ghost_frames["frightened"]                     -> [Surface x3]
-        # ghost_frames["eaten"]["up"|"down"]              -> [Surface, Surface]
-        # ghost_frames["eaten"]["side"][Facing]           -> [Surface, Surface]  (mirrored)
+        # ghost_frames["hunt"][GhostColor][Facing]-> [Surface, Surface]
+        # ghost_frames["frightened"]              -> [Surface x3]
+        # ghost_frames["eaten"]["up"|"down"]      -> [Surface, Surface]
+        # ghost_frames["eaten"]["side"][Facing]   -> [Surface, Surface]
         self._ghost_frames: dict = {}
         self._ghosts_loaded = False
 
@@ -186,10 +204,14 @@ class SpriteLibrary:
         for mode in PacmanMode:
             frames = self._frames[mode]
             self._walk_frames[mode] = frames[: self.WALK_FRAME_COUNT]
-            self._attack_frames[mode] = frames[self.WALK_FRAME_COUNT :]
+            self._attack_frames[mode] = frames[self.WALK_FRAME_COUNT:]
         self._loaded = True
 
-    def _load_mode(self, mode: PacmanMode, target_size: int) -> list[pygame.Surface]:
+    def _load_mode(
+        self,
+        mode: PacmanMode,
+        target_size: int,
+    ) -> list[pygame.Surface]:
         folder = PACMAN_DIRS[mode]
 
         with open(os.path.join(folder, "meta.json")) as f:
@@ -274,16 +296,20 @@ class SpriteLibrary:
             }
 
         frightened = load_list(meta["frightened"])
-        eaten_side_r = load_list(meta["eaten"]["side"])
-        eaten_side_l = [pygame.transform.flip(s, True, False) for s in eaten_side_r]
+        eaten_r = load_list(meta["eaten"]["side"])
+        eaten_side_l = [pygame.transform.flip(s, True, False) for s in eaten_r]
 
         eaten = {
             "up": load_list(meta["eaten"]["up"]),
             "down": load_list(meta["eaten"]["down"]),
-            "side": {Facing.RIGHT: eaten_side_r, Facing.LEFT: eaten_side_l},
+            "side": {Facing.RIGHT: eaten_r, Facing.LEFT: eaten_side_l},
         }
 
-        self._ghost_frames = {"hunt": hunt, "frightened": frightened, "eaten": eaten}
+        self._ghost_frames = {
+            "hunt": hunt,
+            "frightened": frightened,
+            "eaten": eaten,
+        }
         self._ghosts_loaded = True
 
     def new_ghost_animation(
@@ -321,7 +347,7 @@ class SpriteLibrary:
             down_frames = self._ghost_frames["eaten"]["down"]
             right_frames = self._ghost_frames["eaten"]["side"][Facing.RIGHT]
             left_frames = self._ghost_frames["eaten"]["side"][Facing.LEFT]
-            
+
             # Combine the frames to cycle: Up -> Right -> Down -> Left
             frames = [
                 up_frames[0],

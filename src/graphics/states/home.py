@@ -53,7 +53,12 @@ class HomeState(State):
         elif self.button_index == 2:
             from src.graphics.states.high_score import HighScoreState
 
-            self.game.state_manager.change_state(HighScoreState(self.game, self))
+            self.game.state_manager.change_state(
+                HighScoreState(
+                    self.game,
+                    self,
+                )
+            )
 
         elif self.button_index == 3:
             self.game.running = False

@@ -103,7 +103,11 @@ class MovementSystem:
             if entity.direction is None:
                 return
 
-            if not self.can_move(entity.grid_y, entity.grid_x, entity.direction):
+            if not self.can_move(
+                entity.grid_y,
+                entity.grid_x,
+                entity.direction,
+            ):
                 return
 
         entity.x += entity.grid_x_direction * entity.speed
@@ -181,7 +185,12 @@ class MovementSystem:
 
         return None
 
-    def _navigate_bfs(self, ghost, target_grid_y: int, target_grid_x: int) -> None:
+    def _navigate_bfs(
+        self,
+        ghost,
+        target_grid_y: int,
+        target_grid_x: int,
+    ) -> None:
         """Move ghost toward target using BFS pathfinding."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
@@ -200,21 +209,21 @@ class MovementSystem:
 
         self.update_entity(ghost)
 
-    def update_bfs_ghost(self, ghost, player) -> None:
-        """Move ghost toward player when ghost is not edible."""
-        if self.is_centered(ghost):
-            self.update_cell_position(ghost)
+    # def update_bfs_ghost(self, ghost, player) -> None:
+    #     """Move ghost toward player when ghost is not edible."""
+    #     if self.is_centered(ghost):
+    #         self.update_cell_position(ghost)
 
-            start = (ghost.grid_y, ghost.grid_x)
-            target = (player.grid_y, player.grid_x)
+    #         start = (ghost.grid_y, ghost.grid_x)
+    #         target = (player.grid_y, player.grid_x)
 
-            path = self.bfs_path(start, target)
+    #         path = self.bfs_path(start, target)
 
-            if len(path) >= 2:
-                direction = self.direction_to_next_cell(path[0], path[1])
-                if direction is not None:
-                    self.set_direction(ghost, direction)
-        self.update_entity(ghost)
+    #         if len(path) >= 2:
+    #             direction = self.direction_to_next_cell(path[0], path[1])
+    #             if direction is not None:
+    #                 self.set_direction(ghost, direction)
+    #     self.update_entity(ghost)
 
     def update_ghost_to_target(self, ghost, target_grid_y, target_grid_x):
         self._navigate_bfs(ghost, target_grid_y, target_grid_x)
@@ -280,9 +289,13 @@ class MovementSystem:
         while safe_zones:
             random_zone = self.rng.choice(safe_zones)
 
-            (grid_y_min, grid_y_max), (grid_x_min, grid_x_max) = self.get_zone_bounds(
-                random_zone
-            )
+            (
+                grid_y_min,
+                grid_y_max,
+            ), (
+                grid_x_min,
+                grid_x_max,
+            ) = self.get_zone_bounds(random_zone)
 
             valid_cells = []
 
@@ -298,7 +311,13 @@ class MovementSystem:
 
         return None
 
-    # def distance(self, grid_y1: int, grid_x1: int, grid_y2: int, grid_x2: int) -> int:
+    # def distance(
+    #     self,
+    #     grid_y1: int,
+    #     grid_x1: int,
+    #     grid_y2: int,
+    #     grid_x2: int,
+    # ) -> int:
     #     return abs(grid_y1 - grid_y2) + abs(grid_x1 - grid_x2)
 
     # def choose_runaway_target(self, player) -> tuple[int, int]:
@@ -331,16 +350,20 @@ class MovementSystem:
     #     return best_corner
 
     def update_runaway_ghost(self, ghost, player) -> None:
-        """Move edible ghost away from the player using one fixed random target."""
+        """Move edible ghost away from the player using fixed random target."""
 
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
 
             if ghost.runaway_target is None:
-                ghost.runaway_target = self.choose_runaway_target_by_zone(player)
+                ghost.runaway_target = self.choose_runaway_target_by_zone(
+                    player,
+                )
 
             if ghost.runaway_target == (ghost.grid_y, ghost.grid_x):
-                ghost.runaway_target = self.choose_runaway_target_by_zone(player)
+                ghost.runaway_target = self.choose_runaway_target_by_zone(
+                    player,
+                )
 
             if ghost.runaway_target is not None:
                 start = (ghost.grid_y, ghost.grid_x)

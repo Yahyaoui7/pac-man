@@ -30,7 +30,7 @@ class LevelManager:
     @staticmethod
     def clamp_dimensions(width: int, height: int) -> tuple[int, int]:
         """Force any configured size into the range the game can render."""
-        return max(10, min(37, width)), max(10, min(24, height))
+        return max(10, min(37, width)), max(10, min(23, height))
 
     def load_level(self, level_index: int) -> bool:
         if level_index >= len(self.config.levels):
@@ -39,7 +39,9 @@ class LevelManager:
         level_conf = self.get_current_level_config()
         try:
 
-            width, height = self.clamp_dimensions(level_conf.width, level_conf.height)
+            width, height = self.clamp_dimensions(
+                level_conf.width, level_conf.height
+            )
 
             self.current_maze = self.build_maze(
                 width,
@@ -56,7 +58,9 @@ class LevelManager:
                 e,
             )
             level_conf = self.config.levels[0]
-            width, height = self.clamp_dimensions(level_conf.width, level_conf.height)
+            width, height = self.clamp_dimensions(
+                level_conf.width, level_conf.height
+            )
             self.current_maze = self.build_maze(
                 width,
                 height,

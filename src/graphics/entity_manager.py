@@ -218,7 +218,7 @@ class EntityManager:
 
         if 5 > height or 7 > width:
             return False
-
+        
         for y in range(height):
             for x in range(width):
                 if self.maze[y][x] == 15:

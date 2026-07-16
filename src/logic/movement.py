@@ -4,6 +4,8 @@ from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 import random
 import math
 
+from src.graphics.entity_manager import Player
+
 
 class MovementSystem:
     """Controls movement for player and ghosts."""
@@ -108,7 +110,6 @@ class MovementSystem:
 
     def update_entity(self, entity) -> None:
         """Move an entity by pixels, only change direction at cell center."""
-
         if self.is_opposite_direction(entity):
             self.set_direction(entity, entity.next_direction)
             entity.next_direction = None

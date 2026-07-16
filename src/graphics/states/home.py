@@ -4,7 +4,8 @@ from typing import Any, List
 from src.UI.button import Button, ButtonManager
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
-from src.logic.helpers import screen_center
+from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST, get_home_maze
+from src.logic.helpers import cell_to_screen, screen_center
 
 
 class HomeState(State):
@@ -24,6 +25,7 @@ class HomeState(State):
             self.quit_button,
         ]
         self.button_manager = ButtonManager(self.buttons)
+        self.home_maze = get_home_maze()
 
     def enter(self) -> None:
         self.game.resize_window(1000, 600)
@@ -86,6 +88,37 @@ class HomeState(State):
         self.scores_button.rect.topleft = (x - 100, y + 40)
         self.quit_button.rect.topleft = (x - 100, y + 110)
 
+    def draw_maze(self, screen: pygame.Surface) -> None:
+        for row, cells in enumerate(self.home_maze):
+
+            for col, cell in enumerate(cells):
+                x = col * 39
+                y = row * 39
+
+                if cell & NORTH:
+                    pygame.draw.line(screen, "blue", (x, y), (x + 39, y), 2)
+
+                if cell & EAST:
+                    pygame.draw.line(
+                        screen,
+                        "blue",
+                        (x + 39, y),
+                        (x + 39, y + 39),
+                        2,
+                    )
+
+                if cell & SOUTH:
+                    pygame.draw.line(
+                        screen,
+                        "blue",
+                        (x, y + 39),
+                        (x + 39, y + 39),
+                        2,
+                    )
+
+                if cell & WEST:
+                    pygame.draw.line(screen, "blue", (x, y), (x, y + 39), 2)
+
     def draw(self, screen: pygame.Surface) -> None:
         x, y = screen_center(screen.get_width(), screen.get_height())
 
@@ -110,3 +143,4 @@ class HomeState(State):
         self.instructions_button.draw(screen)
         self.scores_button.draw(screen)
         self.quit_button.draw(screen)
+        self.draw_maze(screen)

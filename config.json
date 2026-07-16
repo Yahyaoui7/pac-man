@@ -6,17 +6,18 @@
     "highscore_filename": "highscores.json",
     "levels": [
         {
-            "width": 12,
-            "height": 12,
-            "seed": 42,
+            "width": 25,
+            "height": 15,
+            "seed": 10,
             "level_max_time": 1000
-        },        {
+        },
+        {
             "width": 12,
             "height": 12,
             "seed": 42,
             "level_max_time": 1000
         },
-                {
+        {
             "width": 40,
             "height": 32,
             "seed": 42,

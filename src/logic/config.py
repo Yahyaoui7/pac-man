@@ -1,6 +1,8 @@
 """Classes used to store game configuration."""
 
 from dataclasses import dataclass, field
+import json
+import os
 
 TOP_BAR_HEIGHT = 30
 CELL_SIZE = 40
@@ -32,3 +34,13 @@ class GameConfig:
     points_per_ghost: int = 200
     highscore_filename: str = "highscores.json"
     levels: list[LevelConfig] = field(default_factory=list)
+
+
+def get_home_maze():
+    program_folder = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(program_folder))
+    path = os.path.join(project_root, "assets", "home_maze.json")
+
+    with open(path) as f:
+        maze = json.load(f)
+    return maze["maze"]

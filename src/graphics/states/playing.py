@@ -40,7 +40,6 @@ class PlayingState(State):
 
         height = len(self.maze)
         width = len(self.maze[0]) if height else 0
-        print(f"level loaded wiht the size {height} x {width}")
         self.game.recalculate_cell_size(width, height)
         self.game.resize_window(
             width * CELL_SIZE + PADDING,
@@ -54,6 +53,7 @@ class PlayingState(State):
 
         self.player_speed = self.game.entity_manager.player.speed
         self.active_cheats = set()
+        print(self.maze)
 
     def update(
         self,
@@ -383,6 +383,7 @@ class PlayingState(State):
 
     def _draw_maze_walls(self, screen: pygame.Surface) -> None:
         c = CELL_SIZE
+
         for row, cells in enumerate(self.maze):
             for col, cell in enumerate(cells):
                 x, y = cell_to_screen(row, col)

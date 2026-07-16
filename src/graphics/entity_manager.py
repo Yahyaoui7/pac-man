@@ -79,11 +79,11 @@ class EntityManager:
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""
         self.maze = maze
+        self.get_42_patterns()
         self._init_pellet_grid(maze)
 
         height = len(maze)
         width = len(maze[0])
-        print(height, "x", width)
         center_x = width // 2
         center_y = height // 2
 
@@ -211,6 +211,20 @@ class EntityManager:
         for ghost in self.ghosts:
             ghost.reset()
 
+    def get_42_patterns(self) -> bool:
+        self.pattern_42_cells = []
+        height = len(self.maze)
+        width = len(self.maze[0])
+
+        if 5 > height or 7 > width:
+            return False
+
+        for y in range(height):
+            for x in range(width):
+                if self.maze[y][x] == 15:
+                    self.pattern_42_cells.append((y, x))
+        return True
+
 
 class Entity:
     def __init__(
@@ -263,7 +277,7 @@ def _facing_from_direction(direction, current_facing: Facing) -> Facing:
 
 class Player(Entity):
     def __init__(self, y: int, x: int) -> None:
-        super().__init__(y, x, speed=4)
+        super().__init__(y, x, speed=3.5)
 
         self.score = 0
         self.msg_txt = ""
@@ -421,7 +435,7 @@ class Ghost(Entity):
         color,
         name: str,
     ) -> None:
-        super().__init__(y, x, speed=2)
+        super().__init__(y, x, speed=1.5)
 
         self.name = name
         self.color = color
@@ -435,6 +449,10 @@ class Ghost(Entity):
         self.frightened_timer = 0.0
         self.respawn_timer = 0.0
         self.runaway_target = None
+
+        self.going_to_prison = False
+        self.in_prison = False
+        self.prison_target = None
 
         self.sprites = SpriteLibrary.instance()
         self.state = gs.HUNT

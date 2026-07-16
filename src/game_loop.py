@@ -78,12 +78,14 @@ class GameStarter:
         while self.running:
 
             events = pygame.event.get()
+
             input_state = input_manager.update(events)
 
             if input_state.quit_requested:
                 self.running = False
 
             # Update the current state
+
             self.state_manager.update(input_state, events)
 
             # Draw the current state

@@ -2,6 +2,7 @@ from collections import deque
 
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 import random
+import math
 
 
 class MovementSystem:
@@ -54,17 +55,41 @@ class MovementSystem:
         entity.grid_x = int(entity.x // CELL_SIZE)
 
     def can_move(self, grid_y: int, grid_x: int, direction: str) -> bool:
-        """Check if there is no wall in the wanted direction."""
+        directions = {
+            "LEFT": (0, -1),
+            "RIGHT": (0, 1),
+            "UP": (-1, 0),
+            "DOWN": (1, 0),
+        }
+
+        if direction not in directions:
+            return False
+
+        d_grid_y, d_grid_x = directions[direction]
+        next_y = grid_y + d_grid_y
+        next_x = grid_x + d_grid_x
+
+        if not (0 <= next_y < len(self.maze)):
+            return False
+
+        if not (0 <= next_x < len(self.maze[0])):
+            return False
+
+        next_cell = (next_y, next_x)
+
+        if self.pattern_42 and next_cell in self.pattern_42:
+            return True
+
         cell = self.maze[grid_y][grid_x]
 
         if direction == "LEFT":
-            return grid_x > 0 and not (cell & WEST)
+            return not (cell & WEST)
         if direction == "RIGHT":
-            return grid_x < len(self.maze[0]) - 1 and not (cell & EAST)
+            return not (cell & EAST)
         if direction == "UP":
-            return grid_y > 0 and not (cell & NORTH)
+            return not (cell & NORTH)
         if direction == "DOWN":
-            return grid_y < len(self.maze) - 1 and not (cell & SOUTH)
+            return not (cell & SOUTH)
 
         return False
 
@@ -130,15 +155,14 @@ class MovementSystem:
         }
 
         for direction, (d_grid_y, d_grid_x) in directions.items():
+            next_cell = (grid_y + d_grid_y, grid_x + d_grid_x)
             if self.can_move(grid_y, grid_x, direction):
-                neighbors.append((grid_y + d_grid_y, grid_x + d_grid_x))
+                neighbors.append(next_cell)
 
         return neighbors
 
     def bfs_path(
-        self,
-        start: tuple[int, int],
-        target: tuple[int, int],
+        self, start: tuple[int, int], target: tuple[int, int]
     ) -> list[tuple[int, int]]:
         """Find the shortest path from ghost to player."""
         queue = deque([start])
@@ -185,16 +209,46 @@ class MovementSystem:
 
         return None
 
+    def move_inside_prison(self, ghost, entity, pattern_42):
+        self.pattern_42 = pattern_42
+
+        try:
+            if self.is_centered(ghost):
+                self.update_cell_position(ghost)
+
+                neighbors = []
+
+                directions = {
+                    "LEFT": (0, -1),
+                    "RIGHT": (0, 1),
+                    "UP": (-1, 0),
+                    "DOWN": (1, 0),
+                }
+
+                for direction, (d_grid_y, d_grid_x) in directions.items():
+                    next_cell = (
+                        ghost.grid_y + d_grid_y,
+                        ghost.grid_x + d_grid_x,
+                    )
+
+                    if next_cell in entity.pattern_42_cells:
+                        neighbors.append(direction)
+
+                if neighbors:
+                    dirc = random.choice(neighbors)
+                    self.set_direction(ghost, dirc)
+
+            self.update_entity(ghost)
+
+        finally:
+            self.pattern_42 = None
+
     def _navigate_bfs(
-        self,
-        ghost,
-        target_grid_y: int,
-        target_grid_x: int,
+        self, ghost, target_grid_y: int, target_grid_x: int
     ) -> None:
         """Move ghost toward target using BFS pathfinding."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
-
             start = (ghost.grid_y, ghost.grid_x)
             target = (target_grid_y, target_grid_x)
 
@@ -224,12 +278,43 @@ class MovementSystem:
     #             if direction is not None:
     #                 self.set_direction(ghost, direction)
     #     self.update_entity(ghost)
+    # def update_ghost_to_prison_target(
+    #     self, ghost, target_grid_y, target_grid_x
+    # ):
+    #     target_x = target_grid_x * CELL_SIZE + CELL_SIZE // 2
+    #     target_y = target_grid_y * CELL_SIZE + CELL_SIZE // 2
 
-    def update_ghost_to_target(self, ghost, target_grid_y, target_grid_x):
-        self._navigate_bfs(ghost, target_grid_y, target_grid_x)
+    #     dx = target_x - ghost.x
+    #     dy = target_y - ghost.y
+    #     distance = math.hypot(dx, dy)
+
+    #     if distance <= ghost.speed:
+    #         ghost.x = target_x
+    #         ghost.y = target_y
+    #         ghost.grid_x = target_grid_x
+    #         ghost.grid_y = target_grid_y
+    #         return
+
+    #     ghost.x += ghost.speed * dx / distance
+    #     ghost.y += ghost.speed * dy / distance
+
+    def update_ghost_to_target(
+        self,
+        ghost,
+        target_y,
+        target_x,
+        pattern_42=None,
+    ):
+        self.pattern_42 = pattern_42
+
+        try:
+            self._navigate_bfs(ghost, target_y, target_x)
+        finally:
+            self.pattern_42 = None
 
     def update_bfs_ghost(self, ghost, player) -> None:
         """Move ghost toward player when ghost is not edible."""
+        self.pattern_42 = None
         self._navigate_bfs(ghost, player.grid_y, player.grid_x)
 
     # ----------------------------

@@ -2,6 +2,7 @@ import math
 
 import pygame
 import pygame.draw as dr
+import random
 from typing import Any, List
 
 from src.graphics.renderer import State
@@ -120,7 +121,9 @@ class PlayingState(State):
             self.player_invincible_until = 999999999999 if turning_on else 0
         elif name == "speed boost":
             player = self.game.entity_manager.player
-            player.speed = self.player_speed * 2 if turning_on else self.player_speed
+            player.speed = (
+                self.player_speed * 2 if turning_on else self.player_speed
+            )
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
@@ -128,17 +131,49 @@ class PlayingState(State):
 
         if "ghost freeze" not in self.active_cheats:
             for ghost in em.ghosts:
-                if ghost.is_eaten:
+                if ghost.going_to_prison:
+                    if ghost.prison_target is not None:
+                        target_y, target_x = ghost.prison_target
+
+                        self.movement.update_ghost_to_target(
+                            ghost, target_y, target_x, em.pattern_42_cells
+                        )
+
+                        if (
+                            ghost.grid_y == target_y
+                            and ghost.grid_x == target_x
+                        ):
+                            ghost.going_to_prison = False
+                            ghost.in_prison = True
+                            ghost.respawn_timer = after(5000)
+
+                elif ghost.in_prison:
+                    if expired(ghost.respawn_timer):
+                        ghost.reset()
+                        ghost.is_eaten = False
+                        ghost.is_edible = False
+                        ghost.going_to_prison = False
+                        ghost.in_prison = False
+                        ghost.prison_target = None
+                        ghost.respawn_timer = 0.0
+
+                        continue
+
+                    self.movement.move_inside_prison(
+                        ghost, self.game.entity_manager, em.pattern_42_cells
+                    )
+                elif ghost.is_eaten:
                     self.movement.update_ghost_to_target(
                         ghost,
                         ghost.spawn_y,
                         ghost.spawn_x,
                     )
+
                 elif ghost.is_edible:
                     self.movement.update_runaway_ghost(ghost, em.player)
+
                 else:
                     self.movement.update_bfs_ghost(ghost, em.player)
-
         self.check_collision(em.player, em.ghosts)
         em.update(self.maze, 1 / 60.0)
 
@@ -499,6 +534,16 @@ class PlayingState(State):
                     ghost.is_edible = False
                     ghost.frightened_timer = 0.0
                     ghost.respawn_timer = -1.0
+
+                    ghost.going_to_prison = True
+                    ghost.in_prison = False
+
+                    if self.game.entity_manager.pattern_42_cells:
+                        ghost.prison_target = random.choice(
+                            self.game.entity_manager.pattern_42_cells
+                        )
+                    else:
+                        ghost.prison_target = (ghost.spawn_y, ghost.spawn_x)
 
                     self.game.sound_manager.play_sound("eat_ghost")
                     self.game.score_management.add_ghost()

@@ -68,7 +68,9 @@ class GameStarter:
         self.screen = pygame.display.set_mode((1000, 600))
         pygame.display.set_caption("NEON PAC-MAN")
 
-        self.entity_manager = EntityManager(self.config, self.score_management)
+        self.entity_manager = EntityManager(
+            self.config, self.score_management, self
+        )
 
         clock = pygame.time.Clock()
         input_manager = InputManager()
@@ -78,13 +80,16 @@ class GameStarter:
         while self.running:
 
             events = pygame.event.get()
+
             input_state = input_manager.update(events)
 
             if input_state.quit_requested:
                 self.running = False
 
             # Update the current state
+
             self.state_manager.update(input_state, events)
+
 
             # Draw the current state
             if self.screen:

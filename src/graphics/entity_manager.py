@@ -32,10 +32,11 @@ ABILITY_KICK = "kick"
 
 
 class EntityManager:
-    def __init__(self, config: GameConfig, score_management) -> None:
+    def __init__(self, config: GameConfig, score_management, game) -> None:
         """Initialize systems and settings from configuration."""
         self.config: GameConfig = config
         self.score_management = score_management
+        self.game = game
         self.player: Optional[Player] = None
         self.ghosts: list[Ghost] = []
         self.pellets: list[list[int]] = []
@@ -79,15 +80,15 @@ class EntityManager:
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""
         self.maze = maze
+        self.get_42_patterns()
         self._init_pellet_grid(maze)
 
         height = len(maze)
         width = len(maze[0])
         center_x = width // 2
         center_y = height // 2
-
         self.player = Player(center_y, center_x)
-
+        self.player.find_player_spawn(self.game, maze)
         self.ghosts = [
             Ghost(0, 0, (255, 0, 0), "Blinky"),
             Ghost(0, width - 1, (255, 182, 193), "Pinky"),
@@ -209,6 +210,27 @@ class EntityManager:
 
         for ghost in self.ghosts:
             ghost.reset()
+
+    def get_42_patterns(self) -> bool:
+        self.pattern_42_cells = []
+        self.pattern_4_cells = []
+        self.pattern_2_cells = []
+        height = len(self.maze)
+        width = len(self.maze[0])
+
+        if 5 > height or 7 > width:
+            return False
+
+        for y in range(height):
+            for x in range(width):
+                if self.maze[y][x] == 15:
+                    self.pattern_42_cells.append((y, x))
+                    if x < width // 2:
+                        self.pattern_4_cells.append((y, x))
+                    else:
+                        self.pattern_2_cells.append((y, x))
+
+        return True
 
 
 class Entity:
@@ -370,27 +392,32 @@ class Player(Entity):
         rect = frame.get_rect(center=(int(x), int(y)))
         screen.blit(frame, rect)
 
-    def is_valid_spawn(self, row: int, col: int) -> bool:
-        cell = self.maze[row][col]
+    def is_valid_spawn(self, row: int, col: int, maze) -> bool:
+        cell = maze[row][col]
         return cell != (NORTH | EAST | SOUTH | WEST)
 
-    def find_player_spawn(self) -> tuple[int, int]:
-        middle_row = self.game.curr_level.height // 2
-        middle_col = self.game.curr_level.width // 2
+    def find_player_spawn(self, game, maze) -> bool:
+        middle_row = game.curr_level.height // 2
+        middle_col = game.curr_level.width // 2
 
         for radius in range(
-            max(self.game.curr_level.width, self.game.curr_level.height)
+            max(game.curr_level.width, game.curr_level.height)
         ):
             for row in range(middle_row - radius, middle_row + radius + 1):
                 for col in range(middle_col - radius, middle_col + radius + 1):
                     if (
-                        0 <= row < self.game.curr_level.height
-                        and 0 <= col < self.game.curr_level.width
-                        and self.is_valid_spawn(row, col)
+                        0 <= row < game.curr_level.height
+                        and 0 <= col < game.curr_level.width
+                        and self.is_valid_spawn(row, col, maze)
                     ):
-                        return row, col
+                        self.spawn_x = col
+                        self.spawn_y = row
+                        self.grid_y = row
+                        self.grid_x = col
+                        self.x, self.y = grid_to_pixel(row, col)
+                        return True
 
-        return 0, 0
+        return False
 
     def reset_location(self):
         self.x, self.y = grid_to_pixel(self.spawn_y, self.spawn_x)
@@ -434,6 +461,10 @@ class Ghost(Entity):
         self.frightened_timer = 0.0
         self.respawn_timer = 0.0
         self.runaway_target = None
+
+        self.going_to_prison = False
+        self.in_prison = False
+        self.prison_target = None
 
         self.sprites = SpriteLibrary.instance()
         self.state = gs.HUNT

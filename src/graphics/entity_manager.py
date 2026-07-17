@@ -80,7 +80,6 @@ class EntityManager:
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""
         self.maze = maze
-        self.get_42_patterns()
         self._init_pellet_grid(maze)
 
         height = len(maze)
@@ -95,6 +94,7 @@ class EntityManager:
             Ghost(height - 1, 0, (0, 255, 255), "Inky"),
             Ghost(height - 1, width - 1, (255, 165, 0), "Clyde"),
         ]
+        self.get_42_patterns()
 
     def play_sound(self, name):
         self.sound.play_sound_with_duck(name)
@@ -212,23 +212,28 @@ class EntityManager:
             ghost.reset()
 
     def get_42_patterns(self) -> bool:
-        self.pattern_42_cells = []
-        self.pattern_4_cells = []
-        self.pattern_2_cells = []
+        pattern_4_cells = []
+        pattern_2_cells = []
         height = len(self.maze)
         width = len(self.maze[0])
 
         if 5 > height or 7 > width:
+            for ghost in self.ghosts:
+                ghost.prison_cells = None
             return False
 
         for y in range(height):
             for x in range(width):
                 if self.maze[y][x] == 15:
-                    self.pattern_42_cells.append((y, x))
                     if x < width // 2:
-                        self.pattern_4_cells.append((y, x))
+                        pattern_4_cells.append((y, x))
                     else:
-                        self.pattern_2_cells.append((y, x))
+                        pattern_2_cells.append((y, x))
+        for ghost in self.ghosts:
+            if ghost.name in ("Blinky", "Pinky"):
+                ghost.prison_cells = pattern_4_cells
+            else:
+                ghost.prison_cells = pattern_2_cells
 
         return True
 

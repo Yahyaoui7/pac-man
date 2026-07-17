@@ -136,16 +136,15 @@ class PlayingState(State):
                         target_y, target_x = ghost.prison_target
 
                         self.movement.update_ghost_to_target(
-                            ghost, target_y, target_x, em.pattern_42_cells
+                            ghost, target_y, target_x
                         )
-
                         if (
                             ghost.grid_y == target_y
                             and ghost.grid_x == target_x
                         ):
                             ghost.going_to_prison = False
                             ghost.in_prison = True
-                            ghost.respawn_timer = after(5000)
+                            ghost.respawn_timer = after(10000)
 
                 elif ghost.in_prison:
                     if expired(ghost.respawn_timer):
@@ -160,7 +159,7 @@ class PlayingState(State):
                         continue
 
                     self.movement.move_inside_prison(
-                        ghost, self.game.entity_manager, em.pattern_42_cells
+                        ghost
                     )
                 elif ghost.is_eaten:
                     self.movement.update_ghost_to_target(
@@ -520,6 +519,31 @@ class PlayingState(State):
         screen.blit(bubble, bubble_rect.topleft)
         screen.blit(surf, rect)
 
+    def give_target(self, ghost):
+        if ghost.name == "Blinky":
+            ghost.prison_target = min(
+                ghost.prison_cells,
+                key=lambda cell: cell[0],
+            )
+
+        elif ghost.name == "Pinky":
+            ghost.prison_target = max(
+                ghost.prison_cells,
+                key=lambda cell: cell[0],
+            )
+
+        elif ghost.name == "Inky":
+            ghost.prison_target = min(
+                ghost.prison_cells,
+                key=lambda cell: cell[0],
+            )
+
+        elif ghost.name == "Clyde":
+            ghost.prison_target = max(
+                ghost.prison_cells,
+                key=lambda cell: cell[0],
+            )
+
     def check_collision(self, player, ghosts):
         radius = CELL_SIZE // 3
 
@@ -538,10 +562,8 @@ class PlayingState(State):
                     ghost.going_to_prison = True
                     ghost.in_prison = False
 
-                    if self.game.entity_manager.pattern_42_cells:
-                        ghost.prison_target = random.choice(
-                            self.game.entity_manager.pattern_42_cells
-                        )
+                    if ghost.prison_cells:
+                        self.give_target(ghost)
                     else:
                         ghost.prison_target = (ghost.spawn_y, ghost.spawn_x)
 

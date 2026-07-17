@@ -210,34 +210,38 @@ class MovementSystem:
 
         return None
 
-    def move_inside_prison(self, ghost, entity, pattern_42):
-        self.pattern_42 = pattern_42
+    def move_inside_prison(self, ghost):
+        self.pattern_42 = ghost.prison_cells
 
         try:
             if self.is_centered(ghost):
                 self.update_cell_position(ghost)
 
-                neighbors = []
+                high_cell = min(ghost.prison_cells, key=lambda cell: cell[0])
+                low_cell = max(ghost.prison_cells, key=lambda cell: cell[0])
 
-                directions = {
-                    "LEFT": (0, -1),
-                    "RIGHT": (0, 1),
-                    "UP": (-1, 0),
-                    "DOWN": (1, 0),
-                }
+                current_cell = (ghost.grid_y, ghost.grid_x)
 
-                for direction, (d_grid_y, d_grid_x) in directions.items():
-                    next_cell = (
-                        ghost.grid_y + d_grid_y,
-                        ghost.grid_x + d_grid_x,
+                if ghost.prison_target is None:
+                    ghost.prison_target = low_cell
+
+                if current_cell == ghost.prison_target:
+                    if ghost.prison_target == low_cell:
+                        ghost.prison_target = high_cell
+                    else:
+                        ghost.prison_target = low_cell
+
+                path = self.bfs_path(current_cell, ghost.prison_target)
+
+                if len(path) >= 2:
+                    next_cell = path[1]
+                    direction = self.direction_to_next_cell(
+                        current_cell,
+                        next_cell,
                     )
 
-                    if next_cell in entity.pattern_42_cells:
-                        neighbors.append(direction)
-
-                if neighbors:
-                    dirc = random.choice(neighbors)
-                    self.set_direction(ghost, dirc)
+                    if direction is not None:
+                        self.set_direction(ghost, direction)
 
             self.update_entity(ghost)
 
@@ -264,49 +268,13 @@ class MovementSystem:
 
         self.update_entity(ghost)
 
-    # def update_bfs_ghost(self, ghost, player) -> None:
-    #     """Move ghost toward player when ghost is not edible."""
-    #     if self.is_centered(ghost):
-    #         self.update_cell_position(ghost)
-
-    #         start = (ghost.grid_y, ghost.grid_x)
-    #         target = (player.grid_y, player.grid_x)
-
-    #         path = self.bfs_path(start, target)
-
-    #         if len(path) >= 2:
-    #             direction = self.direction_to_next_cell(path[0], path[1])
-    #             if direction is not None:
-    #                 self.set_direction(ghost, direction)
-    #     self.update_entity(ghost)
-    # def update_ghost_to_prison_target(
-    #     self, ghost, target_grid_y, target_grid_x
-    # ):
-    #     target_x = target_grid_x * CELL_SIZE + CELL_SIZE // 2
-    #     target_y = target_grid_y * CELL_SIZE + CELL_SIZE // 2
-
-    #     dx = target_x - ghost.x
-    #     dy = target_y - ghost.y
-    #     distance = math.hypot(dx, dy)
-
-    #     if distance <= ghost.speed:
-    #         ghost.x = target_x
-    #         ghost.y = target_y
-    #         ghost.grid_x = target_grid_x
-    #         ghost.grid_y = target_grid_y
-    #         return
-
-    #     ghost.x += ghost.speed * dx / distance
-    #     ghost.y += ghost.speed * dy / distance
-
     def update_ghost_to_target(
         self,
         ghost,
         target_y,
         target_x,
-        pattern_42=None,
     ):
-        self.pattern_42 = pattern_42
+        self.pattern_42 = ghost.prison_cells
 
         try:
             self._navigate_bfs(ghost, target_y, target_x)
@@ -396,44 +364,6 @@ class MovementSystem:
             safe_zones.remove(random_zone)
 
         return None
-
-    # def distance(
-    #     self,
-    #     grid_y1: int,
-    #     grid_x1: int,
-    #     grid_y2: int,
-    #     grid_x2: int,
-    # ) -> int:
-    #     return abs(grid_y1 - grid_y2) + abs(grid_x1 - grid_x2)
-
-    # def choose_runaway_target(self, player) -> tuple[int, int]:
-    #     """Choose the corner farthest from the player."""
-    #     max_grid_y = len(self.maze) - 1
-    #     max_grid_x = len(self.maze[0]) - 1
-
-    #     corners = [
-    #         (0, 0),
-    #         (0, max_grid_x),
-    #         (max_grid_y, 0),
-    #         (max_grid_y, max_grid_x),
-    #     ]
-
-    #     best_corner = corners[0]
-    #     best_distance = -1
-
-    #     for corner in corners:
-    #         dist = self.distance(
-    #             corner[0],
-    #             corner[1],
-    #             player.grid_y,
-    #             player.grid_x,
-    #         )
-
-    #         if dist > best_distance:
-    #             best_distance = dist
-    #             best_corner = corner
-
-    #     return best_corner
 
     def update_runaway_ghost(self, ghost, player) -> None:
         """Move edible ghost away from the player using fixed random target."""

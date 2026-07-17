@@ -1,14 +1,14 @@
-from typing import List
+from typing import List, Optional, Tuple, Any
 
 import pygame
 
 from src.logic.config import BUTTON_SIZE
 from src.graphics import ui_helpers as ui
 
-button_font = None
+button_font: Optional[pygame.font.Font] = None
 
 
-def get_button_font():
+def get_button_font() -> pygame.font.Font:
     global button_font
     if button_font is None:
         button_font = pygame.font.Font(None, 36)
@@ -17,7 +17,13 @@ def get_button_font():
 
 class Button:
 
-    def __init__(self, cord, text, font=None, size=BUTTON_SIZE):
+    def __init__(
+        self,
+        cord: Tuple[int, int],
+        text: str,
+        font: Optional[pygame.font.Font] = None,
+        size: Tuple[int, int] = BUTTON_SIZE,
+    ) -> None:
         if font is None:
             font = get_button_font()
         width, height = size
@@ -34,13 +40,13 @@ class Button:
         self.hovered = False
         self.selected = False
 
-    def update(self, input_state):
+    def update(self, input_state: Any) -> bool:
         """Returns True once when the button is clicked."""
         self.hovered = self.rect.collidepoint(input_state.mouse_pos)
 
-        return self.hovered and input_state.mouse_clicked
+        return bool(self.hovered and input_state.mouse_clicked)
 
-    def draw(self, screen):
+    def draw(self, screen: pygame.Surface) -> None:
 
         fill = (30, 30, 40)
 
@@ -69,10 +75,12 @@ class Button:
 
 
 class ButtonManager:
-    def __init__(self, buttons: List[Button]):
+    def __init__(self, buttons: List[Button]) -> None:
         self.buttons = buttons
 
-    def update(self, input_state, button_index):
+    def update(
+        self, input_state: Any, button_index: int
+    ) -> Tuple[int, Optional[int]]:
         """Update selection from keyboard/mouse input.
 
         Returns (button_index, clicked_index):

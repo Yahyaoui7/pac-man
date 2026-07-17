@@ -4,8 +4,7 @@ from typing import Any, List
 from src.UI.button import Button, ButtonManager
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
-from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST, get_home_maze
-from src.logic.helpers import cell_to_screen, screen_center
+from src.logic.helpers import screen_center
 
 
 class HomeState(State):
@@ -25,14 +24,13 @@ class HomeState(State):
             self.quit_button,
         ]
         self.button_manager = ButtonManager(self.buttons)
-        self.home_maze = get_home_maze()
 
     def enter(self) -> None:
         self.game.resize_window(1000, 600)
         self.game.sound_manager.play_music("menu_intro", False)
         self.game.lives = self.game.config.lives
 
-    def activate_selected_button(self):
+    def activate_selected_button(self) -> None:
 
         if self.button_index == 0:
 
@@ -81,49 +79,21 @@ class HomeState(State):
         if not pygame.mixer.music.get_busy():
             self.game.sound_manager.play_music("menu_music")
 
-    def layout_buttons(self, x, y):
+    def layout_buttons(self, x: int, y: int) -> None:
 
         self.play_button.rect.topleft = (x - 100, y - 100)
         self.instructions_button.rect.topleft = (x - 100, y - 30)
         self.scores_button.rect.topleft = (x - 100, y + 40)
         self.quit_button.rect.topleft = (x - 100, y + 110)
 
-    def draw_maze(self, screen: pygame.Surface) -> None:
-        for row, cells in enumerate(self.home_maze):
-
-            for col, cell in enumerate(cells):
-                x = col * 39
-                y = row * 39
-
-                if cell & NORTH:
-                    pygame.draw.line(screen, "blue", (x, y), (x + 39, y), 2)
-
-                if cell & EAST:
-                    pygame.draw.line(
-                        screen,
-                        "blue",
-                        (x + 39, y),
-                        (x + 39, y + 39),
-                        2,
-                    )
-
-                if cell & SOUTH:
-                    pygame.draw.line(
-                        screen,
-                        "blue",
-                        (x, y + 39),
-                        (x + 39, y + 39),
-                        2,
-                    )
-
-                if cell & WEST:
-                    pygame.draw.line(screen, "blue", (x, y), (x, y + 39), 2)
-
     def draw(self, screen: pygame.Surface) -> None:
         x, y = screen_center(screen.get_width(), screen.get_height())
 
         self.layout_buttons(x, y)
         screen.fill(ui.COLOR_BG_DARK)
+
+        assert ui.FONT_TITLE_LARGE is not None
+        assert ui.FONT_BTN is not None
 
         title_surf = ui.FONT_TITLE_LARGE.render(
             "PAC-MAN",
@@ -143,4 +113,3 @@ class HomeState(State):
         self.instructions_button.draw(screen)
         self.scores_button.draw(screen)
         self.quit_button.draw(screen)
-        self.draw_maze(screen)

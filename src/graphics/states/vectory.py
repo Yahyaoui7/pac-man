@@ -1,4 +1,5 @@
-from typing import Optional
+import pygame
+from typing import Any
 
 from src.UI.button import Button, ButtonManager
 from src.graphics.renderer import State
@@ -8,10 +9,10 @@ from src.graphics import ui_helpers as ui
 class VictoryState(State):
     """The game completed victory screen."""
 
-    def __init__(self, game):
+    def __init__(self, game: Any) -> None:
         super().__init__(game)
-        self.save_score_button: Optional[Button] = Button((0, 0), "Save Score")
-        self.home_button: Optional[Button] = Button((0, 0), "Home Menu")
+        self.save_score_button: Button = Button((0, 0), "Save Score")
+        self.home_button: Button = Button((0, 0), "Home Menu")
         self.buttons_manager = ButtonManager(
             [
                 self.home_button,
@@ -20,7 +21,7 @@ class VictoryState(State):
         )
         self.button_index = 0
 
-    def enter(self):
+    def enter(self) -> None:
         self.game.resize_window(1000, 600)
         self.game.sound_manager.play_music("victory_music", loop=False)
         w = self.game.screen.get_width()
@@ -30,7 +31,7 @@ class VictoryState(State):
         self.save_score_button.rect.topleft = (x - 100, y + 40)
         self.home_button.rect.topleft = (x - 100, y + 105)
 
-    def activate_selected_button(self):
+    def activate_selected_button(self) -> None:
         if self.button_index == 0:
             from src.graphics.states.home import HomeState
 
@@ -41,7 +42,9 @@ class VictoryState(State):
 
             self.game.state_manager.change_state(NameInputState(self.game))
 
-    def update(self, input_state, events):
+    def update(
+        self, input_state: Any, events: list[pygame.event.Event]
+    ) -> None:
         self.button_index, clicked_index = self.buttons_manager.update(
             input_state,
             self.button_index,
@@ -51,8 +54,11 @@ class VictoryState(State):
         if input_state.confirm_pressed or clicked_index is not None:
             self.activate_selected_button()
 
-    def draw(self, screen):
+    def draw(self, screen: pygame.Surface) -> None:
         screen.fill(ui.COLOR_BG_PANEL)
+
+        assert ui.FONT_TITLE_LARGE is not None
+        assert ui.FONT_SCORE is not None
 
         ui.draw_text_centered(
             screen, ui.FONT_TITLE_LARGE, "YOU WIN!", 130, ui.COLOR_NEON_YELLOW

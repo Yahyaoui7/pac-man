@@ -9,7 +9,9 @@ from src.graphics import ui_helpers as ui
 class HighScoreState(State):
     """The top 10 highscores display screen."""
 
-    def __init__(self, game: Any, previous_state=None) -> None:
+    def __init__(
+        self, game: Any, previous_state: Optional[State] = None
+    ) -> None:
         super().__init__(game)
         self.previous_state = previous_state
         self.home_button: Optional[Button] = None
@@ -43,6 +45,9 @@ class HighScoreState(State):
             screen.fill(ui.COLOR_BG_PANEL)
 
         ui.draw_overlay(screen, 180)
+        assert ui.FONT_TITLE is not None
+        assert ui.FONT_SCORE is not None
+
         ui.draw_text_centered(
             screen, ui.FONT_TITLE, "HIGH SCORES", 90, ui.COLOR_NEON_CYAN
         )

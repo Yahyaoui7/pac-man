@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pygame
-from typing import Optional
+from typing import Optional, Any
 
 from src.UI.button import Button
 from src.graphics.renderer import State
@@ -11,14 +11,14 @@ from src.graphics import ui_helpers as ui
 class GameOverState(State):
     """The Game Over display screen and Name Input handler."""
 
-    def __init__(self, game, previous_state: State):
+    def __init__(self, game: Any, previous_state: State) -> None:
         super().__init__(game)
         self.previous_state = previous_state
         self.name_button: Optional[Button] = None
         self.home_button: Optional[Button] = None
         self.hi_score_button: Optional[Button] = None
 
-    def enter(self):
+    def enter(self) -> None:
         self.game.sound_manager.play_music("game_over_music", loop=False)
         w = self.game.screen.get_width()
         h = self.game.screen.get_height()
@@ -34,7 +34,9 @@ class GameOverState(State):
             (center_x - 100, center_y + 150), "Home Menu", ui.FONT_BTN
         )
 
-    def update(self, input_state, events):
+    def update(
+        self, input_state: Any, events: list[pygame.event.Event]
+    ) -> None:
         if self.name_button and self.name_button.update(input_state):
             from src.graphics.states.name_input import NameInputState
 
@@ -56,6 +58,10 @@ class GameOverState(State):
 
         center_x = screen.get_width() // 2
         center_y = screen.get_height() // 2
+
+        assert ui.FONT_TITLE is not None
+        assert ui.FONT_LOSING is not None
+        assert ui.FONT_BTN is not None
 
         # Title
         ui.draw_text_centered(

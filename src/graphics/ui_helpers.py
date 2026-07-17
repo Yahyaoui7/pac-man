@@ -1,6 +1,7 @@
 """Shared UI drawing helpers: fonts, colors, overlays, text, buttons."""
 
 import pygame
+from typing import Optional
 
 COLOR_NEON_YELLOW = (255, 238, 0)
 COLOR_NEON_CYAN = (0, 238, 255)
@@ -48,17 +49,17 @@ def _font_attr(name: str, size: int) -> pygame.font.Font:
     return f
 
 
-FONT_TITLE = None
-FONT_TITLE_LARGE = None
-FONT_BTN = None
-FONT_TEXT = None
-FONT_HUD = None
-FONT_SCORE = None
-FONT_INPUT = None
-FONT_LOSING = None
+FONT_TITLE: Optional[pygame.font.Font] = None
+FONT_TITLE_LARGE: Optional[pygame.font.Font] = None
+FONT_BTN: Optional[pygame.font.Font] = None
+FONT_TEXT: Optional[pygame.font.Font] = None
+FONT_HUD: Optional[pygame.font.Font] = None
+FONT_SCORE: Optional[pygame.font.Font] = None
+FONT_INPUT: Optional[pygame.font.Font] = None
+FONT_LOSING: Optional[pygame.font.Font] = None
 
 
-def _init_fonts():
+def _init_fonts() -> None:
     """Call once after pygame.init() to populate font constants."""
     global FONT_TITLE, FONT_TITLE_LARGE, FONT_BTN, FONT_TEXT
     global FONT_HUD, FONT_SCORE, FONT_INPUT, FONT_LOSING
@@ -84,7 +85,9 @@ def draw_text_centered(
     font: pygame.font.Font,
     text: str,
     y: int,
-    color=COLOR_WHITE,
+    color: (
+        tuple[int, int, int] | tuple[int, int, int, int] | pygame.Color
+    ) = COLOR_WHITE,
 ) -> pygame.Rect:
     """Render text centered horizontally at *y*, blit it, return rect."""
     surf = font.render(text, True, color)
@@ -93,7 +96,10 @@ def draw_text_centered(
     return rect
 
 
-def draw_bubble(text, padding=(20, 12)):
+def draw_bubble(
+    text: str, padding: tuple[int, int] = (20, 12)
+) -> pygame.Surface:
+    assert FONT_HUD is not None
     text_surface = FONT_HUD.render(text, True, COLOR_WHITE)
 
     pad_x, pad_y = padding

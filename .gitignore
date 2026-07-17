@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 *highscores.json
 .highscores.json
+.venv/
+.mypy_cache/

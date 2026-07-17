@@ -1,10 +1,13 @@
 import json
+from typing import Any
+
+from src.logic.config import GameConfig
 
 
 class ScoreManager:
     """Manage player score."""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config: GameConfig) -> None:
         self.score = 0
 
         self.normal_pellet_points = config.points_per_pacgum
@@ -27,7 +30,7 @@ class ScoreManager:
         """Add score when player eats edible ghost."""
         self.score += self.ghost_points
 
-    def add_time_bonus(self, time):
+    def add_time_bonus(self, time: int) -> None:
         self.score += time
 
     def get_score(self) -> int:
@@ -36,13 +39,13 @@ class ScoreManager:
 
 
 class HighScoreManager:
-    def __init__(self, file_path):
+    def __init__(self, file_path: str) -> None:
         self.file_path = file_path
-        self.highscores = []
+        self.highscores: list[dict[str, Any]] = []
         self.max_scores = 10
         self.load_scores()
 
-    def load_scores(self):
+    def load_scores(self) -> None:
         try:
             with open(self.file_path, "r", encoding="utf-8") as file:
                 self.highscores = json.load(file)
@@ -51,7 +54,7 @@ class HighScoreManager:
         except json.JSONDecodeError:
             self.highscores = []
 
-    def save_scores(self):
+    def save_scores(self) -> None:
         with open(self.file_path, "w", encoding="utf-8") as file:
             json.dump(self.highscores, file)
 
@@ -73,9 +76,9 @@ class HighScoreManager:
             reverse=True,
         )
 
-        self.highscores = self.highscores[:self.max_scores]
+        self.highscores = self.highscores[: self.max_scores]
 
         self.save_scores()
 
-    def get_top_scores(self):
+    def get_top_scores(self) -> list[dict[str, Any]]:
         return self.highscores

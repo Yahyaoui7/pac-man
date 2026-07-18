@@ -11,6 +11,8 @@
 # └── CollisionSystem
 
 
+from typing import Any
+
 from src.graphics.entity_manager import EntityManager
 from src.graphics.renderer import StateManager
 from src.graphics.states.home import HomeState
@@ -33,14 +35,14 @@ class GameStarter:
     def __init__(self, config: GameConfig):
         self.running = True
         self.config = config
-        self.screen = None
+        self.screen: Any = None
 
         self.state_manager = StateManager(self)
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
         self.score_management = ScoreManager(config)
         self.highscore_manager = HighScoreManager(".highscores.json")
-        self.entity_manager = None
+        self.entity_manager: Any = None
 
         self.lives: int = config.lives
 
@@ -69,7 +71,9 @@ class GameStarter:
         pygame.display.set_caption("NEON PAC-MAN")
 
         self.entity_manager = EntityManager(
-            self.config, self.score_management, self
+            self.config,
+            self.score_management,
+            self,
         )
 
         clock = pygame.time.Clock()
@@ -86,12 +90,8 @@ class GameStarter:
             if input_state.quit_requested:
                 self.running = False
 
-            # Update the current state
-
             self.state_manager.update(input_state, events)
 
-
-            # Draw the current state
             if self.screen:
                 self.screen.fill((0, 0, 0))
                 self.state_manager.draw(self.screen)

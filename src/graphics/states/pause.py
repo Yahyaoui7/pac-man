@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pygame
-from typing import Any, List, Optional
+from typing import Any, List
 
 from src.UI.button import Button, ButtonManager
 from src.graphics.renderer import State
@@ -14,8 +14,8 @@ class PauseState(State):
     def __init__(self, game: Any, previous_state: State) -> None:
         super().__init__(game)
         self.previous_state = previous_state
-        self.resume_button: Optional[Button] = Button((0, 0), "RESUME")
-        self.home_button: Optional[Button] = Button((0, 0), "Home MENU")
+        self.resume_button: Button = Button((0, 0), "RESUME")
+        self.home_button: Button = Button((0, 0), "Home MENU")
         self.buttons_manager = ButtonManager(
             [
                 self.resume_button,
@@ -24,7 +24,7 @@ class PauseState(State):
         )
         self.button_index = 0
 
-    def enter(self):
+    def enter(self) -> None:
         self.game.sound_manager.play_sound("pause")
 
         w = self.game.screen.get_width()
@@ -33,7 +33,7 @@ class PauseState(State):
         self.resume_button.rect.topleft = (w // 2 - 100, h // 2 - 40)
         self.home_button.rect.topleft = (w // 2 - 100, h // 2 + 25)
 
-    def activate_selected_button(self):
+    def activate_selected_button(self) -> None:
         if self.button_index == 0:
             self.game.state_manager.pop_state()
 
@@ -60,6 +60,7 @@ class PauseState(State):
     def draw(self, screen: pygame.Surface) -> None:
         self.previous_state.draw(screen)
         ui.draw_overlay(screen, 150)
+        assert ui.FONT_TITLE is not None
         ui.draw_text_centered(
             screen,
             ui.FONT_TITLE,

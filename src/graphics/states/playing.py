@@ -2,11 +2,13 @@ import math
 
 import pygame
 import pygame.draw as dr
-import random
 from typing import Any, List
 
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
+from src.logic.movement import MovementSystem
+from src.logic.helpers import cell_to_screen, pixel_to_screen, expired, after
+
 from src.logic.config import (
     CELL_SIZE,
     PADDING,
@@ -16,8 +18,6 @@ from src.logic.config import (
     SOUTH,
     WEST,
 )
-from src.logic.helpers import cell_to_screen, pixel_to_screen, expired, after
-from src.logic.movement import MovementSystem
 
 
 class PlayingState(State):
@@ -54,7 +54,6 @@ class PlayingState(State):
 
         self.player_speed = self.game.entity_manager.player.speed
         self.active_cheats = set()
-        print(self.maze)
 
     def update(
         self,
@@ -81,7 +80,7 @@ class PlayingState(State):
         self._update_entities()
         self._check_level_end()
 
-    def _handle_input(self, input_state) -> None:
+    def _handle_input(self, input_state: Any) -> None:
         player = self.game.entity_manager.player
         if input_state.move_left:
             player.next_direction = "LEFT"
@@ -123,56 +122,53 @@ class PlayingState(State):
             player = self.game.entity_manager.player
             player.speed = (
                 self.player_speed * 2 if turning_on else self.player_speed
-            )
+                )
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
         self.movement.update_entity(em.player)
 
         if "ghost freeze" not in self.active_cheats:
-            for ghost in em.ghosts:
-                if ghost.going_to_prison:
-                    if ghost.prison_target is not None:
-                        target_y, target_x = ghost.prison_target
+            for gst in em.ghosts:
+                if gst.going_to_prison:
+                    if gst.prison_target is not None:
+                        target_y, target_x = gst.prison_target
 
                         self.movement.update_ghost_to_target(
-                            ghost, target_y, target_x
+                            gst,
+                            target_y,
+                            target_x,
                         )
-                        if (
-                            ghost.grid_y == target_y
-                            and ghost.grid_x == target_x
-                        ):
-                            ghost.going_to_prison = False
-                            ghost.in_prison = True
-                            ghost.respawn_timer = after(10000)
+                        if (gst.grid_x, gst.grid_y) == (target_x, target_y):
+                            gst.going_to_prison = False
+                            gst.in_prison = True
+                            gst.respawn_timer = after(10000)
 
-                elif ghost.in_prison:
-                    if expired(ghost.respawn_timer):
-                        ghost.reset()
-                        ghost.is_eaten = False
-                        ghost.is_edible = False
-                        ghost.going_to_prison = False
-                        ghost.in_prison = False
-                        ghost.prison_target = None
-                        ghost.respawn_timer = 0.0
+                elif gst.in_prison:
+                    if expired(gst.respawn_timer):
+                        gst.reset()
+                        gst.is_eaten = False
+                        gst.is_edible = False
+                        gst.going_to_prison = False
+                        gst.in_prison = False
+                        gst.prison_target = None
+                        gst.respawn_timer = 0.0
 
                         continue
 
-                    self.movement.move_inside_prison(
-                        ghost
-                    )
-                elif ghost.is_eaten:
+                    self.movement.move_inside_prison(gst)
+                elif gst.is_eaten:
                     self.movement.update_ghost_to_target(
-                        ghost,
-                        ghost.spawn_y,
-                        ghost.spawn_x,
+                        gst,
+                        gst.spawn_y,
+                        gst.spawn_x,
                     )
 
-                elif ghost.is_edible:
-                    self.movement.update_runaway_ghost(ghost, em.player)
+                elif gst.is_edible:
+                    self.movement.update_runaway_ghost(gst, em.player)
 
                 else:
-                    self.movement.update_bfs_ghost(ghost, em.player)
+                    self.movement.update_bfs_ghost(gst, em.player)
         self.check_collision(em.player, em.ghosts)
         em.update(self.maze, 1 / 60.0)
 
@@ -324,11 +320,11 @@ class PlayingState(State):
         cy: float,
         icon: str,
         value: str,
-        color,
+        color: Any,
         seg_w: float,
     ) -> None:
         text = f"{icon} {value}"
-        font = ui.get_scaled_font(text, max_width=seg_w - 8, base_size=26)
+        font = ui.get_scaled_font(text, max_width=int(seg_w - 8), base_size=26)
         surf = font.render(text, True, color)
         rect = surf.get_rect(center=(cx, cy))
         screen.blit(surf, rect)
@@ -357,7 +353,7 @@ class PlayingState(State):
             extra = f"+{lives - max_icons}"
             font = ui.get_scaled_font(
                 extra,
-                max_width=seg_w * 0.3,
+                max_width=int(seg_w * 0.3),
                 base_size=20,
             )
             surf = font.render(extra, True, ui.COLOR_WHITE)
@@ -366,17 +362,16 @@ class PlayingState(State):
                 (start_x + total_w + 6, cy - surf.get_height() // 2),
             )
         elif lives <= 0:
-            surf = ui.get_scaled_font("0", seg_w - 8, base_size=22).render(
-                "0", True, ui.COLOR_RED
-            )
+            font = ui.get_scaled_font("0", int(seg_w - 8), base_size=22)
+            surf = font.render("0", True, ui.COLOR_RED)
             screen.blit(surf, surf.get_rect(center=(cx, cy)))
 
     @staticmethod
     def _draw_pacman_icon(
         screen: pygame.Surface,
-        center,
+        center: tuple[float, float],
         radius: int,
-        color,
+        color: Any,
     ) -> None:
         x, y = center
         mouth = 40
@@ -432,7 +427,9 @@ class PlayingState(State):
                     self._draw_wall_segment(screen, (x, y), (x, y + c))
 
     @staticmethod
-    def _draw_wall_segment(screen: pygame.Surface, p1, p2) -> None:
+    def _draw_wall_segment(
+        screen: pygame.Surface, p1: tuple[int, int], p2: tuple[int, int]
+    ) -> None:
         """Two-tone glowing wall: a soft dim outer stroke plus a bright core,
         with rounded joints so segments read as continuous walls."""
         glow_w, core_w = 6, 2
@@ -459,6 +456,7 @@ class PlayingState(State):
 
         player = self.game.entity_manager.player
         px, py = pixel_to_screen(player.x, player.y)
+        assert ui.FONT_HUD is not None
         text_surface = ui.FONT_HUD.render(self.msg_text, True, ui.COLOR_WHITE)
         text_rect = text_surface.get_rect(center=(px, py - 40))
 
@@ -519,7 +517,7 @@ class PlayingState(State):
         screen.blit(bubble, bubble_rect.topleft)
         screen.blit(surf, rect)
 
-    def give_target(self, ghost):
+    def give_target(self, ghost: Any) -> None:
         if ghost.name == "Blinky":
             ghost.prison_target = min(
                 ghost.prison_cells,
@@ -544,7 +542,7 @@ class PlayingState(State):
                 key=lambda cell: cell[0],
             )
 
-    def check_collision(self, player, ghosts):
+    def check_collision(self, player: Any, ghosts: List[Any]) -> None:
         radius = CELL_SIZE // 3
 
         for ghost in ghosts:

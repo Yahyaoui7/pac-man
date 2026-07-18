@@ -50,6 +50,9 @@ class InstructionsState(State):
             border_radius=12,
         )
 
+        assert ui.FONT_TITLE is not None
+        assert ui.FONT_TEXT is not None
+
         title_surf = ui.FONT_TITLE.render(
             "HOW TO PLAY",
             True,

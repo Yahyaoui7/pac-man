@@ -35,12 +35,12 @@ class StateManager:
         self.stack: list[State] = []
 
     @property
-    def current(self):
+    def current(self) -> State | None:
         if self.stack:
             return self.stack[-1]
         return None
 
-    def change_state(self, state: State):
+    def change_state(self, state: State) -> None:
         while self.stack:
             self.stack.pop().exit()
         self.stack.append(state)
@@ -56,7 +56,9 @@ class StateManager:
         state = self.stack.pop()
         state.exit()
 
-    def update(self, input_state, events):
+    def update(
+        self, input_state: Any, events: list[pygame.event.Event]
+    ) -> None:
         if self.current:
             self.current.update(input_state, events)
 

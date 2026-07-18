@@ -1,6 +1,6 @@
 import math
 import random
-from typing import Optional
+from typing import Optional, Any
 
 import pygame
 
@@ -32,7 +32,9 @@ ABILITY_KICK = "kick"
 
 
 class EntityManager:
-    def __init__(self, config: GameConfig, score_management, game) -> None:
+    def __init__(
+        self, config: GameConfig, score_management: Any, game: Any
+    ) -> None:
         """Initialize systems and settings from configuration."""
         self.config: GameConfig = config
         self.score_management = score_management
@@ -96,11 +98,11 @@ class EntityManager:
         ]
         self.get_42_patterns()
 
-    def play_sound(self, name):
+    def play_sound(self, name: str) -> None:
         self.sound.play_sound_with_duck(name)
 
     def update(self, maze: list[list[int]], dt: float) -> None:
-
+        assert self.player is not None
         px, py = self.player.grid_x, self.player.grid_y
         pellet = self.pellets[py][px]
 
@@ -162,11 +164,12 @@ class EntityManager:
                     ghost.is_edible = False
             ghost.update_animation(dt_ms)
 
-    def init_pellets(self):
+    def init_pellets(self) -> None:
         self._init_pellet_grid(self.maze)
 
     def draw(self, screen: pygame.Surface) -> None:
         """Draw pellets, player, and Ghosts."""
+        assert self.player is not None
         height = len(self.pellets)
         width = len(self.pellets[0])
 
@@ -202,7 +205,7 @@ class EntityManager:
         for ghost in self.ghosts:
             ghost.draw(screen)
 
-    def reset_positions(self):
+    def reset_positions(self) -> None:
         """Reset Pacman and Ghosts to start positions."""
         self.init_pellets()
         if self.player:
@@ -243,14 +246,16 @@ class Entity:
         self,
         y: int,
         x: int,
-        speed: int,
+        speed: float,
     ) -> None:
         self.spawn_x = x
         self.spawn_y = y
         self.grid_y = y
         self.grid_x = x
 
-        self.x, self.y = grid_to_pixel(y, x)
+        px, py = grid_to_pixel(y, x)
+        self.x: float = float(px)
+        self.y: float = float(py)
 
         self.speed = speed
 
@@ -259,11 +264,15 @@ class Entity:
 
         self.row_direction = 0
         self.col_direction = 0
+        self.grid_x_direction = 0
+        self.grid_y_direction = 0
 
         self.facing = Facing.RIGHT
 
 
-def _facing_from_direction(direction, current_facing: Facing) -> Facing:
+def _facing_from_direction(
+    direction: Optional[str], current_facing: Facing
+) -> Facing:
     """
     Map a movement direction string to a horizontal Facing, WITHOUT ever
     producing a vertical flip.
@@ -375,6 +384,7 @@ class Player(Entity):
 
         if self.is_attacking and self.animation.finished:
             self.is_attacking = False
+            assert self.powered_mode is not None
             self.animation = self.sprites.new_walk_animation(self.powered_mode)
 
         if (
@@ -388,7 +398,7 @@ class Player(Entity):
             self.animation = self.sprites.new_animation(pm.NORMAL)
 
     def draw(self, screen: pygame.Surface) -> None:
-        x, y = pixel_to_screen(self.x, self.y)
+        x, y = pixel_to_screen(int(self.x), int(self.y))
 
         frame = self.animation.current_frame
         if self.facing == Facing.LEFT:
@@ -397,11 +407,13 @@ class Player(Entity):
         rect = frame.get_rect(center=(int(x), int(y)))
         screen.blit(frame, rect)
 
-    def is_valid_spawn(self, row: int, col: int, maze) -> bool:
+    def is_valid_spawn(
+        self, row: int, col: int, maze: list[list[int]]
+    ) -> bool:
         cell = maze[row][col]
         return cell != (NORTH | EAST | SOUTH | WEST)
 
-    def find_player_spawn(self, game, maze) -> bool:
+    def find_player_spawn(self, game: Any, maze: list[list[int]]) -> bool:
         middle_row = game.curr_level.height // 2
         middle_col = game.curr_level.width // 2
 
@@ -424,7 +436,7 @@ class Player(Entity):
 
         return False
 
-    def reset_location(self):
+    def reset_location(self) -> None:
         self.x, self.y = grid_to_pixel(self.spawn_y, self.spawn_x)
 
         self.direction = None
@@ -449,7 +461,7 @@ class Ghost(Entity):
         self,
         y: int,
         x: int,
-        color,
+        color: tuple[int, int, int] | pygame.Color,
         name: str,
     ) -> None:
         super().__init__(y, x, speed=1.5)
@@ -465,15 +477,16 @@ class Ghost(Entity):
         self.is_eaten = False
         self.frightened_timer = 0.0
         self.respawn_timer = 0.0
-        self.runaway_target = None
+        self.runaway_target: Optional[tuple[int, int]] = None
 
         self.going_to_prison = False
         self.in_prison = False
         self.prison_target = None
+        self.prison_cells: Optional[list[tuple[int, int]]] = None
 
         self.sprites = SpriteLibrary.instance()
         self.state = gs.HUNT
-        self._last_vertical = None
+        self._last_vertical: Optional[str] = None
         self.animation = self.sprites.new_ghost_animation(
             gs.HUNT, color=self.ghost_color, facing=self.facing
         )
@@ -516,7 +529,7 @@ class Ghost(Entity):
         self.animation.update(dt_ms)
 
     def draw(self, screen: pygame.Surface) -> None:
-        x, y = pixel_to_screen(self.x, self.y)
+        x, y = pixel_to_screen(int(self.x), int(self.y))
 
         frame = self.animation.current_frame
 

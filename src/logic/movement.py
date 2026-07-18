@@ -1,26 +1,21 @@
 from collections import deque
+from typing import List, Optional, Any, Tuple
 
+from src.graphics.entity_manager import Entity
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 import random
-import math
-
-from src.graphics.entity_manager import Player
 
 
 class MovementSystem:
     """Controls movement for player and ghosts."""
 
-    def __init__(self, maze):
+    def __init__(self, maze: List[List[int]]) -> None:
         """Store the maze so we can check walls."""
         self.maze = maze
         self.rng = random.Random()
+        self.pattern_42: Optional[List[Tuple[int, int]]] = None
 
-    # ----------------------------
-    # BASIC ENTITY MOVEMENT
-    # Used by player and ghosts
-    # ----------------------------
-
-    def set_direction(self, entity, direction: str) -> None:
+    def set_direction(self, entity: Entity, direction: str) -> None:
         """Set entity direction and convert it to grid_y/grid_x movement."""
         entity.direction = direction
 
@@ -37,7 +32,7 @@ class MovementSystem:
             entity.grid_y_direction = 1
             entity.grid_x_direction = 0
 
-    def is_centered(self, entity) -> bool:
+    def is_centered(self, entity: Entity) -> bool:
         tolerance = 5
 
         cell_grid_x = int(entity.x // CELL_SIZE)
@@ -46,12 +41,15 @@ class MovementSystem:
         center_x = cell_grid_x * CELL_SIZE + CELL_SIZE // 2
         center_y = cell_grid_y * CELL_SIZE + CELL_SIZE // 2
 
-        return (
+        if (
             abs(entity.x - center_x) <= tolerance
             and abs(entity.y - center_y) <= tolerance
-        )
+        ):
+            return True
+        else:
+            return False
 
-    def update_cell_position(self, entity) -> None:
+    def update_cell_position(self, entity: Entity) -> None:
         """Update grid_y/grid_x using the current pixel position x/y."""
         entity.grid_y = int(entity.y // CELL_SIZE)
         entity.grid_x = int(entity.x // CELL_SIZE)
@@ -95,7 +93,7 @@ class MovementSystem:
 
         return False
 
-    def is_opposite_direction(self, entity) -> bool:
+    def is_opposite_direction(self, entity: Entity) -> bool:
         opposite_direction = {
             "LEFT": "RIGHT",
             "RIGHT": "LEFT",
@@ -103,14 +101,17 @@ class MovementSystem:
             "DOWN": "UP",
         }
 
-        if entity.direction is None or entity.next_direction is None:
+        d = entity.direction
+        nd = entity.next_direction
+        if d is None or nd is None:
             return False
 
-        return opposite_direction[entity.direction] == entity.next_direction
+        return d in opposite_direction and opposite_direction[d] == nd
 
-    def update_entity(self, entity) -> None:
+    def update_entity(self, entity: Entity) -> None:
         """Move an entity by pixels, only change direction at cell center."""
         if self.is_opposite_direction(entity):
+            assert entity.next_direction is not None
             self.set_direction(entity, entity.next_direction)
             entity.next_direction = None
 
@@ -168,7 +169,7 @@ class MovementSystem:
         """Find the shortest path from ghost to player."""
         queue = deque([start])
         visited = {start}
-        parent = {}
+        parent: dict[tuple[int, int], tuple[int, int]] = {}
 
         while queue:
             current = queue.popleft()
@@ -210,7 +211,7 @@ class MovementSystem:
 
         return None
 
-    def move_inside_prison(self, ghost):
+    def move_inside_prison(self, ghost: Any) -> None:
         self.pattern_42 = ghost.prison_cells
 
         try:
@@ -249,7 +250,10 @@ class MovementSystem:
             self.pattern_42 = None
 
     def _navigate_bfs(
-        self, ghost, target_grid_y: int, target_grid_x: int
+        self,
+        ghost: Any,
+        target_grid_y: int,
+        target_grid_x: int,
     ) -> None:
         """Move ghost toward target using BFS pathfinding."""
         if self.is_centered(ghost):
@@ -270,10 +274,10 @@ class MovementSystem:
 
     def update_ghost_to_target(
         self,
-        ghost,
-        target_y,
-        target_x,
-    ):
+        ghost: Any,
+        target_y: int,
+        target_x: int,
+    ) -> None:
         self.pattern_42 = ghost.prison_cells
 
         try:
@@ -281,7 +285,7 @@ class MovementSystem:
         finally:
             self.pattern_42 = None
 
-    def update_bfs_ghost(self, ghost, player) -> None:
+    def update_bfs_ghost(self, ghost: Any, player: Any) -> None:
         """Move ghost toward player when ghost is not edible."""
         self.pattern_42 = None
         self._navigate_bfs(ghost, player.grid_y, player.grid_x)
@@ -291,7 +295,7 @@ class MovementSystem:
     # Ghost runs away from player
     # ----------------------------
 
-    def get_zone(self, grid_y, grid_x):
+    def get_zone(self, grid_y: int, grid_x: int) -> str:
         middle_grid_y = len(self.maze) // 2
         middle_grid_x = len(self.maze[0]) // 2
         if grid_y < middle_grid_y and grid_x < middle_grid_x:
@@ -303,7 +307,9 @@ class MovementSystem:
 
         return "BOTTOM_RIGHT"
 
-    def get_zone_bounds(self, zone: str):
+    def get_zone_bounds(
+        self, zone: str
+    ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         middle_grid_y = len(self.maze) // 2
         middle_grid_x = len(self.maze[0]) // 2
         max_grid_y = len(self.maze) - 1
@@ -317,14 +323,16 @@ class MovementSystem:
             return (middle_grid_y, max_grid_y), (0, middle_grid_x - 1)
         return (middle_grid_y, max_grid_y), (middle_grid_x, max_grid_x)
 
-    def is_valid_cell(self, grid_y, grid_x):
+    def is_valid_cell(self, grid_y: int, grid_x: int) -> bool:
         for direction in ["LEFT", "RIGHT", "UP", "DOWN"]:
             if self.can_move(grid_y, grid_x, direction):
                 return True
 
         return False
 
-    def choose_runaway_target_by_zone(self, player):
+    def choose_runaway_target_by_zone(
+        self, player: Any
+    ) -> Optional[Tuple[int, int]]:
         player_zone = self.get_zone(player.grid_y, player.grid_x)
 
         zones = [
@@ -365,7 +373,7 @@ class MovementSystem:
 
         return None
 
-    def update_runaway_ghost(self, ghost, player) -> None:
+    def update_runaway_ghost(self, ghost: Any, player: Any) -> None:
         """Move edible ghost away from the player using fixed random target."""
 
         if self.is_centered(ghost):

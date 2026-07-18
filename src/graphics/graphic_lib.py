@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import os
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 
 
 import pygame
@@ -94,7 +94,7 @@ class GhostState(Enum):
 # Per-mode playback tuning: default ms/frame, whether it loops, and any
 # frame indices that should be held longer (impact frames read much
 # better on screen with an extra beat -- "hit stop").
-_MODE_TIMING = {
+_MODE_TIMING: dict[PacmanMode, dict[str, Any]] = {
     PacmanMode.NORMAL: dict(
         frame_duration_ms=160,
         loop=True,
@@ -118,11 +118,11 @@ class Animation:
 
     def __init__(
         self,
-        frames,
-        frame_duration_ms=90,
-        loop=True,
-        overrides=None,
-    ):
+        frames: list[pygame.Surface],
+        frame_duration_ms: float = 90,
+        loop: bool = True,
+        overrides: Optional[dict[int, float]] = None,
+    ) -> None:
         self.frames = frames
         self.default_duration = frame_duration_ms
         self.overrides = overrides or {}
@@ -131,12 +131,12 @@ class Animation:
         self.timer = 0.0
         self.finished = False
 
-    def reset(self):
+    def reset(self) -> None:
         self.index = 0
         self.timer = 0.0
         self.finished = False
 
-    def _duration_for(self, index):
+    def _duration_for(self, index: int) -> float:
         return self.overrides.get(index, self.default_duration)
 
     def update(self, dt_ms: float) -> None:
@@ -167,7 +167,7 @@ class SpriteLibrary:
 
     _instance: Optional["SpriteLibrary"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._frames: dict[PacmanMode, list[pygame.Surface]] = {}
         self._walk_frames: dict[PacmanMode, list[pygame.Surface]] = {}
         self._attack_frames: dict[PacmanMode, list[pygame.Surface]] = {}
@@ -177,7 +177,7 @@ class SpriteLibrary:
         # ghost_frames["frightened"]              -> [Surface x3]
         # ghost_frames["eaten"]["up"|"down"]      -> [Surface, Surface]
         # ghost_frames["eaten"]["side"][Facing]   -> [Surface, Surface]
-        self._ghost_frames: dict = {}
+        self._ghost_frames: dict[str, Any] = {}
         self._ghosts_loaded = False
 
     @classmethod
@@ -278,7 +278,7 @@ class SpriteLibrary:
         with open(meta_path) as f:
             meta = json.load(f)
 
-        def load_list(filenames):
+        def load_list(filenames: list[str]) -> list[pygame.Surface]:
             out = []
             for name in filenames:
                 raw = pygame.image.load(
@@ -315,9 +315,9 @@ class SpriteLibrary:
     def new_ghost_animation(
         self,
         state: GhostState,
-        color: GhostColor = None,
+        color: Optional[GhostColor] = None,
         facing: Facing = Facing.RIGHT,
-        vertical: str = None,
+        vertical: Optional[str] = None,
     ) -> Animation:
         """
         state:    HUNT / FRIGHTENED / EATEN

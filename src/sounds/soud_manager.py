@@ -1,10 +1,21 @@
 import pygame
+from typing import Dict, Optional, TypedDict
 
 path = "assets/sounds"
 
 
+class SoundData(TypedDict):
+    sound: pygame.mixer.Sound
+    volume: float
+
+
+class MusicData(TypedDict):
+    file: str
+    volume: float
+
+
 class SoundManager:
-    def __init__(self):
+    def __init__(self) -> None:
         pygame.mixer.init()
         self.normal_music_volume = 0.4
         self.duck_music_volume = 0.1
@@ -13,7 +24,7 @@ class SoundManager:
         self.current_music_volume = self.normal_music_volume
         # ---------- Sound Effects ----------
 
-        self.sounds = {
+        self.sounds: Dict[str, SoundData] = {
             # Pacgum / food
             "eat_normal_pellet": {
                 "sound": pygame.mixer.Sound(f"{path}/munch_pac_man.mp3"),
@@ -65,7 +76,7 @@ class SoundManager:
         for data in self.sounds.values():
             data["sound"].set_volume(data["volume"])
 
-        self.music = {
+        self.music: Dict[str, MusicData] = {
             # Menus
             "menu_intro": {
                 "file": f"{path}/merhba-biiiik.mp3",
@@ -95,12 +106,12 @@ class SoundManager:
             },
         }
 
-    def play_sound(self, name: str):
+    def play_sound(self, name: str) -> Optional[pygame.mixer.Channel]:
         if name in self.sounds:
             return self.sounds[name]["sound"].play(0)
         return None
 
-    def play_music(self, name, loop=True):
+    def play_music(self, name: str, loop: bool = True) -> None:
         if name not in self.music:
             return
 
@@ -109,13 +120,13 @@ class SoundManager:
         pygame.mixer.music.set_volume(self.music[name]["volume"])
         pygame.mixer.music.play(-1 if loop else 0)
 
-    def stop_music(self):
+    def stop_music(self) -> None:
         pygame.mixer.music.stop()
 
-    def pause_music(self):
+    def pause_music(self) -> None:
         pygame.mixer.music.pause()
 
-    def resume_music(self):
+    def resume_music(self) -> None:
         pygame.mixer.music.unpause()
 
     def play_sound_with_duck(self, name: str) -> None:

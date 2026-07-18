@@ -217,7 +217,8 @@ class MovementSystem:
         try:
             if self.is_centered(ghost):
                 self.update_cell_position(ghost)
-
+                if not ghost.prison_cells:
+                    return
                 high_cell = min(ghost.prison_cells, key=lambda cell: cell[0])
                 low_cell = max(ghost.prison_cells, key=lambda cell: cell[0])
 

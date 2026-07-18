@@ -1,7 +1,7 @@
 from collections import deque
 from typing import List, Optional, Any, Tuple
 
-from src.graphics.entity_manager import Entity
+from src.graphics.entitys.entity_manager import Entity
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 import random
 

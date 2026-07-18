@@ -13,7 +13,7 @@
 
 from typing import Any
 
-from src.graphics.entity_manager import EntityManager
+from src.graphics.entitys.entity_manager import EntityManager
 from src.graphics.renderer import StateManager
 from src.graphics.states.home import HomeState
 from src.graphics.ui_helpers import _init_fonts

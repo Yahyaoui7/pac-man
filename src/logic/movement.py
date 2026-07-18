@@ -1,7 +1,7 @@
 from collections import deque
 from typing import List, Optional, Any, Tuple
 
-from src.graphics.entitys.entity_manager import Entity
+from src.graphics.entitys.entity import Entity
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 import random
 
@@ -308,9 +308,10 @@ class MovementSystem:
 
         return "BOTTOM_RIGHT"
 
-    def get_zone_bounds(
-        self, zone: str
-    ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    def get_zone_bounds(self, zone: str) -> Tuple[
+        Tuple[int, int],
+        Tuple[int, int],
+    ]:
         middle_grid_y = len(self.maze) // 2
         middle_grid_x = len(self.maze[0]) // 2
         max_grid_y = len(self.maze) - 1
@@ -332,7 +333,8 @@ class MovementSystem:
         return False
 
     def choose_runaway_target_by_zone(
-        self, player: Any
+        self,
+        player: Any,
     ) -> Optional[Tuple[int, int]]:
         player_zone = self.get_zone(player.grid_y, player.grid_x)
 

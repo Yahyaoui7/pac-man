@@ -8,13 +8,12 @@ from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
 from src.logic.config import CELL_SIZE, GameConfig
 
-from src.logic.helpers import grid_to_pixel, pellet_screen_pos
+from src.logic.helpers import pellet_screen_pos
 from src.graphics.ui_helpers import COLOR_PELLET
 from src.sounds.soud_manager import SoundManager
 
 from src.graphics.entitys.graphic_lib import (
     SpriteLibrary,
-    Facing,
     GhostColor,
 )
 from src.graphics.entitys.graphic_lib import PacmanMode as pm
@@ -243,47 +242,3 @@ class EntityManager:
                 ghost.prison_cells = pattern_2_cells
 
         return True
-
-
-class Entity:
-    def __init__(
-        self,
-        y: int,
-        x: int,
-        speed: float,
-    ) -> None:
-        self.spawn_x = x
-        self.spawn_y = y
-        self.grid_y = y
-        self.grid_x = x
-
-        px, py = grid_to_pixel(y, x)
-        self.x: float = float(px)
-        self.y: float = float(py)
-
-        self.speed = speed
-
-        self.direction: Optional[str] = None
-        self.next_direction: Optional[str] = None
-
-        self.row_direction = 0
-        self.col_direction = 0
-        self.grid_x_direction = 0
-        self.grid_y_direction = 0
-
-        self.facing = Facing.RIGHT
-
-
-def facing_from_direction(
-    direction: Optional[str],
-    current_facing: Facing,
-) -> Facing:
-    """
-    Map a movement direction string to a horizontal Facing, WITHOUT ever
-    producing a vertical flip.
-    """
-    if direction == "LEFT":
-        return Facing.LEFT
-    if direction == "RIGHT":
-        return Facing.RIGHT
-    return current_facing

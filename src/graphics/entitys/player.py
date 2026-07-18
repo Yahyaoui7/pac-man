@@ -2,16 +2,14 @@ from typing import Optional, Any
 
 import pygame
 
-from src.graphics.entitys.entity_manager import (
-    Entity,
-    facing_from_direction,
-)
+from src.graphics.entitys.entity import Entity
 from src.logic.config import NORTH, EAST, SOUTH, WEST
 from src.logic.helpers import grid_to_pixel, pixel_to_screen
 
 from src.graphics.entitys.graphic_lib import (
     SpriteLibrary,
     Facing,
+    facing_from_direction,
 )
 from src.graphics.entitys.graphic_lib import PacmanMode as pm
 

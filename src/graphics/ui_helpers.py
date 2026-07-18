@@ -97,7 +97,8 @@ def draw_text_centered(
 
 
 def draw_bubble(
-    text: str, padding: tuple[int, int] = (20, 12)
+    text: str,
+    padding: tuple[int, int] = (20, 12),
 ) -> pygame.Surface:
     assert FONT_HUD is not None
     text_surface = FONT_HUD.render(text, True, COLOR_WHITE)

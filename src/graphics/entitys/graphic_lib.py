@@ -30,7 +30,13 @@ from typing import Optional, Any
 import pygame
 
 PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.abspath(__file__),
+            )
+        )
+    )
 )
 
 ASSET_ROOT = os.path.join(PROJECT_ROOT, "assets")
@@ -52,6 +58,21 @@ SPRITE_SCALE = 0.9
 # so they read clearly as attacks rather than tiny overlays.
 SPRITE_SCALE_ATTACK = SPRITE_SCALE * 2
 GHOST_SPRITE_SCALE = 1.4
+
+
+def facing_from_direction(
+    direction: Optional[str],
+    current_facing: Facing,
+) -> Facing:
+    """
+    Map a movement direction string to a horizontal Facing, WITHOUT ever
+    producing a vertical flip.
+    """
+    if direction == "LEFT":
+        return Facing.LEFT
+    if direction == "RIGHT":
+        return Facing.RIGHT
+    return current_facing
 
 
 class PacmanMode(Enum):

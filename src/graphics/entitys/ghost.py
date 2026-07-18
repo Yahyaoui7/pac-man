@@ -1,8 +1,8 @@
 from typing import Optional
 import pygame
 
-from src.graphics.entitys.entity_manager import Entity, facing_from_direction
 
+from src.graphics.entitys.entity import Entity
 from src.logic.config import NORTH, SOUTH
 from src.logic.helpers import grid_to_pixel, pixel_to_screen
 
@@ -10,6 +10,7 @@ from src.graphics.entitys.graphic_lib import (
     SpriteLibrary,
     Facing,
     GhostColor,
+    facing_from_direction,
 )
 from src.graphics.entitys.graphic_lib import GhostState as gs
 

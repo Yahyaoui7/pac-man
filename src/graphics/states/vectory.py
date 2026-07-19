@@ -1,7 +1,7 @@
 import pygame
 from typing import Any
 
-from src.UI.button import Button, ButtonManager
+from src.graphics.UI.button import Button, ButtonManager
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
 

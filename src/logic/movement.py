@@ -65,6 +65,9 @@ class MovementSystem:
         if direction not in directions:
             return False
 
+        if not (0 <= grid_y < len(self.maze)) or not (0 <= grid_x < len(self.maze[0])):
+            return False
+
         d_grid_y, d_grid_x = directions[direction]
         next_y = grid_y + d_grid_y
         next_x = grid_x + d_grid_x
@@ -211,7 +214,7 @@ class MovementSystem:
 
         return None
 
-    def move_inside_prison(self, ghost: Any) -> None:
+    def move_inside_son(self, ghost: Any) -> None:
         self.pattern_42 = ghost.prison_cells
 
         try:
@@ -409,3 +412,58 @@ class MovementSystem:
                     ghost.runaway_target = None
 
         self.update_entity(ghost)
+
+    # adding the layer to get the next direction for the data collection
+    def get_bfs_next_move(
+        self,
+        start: tuple[int, int],
+        target: tuple[int, int],
+    ) -> str | None:
+        start_yx = (start[1], start[0])
+        target_yx = (target[1], target[0])
+        path = self.bfs_path(start_yx, target_yx)
+        if len(path) < 2:
+            return None
+        return self.direction_to_next_cell(path[0], path[1]), len(path)
+
+    def get_runaway_next_move(
+        self,
+        ghost_position: tuple[int, int],
+        player_position: tuple[int, int],
+    ) -> str | None:
+        ghost_yx = (ghost_position[1], ghost_position[0])
+        player_yx = (player_position[1], player_position[0])
+
+        target = self.choose_runaway_target(player_yx)
+        if target is None:
+            return None
+
+        path = self.bfs_path(ghost_yx, target)
+        if len(path) < 2:
+            return None
+        return self.direction_to_next_cell(path[0], path[1])
+
+    def choose_runaway_target(
+        self,
+        player_yx: tuple[int, int],
+    ) -> Optional[Tuple[int, int]]:
+        player_zone = self.get_zone(player_yx[0], player_yx[1])
+
+        zones = ["TOP_LEFT", "TOP_RIGHT", "BOTTOM_LEFT", "BOTTOM_RIGHT"]
+        safe_zones = [z for z in zones if z != player_zone]
+
+        while safe_zones:
+            random_zone = self.rng.choice(safe_zones)
+            (y_min, y_max), (x_min, x_max) = self.get_zone_bounds(random_zone)
+
+            valid_cells = []
+            for gy in range(y_min, y_max + 1):
+                for gx in range(x_min, x_max + 1):
+                    if self.is_valid_cell(gy, gx):
+                        valid_cells.append((gy, gx))
+
+            if valid_cells:
+                return self.rng.choice(valid_cells)
+            safe_zones.remove(random_zone)
+
+        return None

@@ -10,6 +10,8 @@ install:
 debug:
 	uv run python -m pdb -m pac_man.py config.json
 
+collect:
+	uv run python -m AI_arena.data_collector.main_loop
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true

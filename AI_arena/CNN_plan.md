@@ -28,50 +28,22 @@ After every movement, it reads the new game state and chooses again. All these m
 The project can be organized like this:
 
 ```text
-pac_man/
+pacman_ai/
 ├── game/
+│   ├── maze.py          # Maze generation & logic
+│   ├── player.py        # Pac-Man logic
+│   └── ghost.py         # Ghost movement logic
 ├── data/
-│   └── training_data.npy
+│   ├── generate_data.py # Creates training samples
+│   └── training_data.npz
 ├── ai/
-│   ├── model.py
-│   ├── dataset.py
-│   ├── train.py
-│   └── predict.py
-└── pac_man.py
-```
-
-### Main Roles
-
-| File | Role |
-|---|---|
-| `model.py` | Defines the CNN architecture |
-| `dataset.py` | Loads maze channels, extra information, and labels |
-| `train.py` | Trains the model and saves its weights |
-| `predict.py` | Uses the trained model to choose directions |
-| `training_data.npy` | Stores the supervised-learning samples |
-| `pac_man.py` | Starts and runs the game |
-
-A more detailed version can look like this:
-
-```text
-pac_man/
-├── game/
-│   ├── game.py
-│   ├── maze.py
-│   ├── ghost.py
-│   └── player.py
-├── data/
-│   ├── training_data.npz
-│   └── generate_data.py
-├── ai/
-│   ├── model.py
-│   ├── dataset.py
-│   ├── train.py
-│   ├── predict.py
-│   └── rewards.py
+│   ├── model.py         # CNN architecture
+│   ├── dataset.py       # Loads data for training
+│   ├── train.py         # Training loop
+│   └── predict.py       # Uses trained model
 ├── models/
-│   └── ghost_ai.pt
-└── pac_man.py
+│   └── ghost_ai.pt      # Saved model weights
+└── main.py              # Run the game
 ```
 
 ---
@@ -82,50 +54,39 @@ pac_man/
 
 Supervised learning needs correct answers called **labels**.
 
-Use a cooperative BFS or A* system as a teacher:
+| Step                  | Teacher Type                                              | Why                                    |
+| --------------------- | --------------------------------------------------------- | -------------------------------------- |
+| **Step 1** (1 ghost)  | **Simple BFS or A\***                                     | One ghost has nobody to cooperate with |
+| **Step 2** (4 ghosts) | **Cooperative pathfinder** (or independent BFS per ghost) | Now ghosts can work together           |
 
-```text
-Game state
-    ↓
-Cooperative BFS/A*
-    ↓
-Good action for every ghost
-    ↓
-Save state + actions
-```
-
-The BFS or A* system is used only to create training data.
-
-After training, the neural network controls the ghosts.
 
 ---
 
 ## 4. Input Data
 
-Represent the maze using separate channels.
+Represent the maze as a multi-channel image. Each channel is a binary grid (0 or 1).
+| Channel | Information      | `1` means...        | `0` means...        |
+| ------- | ---------------- | ------------------- | ------------------- |
+| 0       | Walls            | Wall exists         | Empty space         |
+| 1       | Normal pellets   | Pellet exists       | No pellet           |
+| 2       | Power pellets    | Power pellet exists | No power pellet     |
+| 3       | Player position  | Player is here      | Player is not here  |
+| 4       | Ghost 1 position | Ghost 1 is here     | Ghost 1 is not here |
+| 5       | Ghost 2 position | Ghost 2 is here     | Ghost 2 is not here |
+| 6       | Ghost 3 position | Ghost 3 is here     | Ghost 3 is not here |
+| 7       | Ghost 4 position | Ghost 4 is here     | Ghost 4 is not here |
 
-| Channel   | Information      |
-| --------- | ---------------- |
-| Channel 0 | Valid maze cells |
-| Channel 1 | Walls            |
-| Channel 2 | Normal pellets   |
-| Channel 3 | Power pellets    |
-| Channel 4 | Player position  |
-| Channel 5 | Ghost 1 position |
-| Channel 6 | Ghost 2 position |
-| Channel 7 | Ghost 3 position |
-| Channel 8 | Ghost 4 position |
 
 The input shape is:
 
 ```python
-state_grid.shape = (9, maze_height, maze_width)
+state_grid.shape = (8, maze_height, maze_width)
 ```
 
 For example, for a `5 × 5` maze:
 
 ```python
-state_grid.shape = (9, 5, 5)
+state_grid.shape = (8, 5, 5)
 ```
 
 This means:
@@ -134,20 +95,8 @@ This means:
 9 channels × 5 rows × 5 columns
 ```
 
-### Channel 0: Valid Maze Cells
 
-```text
-0 0 0 0 0
-0 1 1 1 0
-0 1 1 1 0
-0 1 1 1 0
-0 0 0 0 0
-```
-
-* `1` = the cell is walkable
-* `0` = the cell is not walkable
-
-### Channel 1: Walls
+### Channel 0: Walls
 
 ```text
 1 1 1 1 1
@@ -160,7 +109,7 @@ This means:
 * `1` = wall
 * `0` = no wall
 
-### Channel 2: Normal Pellets
+### Channel 1: Normal Pellets
 
 ```text
 0 0 0 0 0
@@ -173,7 +122,7 @@ This means:
 * `1` = a normal pellet exists
 * `0` = no normal pellet
 
-### Channel 3: Power Pellets
+### Channel 2: Power Pellets
 
 ```text
 0 0 0 0 0
@@ -186,7 +135,7 @@ This means:
 * `1` = a power pellet exists
 * `0` = no power pellet
 
-### Channel 4: Player Position
+### Channel 3: Player Position
 
 ```text
 0 0 0 0 0
@@ -198,7 +147,7 @@ This means:
 
 The value `1` shows the player’s position.
 
-### Channel 5: Ghost 1 Position
+### Channel 4: Ghost 1 Position
 
 ```text
 0 0 0 0 0
@@ -208,7 +157,7 @@ The value `1` shows the player’s position.
 0 0 0 0 0
 ```
 
-### Channel 6: Ghost 2 Position
+### Channel 5: Ghost 2 Position
 
 ```text
 0 0 0 0 0
@@ -218,7 +167,7 @@ The value `1` shows the player’s position.
 0 0 0 0 0
 ```
 
-### Channel 7: Ghost 3 Position
+### Channel 6: Ghost 3 Position
 
 ```text
 0 0 0 0 0
@@ -228,7 +177,7 @@ The value `1` shows the player’s position.
 0 0 0 0 0
 ```
 
-### Channel 8: Ghost 4 Position
+### Channel 7: Ghost 4 Position
 
 ```text
 0 0 0 0 0
@@ -307,12 +256,14 @@ extra_data = [
 
 The player direction can use one-hot encoding:
 
-```python
-UP    = [1, 0, 0, 0]
-DOWN  = [0, 1, 0, 0]
-LEFT  = [0, 0, 1, 0]
-RIGHT = [0, 0, 0, 1]
-```
+| Encoding       | Meaning |
+| -------------- | ------- |
+| `[1, 0, 0, 0]` | UP      |
+| `[0, 1, 0, 0]` | DOWN    |
+| `[0, 0, 1, 0]` | LEFT    |
+| `[0, 0, 0, 1]` | RIGHT   |
+
+Total extra_data length: 8
 
 ---
 
@@ -346,7 +297,7 @@ One training sample looks like this:
 
 ```python
 sample = {
-    "grid": state_grid,              # Shape: (7, H, W)
+    "grid": state_grid,              # Shape: (8, H, W)
     "extra": extra_data,             # Direction and edible states
     "valid_actions": action_masks,   # Shape: (4, 4)
     "labels": [3, 0, 1, 2],          # Correct actions
@@ -361,8 +312,8 @@ The model must know which movements are possible.
 
 ```python
 valid_actions = [
-    [1, 0, 1, 1],  # Ghost 1
-    [0, 1, 1, 0],  # Ghost 2
+    [1, 0, 1, 1],  # Ghost 1: UP ok, DOWN blocked, LEFT ok, RIGHT ok
+    [0, 1, 1, 0],  # Ghost 2: UP blocked, DOWN ok, LEFT ok, RIGHT blocked
     [1, 1, 0, 1],  # Ghost 3
     [1, 0, 0, 1],  # Ghost 4
 ]
@@ -383,41 +334,33 @@ The model should never choose an action marked as `0`.
 
 ## 8. Collect Training Data
 
-At every game step:
-
+✅ Correct approach: Generate independent random states. Each sample is a brand new scenario.
 ```python
-state = game.get_ai_state()
+for i in range(50000):  # 50,000 independent samples
+    # 1. Pick random VALID positions
+    player_pos = random_walkable_cell(maze)
+    ghost1_pos = random_walkable_cell(maze)
+    ghost2_pos = random_walkable_cell(maze)
+    ghost3_pos = random_walkable_cell(maze)
+    ghost4_pos = random_walkable_cell(maze)
 
-expert_actions = cooperative_pathfinder.choose_actions(
-    state
-)
+    # 2. Build the state
+    state = build_grid(maze, player_pos, [g1, g2, g3, g4])
 
-save_sample(
-    state=state,
-    labels=expert_actions,
-)
+    # 3. Ask the teacher for correct actions
+    labels = teacher.choose_actions(state)
 
-game.step(expert_actions)
+    # 4. Get valid-action masks
+    masks = get_valid_actions([g1, g2, g3, g4], maze)
+
+    # 5. Save
+    save_sample(state, extra, masks, labels)
 ```
-
-Generate data using:
-
-- Different player positions
-- Different ghost positions
-- Different player directions
-- Different maze seeds
-- Situations where ghosts are close together
-- Situations where ghosts need different paths
-
-Save large arrays using `.npz` or `.pt`, not normal JSON.
-
-Example:
-
-```text
-training_data.npz
-```
-
----
+``Why this is better: ``
+The model sees every possible situation immediately.
+It learns: "No matter where I am, move toward the player."
+No need to simulate movement between samples.
+#### Dataset shapes for 50,000 samples:
 
 ## 9. CNN Structure
 
@@ -465,14 +408,13 @@ The highest value is selected for each ghost:
 
 ## 10. Train the Supervised Model
 
-Use cross-entropy loss for every ghost.
+`Loss function:` Cross-entropy loss for each ghost, summed together.
 
 ```text
-Total loss =
-Ghost 1 loss
-+ Ghost 2 loss
-+ Ghost 3 loss
-+ Ghost 4 loss
+total_loss = loss(ghost1_pred, ghost1_label) +
+             loss(ghost2_pred, ghost2_label) +
+             loss(ghost3_pred, ghost3_label) +
+             loss(ghost4_pred, ghost4_label)
 ```
 
 Training process:
@@ -489,15 +431,15 @@ Calculate loss
 Update model
 ```
 
-Evaluate the model using:
-
-- Action accuracy
-- Invalid movement rate
-- Average time needed to catch the player
-- Number of ghosts using the same corridor
-- Performance on unseen mazes
+#### Evaluation metrics:
+- Action accuracy (matches teacher?)
+- Invalid move rate (should be 0%)
+- Catch time (how fast to catch player?)
+- Corridor overlap (are ghosts spreading out?)
+- Generalization (performance on unseen mazes)
 
 ---
+
 
 # Phase 2: Reinforcement Learning
 

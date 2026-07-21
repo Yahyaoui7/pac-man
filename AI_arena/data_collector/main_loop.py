@@ -1,8 +1,10 @@
 import random
 import time
+from pprint import pprint
 from typing import TextIO
 
 from AI_arena.data_collector.formatters import (
+    CNN_CHANNELS,
     CNNFormatter,
     MLPFormatter,
     StreamWriter,
@@ -151,7 +153,7 @@ def get_randoms() -> TrainingSample:
             )
         )
 
-    if not ghosts:
+    if len(ghosts) != 4:
         return get_randoms()
 
     sample = TrainingSample(
@@ -184,6 +186,7 @@ def collect(
     num_samples: int,
     mlp_path: str = "MLP_DATA.jsonl",
     cnn_path: str = "CNN_DATA.jsonl",
+    debug_first: int = 2,  # Only print first N samples for verification
 ) -> None:
     mlp_w: TextIO | None = None
     cnn_w: TextIO | None = None
@@ -199,21 +202,42 @@ def collect(
 
         mlp_lines = 0
         cnn_lines = 0
-        skipped = 0
         start_time = time.time()
 
         for i in range(num_samples):
             sample = get_randoms()
 
+            # MLP: one record per ghost
             for g_idx in range(len(sample.ghosts)):
                 mlp_record = MLPFormatter.format_line(sample, g_idx)
                 mlp_sw.write_line(mlp_record)
                 mlp_lines += 1
 
-                if cnn_sw is not None:
-                    cnn_record = CNNFormatter.format_line(sample, g_idx)
-                    cnn_sw.write_line(cnn_record)
-                    cnn_lines += 1
+            # CNN: one record for all 4 ghosts
+            cnn_record = CNNFormatter.format_line(sample)
+
+            # DEBUG: print only first N samples, then never again
+            if i < debug_first:
+                print(f"\n=== CNN Sample {i + 1} ===")
+                for channel_name, channel in zip(
+                    CNN_CHANNELS, cnn_record["grid"]
+                ):
+                    print(f"\n--- Channel: {channel_name} ---")
+                    pprint(channel, width=120)
+
+                print("\n--- Non-spatial CNN data ---")
+                pprint(
+                    {
+                        key: value
+                        for key, value in cnn_record.items()
+                        if key != "grid"
+                    },
+                    sort_dicts=False,
+                    width=120,
+                )
+
+            cnn_sw.write_line(cnn_record)
+            cnn_lines += 1
 
             if (i + 1) % 1000 == 0:
                 elapsed = time.time() - start_time
@@ -222,8 +246,7 @@ def collect(
                     f"[{i + 1}/{num_samples}] "
                     f"{rate:.0f} samples/s | "
                     f"MLP: {mlp_lines} lines | "
-                    f"CNN: {cnn_lines} lines | "
-                    f"skipped: {skipped}"
+                    f"CNN: {cnn_lines} lines"
                 )
 
     finally:

@@ -1,3 +1,4 @@
+import argparse
 import random
 import time
 from typing import TextIO
@@ -87,6 +88,7 @@ def get_randoms() -> TrainingSample:
         return get_randoms()
 
     player = random.choice(valid_cells)
+
     valid_cells.remove(player)
 
     ghost_positions = random.sample(valid_cells, 4)
@@ -98,8 +100,11 @@ def get_randoms() -> TrainingSample:
         player,
         ghost_positions,
     )
-
+    player_available_moves = []
     movement = MovementSystem(maze.maze)
+    for d in ["UP", "DOWN", "LEFT", "RIGHT"]:
+        if movement.can_move(player[0], player[1], d):
+            player_available_moves.append(d)
 
     ghosts = []
 
@@ -135,11 +140,12 @@ def get_randoms() -> TrainingSample:
         local_pellets = count_local_pellets(pellets, gx, gy)
         num_exits = len(available_moves)
 
+        mode = "CHASE"
         ghosts.append(
             GhostState(
                 name=name,
                 position=(gx, gy),
-                mode="CHASE",
+                mode=mode,
                 distance_to_player=path_length,
                 bfs_path=bfs_path,
                 bfs_directions=bfs_directions,
@@ -148,6 +154,7 @@ def get_randoms() -> TrainingSample:
                 manhattan_distance=manhattan_dist,
                 local_pellet_count=local_pellets,
                 num_exits=num_exits,
+                frightened_timer=(random.randint(0, 5) if mode == "CHASE" else 0),
             )
         )
 
@@ -164,6 +171,7 @@ def get_randoms() -> TrainingSample:
         world=WorldState(
             maze=maze.maze,
             pellets=pellets,
+            player_available_moves=player_available_moves,
             player_position=player,
             player_direction="NONE",
             player_powered=False,
@@ -180,6 +188,7 @@ def collect(
     num_samples: int,
     mlp_path: str = "MLP_DATA.jsonl",
     cnn_path: str = "CNN_DATA.jsonl",
+    single_ghost: bool = True,
 ) -> None:
     mlp_w: TextIO | None = None
     cnn_w: TextIO | None = None
@@ -201,8 +210,12 @@ def collect(
         for i in range(num_samples):
             sample = get_randoms()
 
-            for g_idx in range(len(sample.ghosts)):
-                mlp_record = MLPFormatter.format_line(sample, g_idx)
+            ghosts_to_write = [0] if single_ghost else list(range(len(sample.ghosts)))
+
+            for g_idx in ghosts_to_write:
+                mlp_record = MLPFormatter.format_line(
+                    sample, g_idx, single_ghost=single_ghost
+                )
                 mlp_sw.write_line(mlp_record)
                 mlp_lines += 1
 
@@ -229,7 +242,9 @@ def collect(
             cnn_w.close()
 
     elapsed = time.time() - start_time
-    print(f"\nDone in {elapsed:.1f}s")
+    mode = "single-ghost" if single_ghost else "all-ghosts"
+    feature_count = len(MLPFormatter.feature_names(single_ghost))
+    print(f"\nDone in {elapsed:.1f}s ({mode}, {feature_count} features)")
     print(f"  MLP: {mlp_lines} lines -> {mlp_path}")
     print(f"  CNN: {cnn_lines} lines -> {cnn_path}")
 
@@ -237,9 +252,10 @@ def collect(
 def main():
 
     collect(
-        num_samples=10000,
+        num_samples=2,
         mlp_path="AI_arena/data/MLP_DATA.jsonl",
-        cnn_path="AI_arena/data/CNN_DATA.json",
+        cnn_path="AI_arena/data/CNN_DATA.jsonl",
+        single_ghost=False,
     )
 
 

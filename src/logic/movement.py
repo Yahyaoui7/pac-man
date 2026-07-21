@@ -413,24 +413,31 @@ class MovementSystem:
 
         self.update_entity(ghost)
 
-    # adding the layer to get the next direction for the data collection
     def get_bfs_next_move(
         self,
         start: tuple[int, int],
         target: tuple[int, int],
-    ) -> str | None:
+    ) -> tuple[list[str | None], int] | None:
+        """Return (directions_list, path_length) from start (x,y) to target (x,y).
+
+        directions_list[i] is the direction from path[i] to path[i+1].
+        The first direction is the immediate next move.
+        """
         start_yx = (start[1], start[0])
         target_yx = (target[1], target[0])
         path = self.bfs_path(start_yx, target_yx)
         if len(path) < 2:
             return None
-        return self.direction_to_next_cell(path[0], path[1]), len(path)
+        res = []
+        for pt in range(len(path) - 1):
+            res.append(self.direction_to_next_cell(path[pt], path[pt + 1]))
+        return res, len(path)
 
     def get_runaway_next_move(
         self,
         ghost_position: tuple[int, int],
         player_position: tuple[int, int],
-    ) -> str | None:
+    ) -> tuple[list[str | None], int] | None:
         ghost_yx = (ghost_position[1], ghost_position[0])
         player_yx = (player_position[1], player_position[0])
 
@@ -441,7 +448,10 @@ class MovementSystem:
         path = self.bfs_path(ghost_yx, target)
         if len(path) < 2:
             return None
-        return self.direction_to_next_cell(path[0], path[1])
+        res = []
+        for pt in range(len(path) - 1):
+            res.append(self.direction_to_next_cell(path[pt], path[pt + 1]))
+        return res, len(path)
 
     def choose_runaway_target(
         self,

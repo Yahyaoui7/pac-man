@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import Literal
+from typing import Optional, Literal
 
 Direction = Literal["UP", "DOWN", "LEFT", "RIGHT", "NONE"]
 
@@ -8,17 +8,19 @@ Direction = Literal["UP", "DOWN", "LEFT", "RIGHT", "NONE"]
 class GhostState:
     name: str
     position: tuple[int, int]
-    direction: Direction
-    mode: Literal[
-        "CHASE",
-        "FRIGHTENED",
-    ]
+    mode: Literal["CHASE", "FRIGHTENED"]
     distance_to_player: int
+    bfs_path: list[tuple[int, int]]
+    bfs_directions: list[Optional[str]]
+    path_length: int
+    available_moves: list[str]
+    manhattan_distance: int
+    local_pellet_count: int
+    num_exits: int
 
 
 @dataclass
 class WorldState:
-
     maze: list[list[int]]
     pellets: list[list[int]]
     player_position: tuple[int, int]
@@ -29,20 +31,10 @@ class WorldState:
 
 
 @dataclass
-class Target:
-
-    Blinky: Direction
-    Pinky: Direction
-    Inky: Direction
-    Clyde: Direction
-
-
-@dataclass
 class TrainingSample:
     metadata: dict
     world: WorldState
     ghosts: list[GhostState]
-    target: Target
 
     def to_dict(self):
         return asdict(self)

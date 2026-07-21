@@ -167,8 +167,12 @@ def get_randoms() -> TrainingSample:
             player_position=player,
             player_direction="NONE",
             player_powered=False,
-            remaining_pellets=sum(cell == 1 for row in pellets for cell in row),
-            remaining_super_pellets=sum(cell == 2 for row in pellets for cell in row),
+            remaining_pellets=sum(
+                cell == 1 for row in pellets for cell in row
+            ),
+            remaining_super_pellets=sum(
+                cell == 2 for row in pellets for cell in row
+            ),
         ),
         ghosts=ghosts,
     )
@@ -239,7 +243,7 @@ def main():
     collect(
         num_samples=10000,
         mlp_path="AI_arena/data/MLP_DATA.jsonl",
-        cnn_path="AI_arena/data/CNN_DATA.json",
+        cnn_path="AI_arena/data/CNN_DATA.jsonl",
     )
 
 

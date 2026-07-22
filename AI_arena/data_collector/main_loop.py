@@ -19,6 +19,8 @@ from mazegenerator import MazeGenerator  # type: ignore
 from src.logic.movement import MovementSystem  # type: ignore
 
 GHOST_NAMES = ["Blinky", "Pinky", "Inky", "Clyde"]
+# Include powered states in the synthetic dataset so the models can learn both
+# chase and frightened behavior instead of seeing constant zero mode features.
 POWERED_SAMPLE_PROBABILITY = 0.2
 MAX_FRIGHTENED_TIMER = 10
 
@@ -62,6 +64,8 @@ def choose_frightened_direction(
     for direction in available_moves:
         dy, dx = DIRECTION_DELTAS[direction]
         next_yx = (gy + dy, gx + dx)
+        # Score each legal next cell by its shortest-path distance back to the
+        # player. A larger value gives the frightened ghost an escape target.
         path = movement.bfs_path(next_yx, (py, px))
         distance = len(path) if path else float("inf")
         scored_moves.append((distance, direction))
@@ -131,6 +135,8 @@ def get_randoms() -> TrainingSample:
         player,
         ghost_positions,
     )
+    # Power mode is sampled once per world because one super pellet affects
+    # the player and all four ghosts at the same time.
     player_powered = random.random() < POWERED_SAMPLE_PROBABILITY
     frightened_timer = (
         random.randint(1, MAX_FRIGHTENED_TIMER) if player_powered else 0
@@ -138,6 +144,7 @@ def get_randoms() -> TrainingSample:
     player_available_moves = []
     movement = MovementSystem(maze.maze)
     for d in ["UP", "DOWN", "LEFT", "RIGHT"]:
+        # MovementSystem accepts coordinates in (row/y, column/x) order.
         if movement.can_move(player[1], player[0], d):
             player_available_moves.append(d)
 
@@ -176,6 +183,8 @@ def get_randoms() -> TrainingSample:
         )
         bfs_directions: list[str | None]
         if mode == "FRIGHTENED":
+            # Store an escape direction as the supervised label. Reusing the
+            # chase BFS label here would teach frightened ghosts to approach.
             bfs_directions = [
                 choose_frightened_direction(
                     movement,

@@ -225,7 +225,8 @@ class CNNFormatter:
                 grid[4][y][x] = int(pellet == 1)
                 grid[5][y][x] = int(pellet == 2)
                 # MazeGenerator uses 15 (all four walls set) for the blocked
-                # cells that form its centered "42" pattern.
+                # cells that form its centered "42" pattern. This channel is
+                # 1 for walkable cells and 0 for those blocked pattern cells.
                 grid[11][y][x] = int(cell != 15)
 
         player_x, player_y = sample.world.player_position
@@ -262,7 +263,8 @@ class CNNFormatter:
             for direction in DIRECTION_INDEX
         ]
 
-        # CENTRAL CNN: global values stay out of spatial channels.
+        # Global state stays outside the spatial channels. These flags let the
+        # CNN distinguish normal chase samples from powered/frightened ones.
         extra_features = [
             *player_direction,
             float(sample.world.player_powered),

@@ -1,7 +1,7 @@
 import random
 import time
 from pprint import pprint
-from typing import TextIO
+from typing import Literal, TextIO
 
 from AI_arena.data_collector.formatters import (
     CNN_CHANNELS,
@@ -10,6 +10,7 @@ from AI_arena.data_collector.formatters import (
     StreamWriter,
 )
 from AI_arena.data_collector.models import (
+    LOCAL_PELLET_RADIUS,
     GhostState,
     TrainingSample,
     WorldState,
@@ -18,6 +19,8 @@ from mazegenerator import MazeGenerator  # type: ignore
 from src.logic.movement import MovementSystem  # type: ignore
 
 GHOST_NAMES = ["Blinky", "Pinky", "Inky", "Clyde"]
+POWERED_SAMPLE_PROBABILITY = 0.2
+MAX_FRIGHTENED_TIMER = 10
 
 DIRECTION_DELTAS = {
     "LEFT": (0, -1),
@@ -32,7 +35,7 @@ def manhattan(a: tuple[int, int], b: tuple[int, int]) -> int:
 
 
 def count_local_pellets(
-    pellets: list[list[int]], x: int, y: int, radius: int = 3
+    pellets: list[list[int]], x: int, y: int, radius: int = LOCAL_PELLET_RADIUS
 ) -> int:
     h = len(pellets)
     w = len(pellets[0])
@@ -43,6 +46,33 @@ def count_local_pellets(
             if 0 <= ny < h and 0 <= nx < w:
                 count += pellets[ny][nx]
     return count
+
+
+def choose_frightened_direction(
+    movement: MovementSystem,
+    ghost_position: tuple[int, int],
+    player_position: tuple[int, int],
+    available_moves: list[str],
+) -> str:
+    """Choose a valid move that maximizes distance from the player."""
+    gx, gy = ghost_position
+    px, py = player_position
+    scored_moves = []
+
+    for direction in available_moves:
+        dy, dx = DIRECTION_DELTAS[direction]
+        next_yx = (gy + dy, gx + dx)
+        path = movement.bfs_path(next_yx, (py, px))
+        distance = len(path) if path else float("inf")
+        scored_moves.append((distance, direction))
+
+    max_distance = max(distance for distance, _ in scored_moves)
+    best_moves = [
+        direction
+        for distance, direction in scored_moves
+        if distance == max_distance
+    ]
+    return random.choice(best_moves)
 
 
 def generate_pellets(width, height, valid_cells, player, ghosts):
@@ -67,7 +97,7 @@ def generate_pellets(width, height, valid_cells, player, ghosts):
 def get_randoms() -> TrainingSample:
     width = random.randint(10, 25)
     height = random.randint(10, 50)
-
+    print(f"\nwidth: {width}, height: {height}")
     seed = random.randint(0, 88888)
 
     maze = MazeGenerator(
@@ -89,6 +119,7 @@ def get_randoms() -> TrainingSample:
         return get_randoms()
 
     player = random.choice(valid_cells)
+
     valid_cells.remove(player)
 
     ghost_positions = random.sample(valid_cells, 4)
@@ -100,8 +131,15 @@ def get_randoms() -> TrainingSample:
         player,
         ghost_positions,
     )
-
+    player_powered = random.random() < POWERED_SAMPLE_PROBABILITY
+    frightened_timer = (
+        random.randint(1, MAX_FRIGHTENED_TIMER) if player_powered else 0
+    )
+    player_available_moves = []
     movement = MovementSystem(maze.maze)
+    for d in ["UP", "DOWN", "LEFT", "RIGHT"]:
+        if movement.can_move(player[1], player[0], d):
+            player_available_moves.append(d)
 
     ghosts = []
 
@@ -109,18 +147,18 @@ def get_randoms() -> TrainingSample:
         result = movement.get_bfs_next_move((gx, gy), player)
 
         if result is not None:
-            bfs_directions, path_length = result
+            chase_directions, path_length = result
         else:
-            bfs_directions, path_length = [], 0
+            chase_directions, path_length = [], 0
 
         bfs_path = []
         if result is not None:
             cur_yx = (gy, gx)
             bfs_path = [cur_yx]
-            for d in bfs_directions:
-                if d is None:
+            for path_direction in chase_directions:
+                if path_direction is None:
                     break
-                dy, dx = DIRECTION_DELTAS[d]
+                dy, dx = DIRECTION_DELTAS[path_direction]
                 cur_yx = (cur_yx[0] + dy, cur_yx[1] + dx)
                 bfs_path.append(cur_yx)
             bfs_path = [(x, y) for y, x in bfs_path]
@@ -130,8 +168,24 @@ def get_randoms() -> TrainingSample:
             if movement.can_move(gy, gx, d):
                 available_moves.append(d)
 
-        if not bfs_directions:
+        if not chase_directions or not available_moves:
             continue
+
+        mode: Literal["CHASE", "FRIGHTENED"] = (
+            "FRIGHTENED" if player_powered else "CHASE"
+        )
+        bfs_directions: list[str | None]
+        if mode == "FRIGHTENED":
+            bfs_directions = [
+                choose_frightened_direction(
+                    movement,
+                    (gx, gy),
+                    player,
+                    available_moves,
+                )
+            ]
+        else:
+            bfs_directions = chase_directions
 
         manhattan_dist = manhattan((gx, gy), player)
         local_pellets = count_local_pellets(pellets, gx, gy)
@@ -141,7 +195,7 @@ def get_randoms() -> TrainingSample:
             GhostState(
                 name=name,
                 position=(gx, gy),
-                mode="CHASE",
+                mode=mode,
                 distance_to_player=path_length,
                 bfs_path=bfs_path,
                 bfs_directions=bfs_directions,
@@ -150,6 +204,7 @@ def get_randoms() -> TrainingSample:
                 manhattan_distance=manhattan_dist,
                 local_pellet_count=local_pellets,
                 num_exits=num_exits,
+                frightened_timer=frightened_timer,
             )
         )
 
@@ -166,9 +221,10 @@ def get_randoms() -> TrainingSample:
         world=WorldState(
             maze=maze.maze,
             pellets=pellets,
+            player_available_moves=player_available_moves,
             player_position=player,
             player_direction="NONE",
-            player_powered=False,
+            player_powered=player_powered,
             remaining_pellets=sum(
                 cell == 1 for row in pellets for cell in row
             ),
@@ -187,6 +243,7 @@ def collect(
     mlp_path: str = "MLP_DATA.jsonl",
     cnn_path: str = "CNN_DATA.jsonl",
     debug_first: int = 2,  # Only print first N samples for verification
+    single_ghost: bool = True,
 ) -> None:
     mlp_w: TextIO | None = None
     cnn_w: TextIO | None = None
@@ -205,11 +262,17 @@ def collect(
         start_time = time.time()
 
         for i in range(num_samples):
+
             sample = get_randoms()
 
-            # MLP: one record per ghost
-            for g_idx in range(len(sample.ghosts)):
-                mlp_record = MLPFormatter.format_line(sample, g_idx)
+            ghosts_to_write = (
+                [0] if single_ghost else list(range(len(sample.ghosts)))
+            )
+
+            for g_idx in ghosts_to_write:
+                mlp_record = MLPFormatter.format_line(
+                    sample, g_idx, single_ghost=single_ghost
+                )
                 mlp_sw.write_line(mlp_record)
                 mlp_lines += 1
 
@@ -255,18 +318,21 @@ def collect(
         if cnn_w is not None:
             cnn_w.close()
 
-    elapsed = time.time() - start_time
-    print(f"\nDone in {elapsed:.1f}s")
-    print(f"  MLP: {mlp_lines} lines -> {mlp_path}")
-    print(f"  CNN: {cnn_lines} lines -> {cnn_path}")
+    # elapsed = time.time() - start_time
+    # mode = "single-ghost" if single_ghost else "all-ghosts"
+    # feature_count = len(MLPFormatter.feature_names(single_ghost))
+    # print(f"\nDone in {elapsed:.1f}s ({mode}, {feature_count} features)")
+    # print(f"  MLP: {mlp_lines} lines -> {mlp_path}")
+    # print(f"  CNN: {cnn_lines} lines -> {cnn_path}")
 
 
 def main():
 
     collect(
-        num_samples=10000,
+        num_samples=1,
         mlp_path="AI_arena/data/MLP_DATA.jsonl",
         cnn_path="AI_arena/data/CNN_DATA.jsonl",
+        single_ghost=True,
     )
 
 

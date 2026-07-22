@@ -11,6 +11,7 @@ GHOST_NAMES = ("Blinky", "Pinky", "Inky", "Clyde")
 MAX_MAZE_WIDTH = 25
 MAX_MAZE_HEIGHT = 50
 
+# MazeGenerator stores the four walls as bits in every maze cell.
 NORTH = 1 << 0
 EAST = 1 << 1
 SOUTH = 1 << 2
@@ -94,12 +95,13 @@ class MLPFormatter:
             mode_chase,  # 18 mode == CHASE
             mode_frightened,  # 19 mode == FRIGHTENED
             fright_timer,  # 20 frightened timer
-
         ]
 
         # --- Cross-ghost context ---
         other_ghosts = [
-            sample.ghosts[j] for j in range(len(sample.ghosts)) if j != ghost_idx
+            sample.ghosts[j]
+            for j in range(len(sample.ghosts))
+            if j != ghost_idx
         ]
 
         if not single_ghost and other_ghosts:
@@ -125,7 +127,8 @@ class MLPFormatter:
             # relative positions of closest other ghost
             closest_og = min(
                 other_ghosts,
-                key=lambda og: abs(gx - og.position[0]) + abs(gy - og.position[1]),
+                key=lambda og: abs(gx - og.position[0])
+                + abs(gy - og.position[1]),
             )
             og_rel_x = (closest_og.position[0] - gx) / max_dim
             og_rel_y = (closest_og.position[1] - gy) / max_dim
@@ -145,7 +148,10 @@ class MLPFormatter:
             features.extend([1.0, 1.0, 0.0, 0.0, 0.0, 0.0])
 
         first_dir = ghost.bfs_directions[0] if ghost.bfs_directions else None
-        label = DIRECTION_INDEX.get(first_dir, -1)
+        # FIX: Handle None explicitly so the lookup is type-safe.
+        label = (
+            DIRECTION_INDEX.get(first_dir, -1) if first_dir is not None else -1
+        )
 
         return {"features": features, "label": label}
 
@@ -204,7 +210,7 @@ class CNNFormatter:
         # Use one fixed tensor shape so records can be batched directly. The
         # valid-cell channel distinguishes real maze cells from zero padding.
         grid = [
-            [[0 for _ in range(MAX_MAZE_WIDTH)] for _ in range(MAX_MAZE_HEIGHT)]
+            [[0 for _ in range(width)] for _ in range(height)]
             for _ in CNN_CHANNELS
         ]
 
@@ -218,14 +224,19 @@ class CNNFormatter:
                 grid[3][y][x] = int(bool(cell & EAST))
                 grid[4][y][x] = int(pellet == 1)
                 grid[5][y][x] = int(pellet == 2)
-                grid[11][y][x] = 1
+                # MazeGenerator uses 15 (all four walls set) for the blocked
+                # cells that form its centered "42" pattern. This channel is
+                # 1 for walkable cells and 0 for those blocked pattern cells.
+                grid[11][y][x] = int(cell != 15)
 
         player_x, player_y = sample.world.player_position
         grid[6][player_y][player_x] = 1
 
         ghosts_by_name = {ghost.name: ghost for ghost in sample.ghosts}
         if set(ghosts_by_name) != set(GHOST_NAMES):
-            raise ValueError("CNN samples require exactly the four named ghosts")
+            raise ValueError(
+                "CNN samples require exactly the four named ghosts"
+            )
 
         labels = []
         valid_actions = []
@@ -234,7 +245,9 @@ class CNNFormatter:
             ghost_x, ghost_y = ghost.position
             grid[7 + ghost_idx][ghost_y][ghost_x] = 1
 
-            first_dir = ghost.bfs_directions[0] if ghost.bfs_directions else None
+            first_dir = (
+                ghost.bfs_directions[0] if ghost.bfs_directions else None
+            )
             if first_dir not in DIRECTION_INDEX:
                 raise ValueError(f"Ghost {name} has no valid supervised label")
             labels.append(DIRECTION_INDEX[first_dir])
@@ -249,24 +262,21 @@ class CNNFormatter:
             int(sample.world.player_direction == direction)
             for direction in DIRECTION_INDEX
         ]
-        maze_area = max(width * height, 1)
 
-        # CENTRAL CNN: global values stay out of spatial channels.
+        # Global state stays outside the spatial channels. These flags let the
+        # CNN distinguish normal chase samples from powered/frightened ones.
         extra_features = [
             *player_direction,
             float(sample.world.player_powered),
-            *(float(ghosts_by_name[name].mode == "FRIGHTENED") for name in GHOST_NAMES),
-            sample.world.remaining_pellets / maze_area,
-            sample.world.remaining_super_pellets / maze_area,
-            width / MAX_MAZE_WIDTH,
-            height / MAX_MAZE_HEIGHT,
+            *(
+                float(ghosts_by_name[name].mode == "FRIGHTENED")
+                for name in GHOST_NAMES
+            ),
         ]
 
         return {
             "grid": grid,
             # Retain source dimensions for masks, diagnostics, and inference.
-            "height": height,
-            "width": width,
             "extra_features": extra_features,
             "valid_actions": valid_actions,
             "labels": labels,
@@ -274,7 +284,7 @@ class CNNFormatter:
 
 
 class StreamWriter:
-    """Appends JSONL lines to a file handle. One write per line, no buffering."""
+    """Append JSONL records to a file handle, one complete line at a time."""
 
     def __init__(self, fh: TextIO) -> None:
         self.fh = fh

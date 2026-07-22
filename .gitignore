@@ -4,8 +4,4 @@ __pycache__/
 .highscores.json
 .venv/
 .mypy_cache/
-<<<<<<< HEAD
 AI_arena/data
-=======
-AI_arena/data
->>>>>>> github-real/master

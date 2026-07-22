@@ -4,6 +4,9 @@ from typing import Optional, Literal
 Direction = Literal["UP", "DOWN", "LEFT", "RIGHT", "NONE"]
 
 
+LOCAL_PELLET_RADIUS = 3
+
+
 @dataclass
 class GhostState:
     name: str
@@ -17,6 +20,7 @@ class GhostState:
     manhattan_distance: int
     local_pellet_count: int
     num_exits: int
+    frightened_timer: float
 
 
 @dataclass
@@ -28,6 +32,7 @@ class WorldState:
     player_powered: bool
     remaining_pellets: int
     remaining_super_pellets: int
+    player_available_moves: list[str]
 
 
 @dataclass

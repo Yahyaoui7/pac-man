@@ -1,9 +1,35 @@
 import json
 from typing import TextIO
 
-from AI_arena.data_collector.models import TrainingSample
+from AI_arena.data_collector.models import LOCAL_PELLET_RADIUS, TrainingSample
+
+NEAR_PLAYER_FRACTION = 0.3
+
 
 DIRECTION_INDEX = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
+GHOST_NAMES = ("Blinky", "Pinky", "Inky", "Clyde")
+MAX_MAZE_WIDTH = 25
+MAX_MAZE_HEIGHT = 50
+
+NORTH = 1 << 0
+EAST = 1 << 1
+SOUTH = 1 << 2
+WEST = 1 << 3
+
+CNN_CHANNELS = (
+    "wall_up",
+    "wall_down",
+    "wall_left",
+    "wall_right",
+    "normal_pellet",
+    "super_pellet",
+    "player",
+    "blinky",
+    "pinky",
+    "inky",
+    "clyde",
+    "valid_cell",
+)
 
 
 class MLPFormatter:
@@ -31,9 +57,10 @@ class MLPFormatter:
         # --- Target ghost features ---
         rel_x = (gx - px) / max_dim
         rel_y = (gy - py) / max_dim
-        bfs_dist = ghost.path_length / max_dim if ghost.path_length else 1.0
+        bfs_dist = ghost.path_length / max_dim
         manhattan_dist = ghost.manhattan_distance / max_dim
-        local_pellets = ghost.local_pellet_count / max(w * h, 1)
+        pellet_window = min((2 * LOCAL_PELLET_RADIUS + 1) ** 2, w * h)
+        local_pellets = ghost.local_pellet_count / max(pellet_window, 1)
         num_exits = ghost.num_exits / 4.0
 
         ghost_up = float("UP" in ghost.available_moves)
@@ -89,10 +116,10 @@ class MLPFormatter:
                 len(other_ghosts) * max_dim
             )
 
-            # how many other ghosts are close to the player (pressure)
-            ghosts_near_player = (
-                sum(1 for og in other_ghosts if og.path_length <= 10) / 3.0
-            )
+            near_threshold = NEAR_PLAYER_FRACTION * max_dim
+            ghosts_near_player = sum(
+                1 for og in other_ghosts if og.path_length <= near_threshold
+            ) / len(other_ghosts)
 
             # relative positions of closest other ghost
             closest_og = min(
@@ -101,6 +128,7 @@ class MLPFormatter:
             )
             og_rel_x = (closest_og.position[0] - gx) / max_dim
             og_rel_y = (closest_og.position[1] - gy) / max_dim
+            has_other_ghosts = 1.0
 
             features.extend(
                 [
@@ -109,11 +137,11 @@ class MLPFormatter:
                     ghosts_near_player,  # 23 ghosts near player (pressure)
                     og_rel_x,  # 24 closest ghost rel_x
                     og_rel_y,  # 25 closest ghost rel_y
+                    has_other_ghosts,  # 26 whether any other ghosts exist
                 ]
             )
         elif not single_ghost:
-            # no other ghosts — pad with zeros
-            features.extend([0.0, 0.0, 0.0, 0.0, 0.0])
+            features.extend([1.0, 1.0, 0.0, 0.0, 0.0, 0.0])
 
         first_dir = ghost.bfs_directions[0] if ghost.bfs_directions else None
         label = DIRECTION_INDEX.get(first_dir, -1)
@@ -153,25 +181,94 @@ class MLPFormatter:
                     "ghosts_near_player",
                     "closest_ghost_rel_x",
                     "closest_ghost_rel_y",
+                    "has_other_ghosts",
                 ]
             )
         return names
 
 
 class CNNFormatter:
-    """Formats a TrainingSample into grid-based data for CNN training."""
+    """Create one centralized observation and four action targets per world."""
 
     @staticmethod
-    def format_line(sample: TrainingSample, ghost_idx: int) -> dict:
-        ghost = sample.ghosts[ghost_idx]
-        first_dir = ghost.bfs_directions[0] if ghost.bfs_directions else None
+    def format_line(sample: TrainingSample) -> dict:
+        width = sample.metadata["maze_width"]
+        height = sample.metadata["maze_height"]
+        if width > MAX_MAZE_WIDTH or height > MAX_MAZE_HEIGHT:
+            raise ValueError(
+                f"Maze {width}x{height} exceeds CNN grid "
+                f"{MAX_MAZE_WIDTH}x{MAX_MAZE_HEIGHT}"
+            )
+
+        # Use one fixed tensor shape so records can be batched directly. The
+        # valid-cell channel distinguishes real maze cells from zero padding.
+        grid = [
+            [[0 for _ in range(MAX_MAZE_WIDTH)] for _ in range(MAX_MAZE_HEIGHT)]
+            for _ in CNN_CHANNELS
+        ]
+
+        for y in range(height):
+            for x in range(width):
+                cell = sample.world.maze[y][x]
+                pellet = sample.world.pellets[y][x]
+                grid[0][y][x] = int(bool(cell & NORTH))
+                grid[1][y][x] = int(bool(cell & SOUTH))
+                grid[2][y][x] = int(bool(cell & WEST))
+                grid[3][y][x] = int(bool(cell & EAST))
+                grid[4][y][x] = int(pellet == 1)
+                grid[5][y][x] = int(pellet == 2)
+                grid[11][y][x] = 1
+
+        player_x, player_y = sample.world.player_position
+        grid[6][player_y][player_x] = 1
+
+        ghosts_by_name = {ghost.name: ghost for ghost in sample.ghosts}
+        if set(ghosts_by_name) != set(GHOST_NAMES):
+            raise ValueError("CNN samples require exactly the four named ghosts")
+
+        labels = []
+        valid_actions = []
+        for ghost_idx, name in enumerate(GHOST_NAMES):
+            ghost = ghosts_by_name[name]
+            ghost_x, ghost_y = ghost.position
+            grid[7 + ghost_idx][ghost_y][ghost_x] = 1
+
+            first_dir = ghost.bfs_directions[0] if ghost.bfs_directions else None
+            if first_dir not in DIRECTION_INDEX:
+                raise ValueError(f"Ghost {name} has no valid supervised label")
+            labels.append(DIRECTION_INDEX[first_dir])
+            valid_actions.append(
+                [
+                    int(direction in ghost.available_moves)
+                    for direction in DIRECTION_INDEX
+                ]
+            )
+
+        player_direction = [
+            int(sample.world.player_direction == direction)
+            for direction in DIRECTION_INDEX
+        ]
+        maze_area = max(width * height, 1)
+
+        # CENTRAL CNN: global values stay out of spatial channels.
+        extra_features = [
+            *player_direction,
+            float(sample.world.player_powered),
+            *(float(ghosts_by_name[name].mode == "FRIGHTENED") for name in GHOST_NAMES),
+            sample.world.remaining_pellets / maze_area,
+            sample.world.remaining_super_pellets / maze_area,
+            width / MAX_MAZE_WIDTH,
+            height / MAX_MAZE_HEIGHT,
+        ]
+
         return {
-            "maze": sample.world.maze,
-            "pellets": sample.world.pellets,
-            "player_position": list(sample.world.player_position),
-            "ghost_position": list(ghost.position),
-            "ghost_name": ghost.name,
-            "label": DIRECTION_INDEX.get(first_dir, -1),
+            "grid": grid,
+            # Retain source dimensions for masks, diagnostics, and inference.
+            "height": height,
+            "width": width,
+            "extra_features": extra_features,
+            "valid_actions": valid_actions,
+            "labels": labels,
         }
 
 

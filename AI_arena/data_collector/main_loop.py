@@ -1,4 +1,3 @@
-import argparse
 import random
 import time
 from typing import TextIO
@@ -9,6 +8,7 @@ from AI_arena.data_collector.formatters import (
     StreamWriter,
 )
 from AI_arena.data_collector.models import (
+    LOCAL_PELLET_RADIUS,
     GhostState,
     TrainingSample,
     WorldState,
@@ -31,7 +31,7 @@ def manhattan(a: tuple[int, int], b: tuple[int, int]) -> int:
 
 
 def count_local_pellets(
-    pellets: list[list[int]], x: int, y: int, radius: int = 3
+    pellets: list[list[int]], x: int, y: int, radius: int = LOCAL_PELLET_RADIUS
 ) -> int:
     h = len(pellets)
     w = len(pellets[0])
@@ -252,10 +252,10 @@ def collect(
 def main():
 
     collect(
-        num_samples=2,
+        num_samples=1,
         mlp_path="AI_arena/data/MLP_DATA.jsonl",
         cnn_path="AI_arena/data/CNN_DATA.jsonl",
-        single_ghost=False,
+        single_ghost=True,
     )
 
 

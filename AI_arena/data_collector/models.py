@@ -4,6 +4,9 @@ from typing import Optional, Literal
 Direction = Literal["UP", "DOWN", "LEFT", "RIGHT", "NONE"]
 
 
+LOCAL_PELLET_RADIUS = 3
+
+
 @dataclass
 class GhostState:
     name: str

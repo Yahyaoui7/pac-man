@@ -154,7 +154,9 @@ def get_randoms() -> TrainingSample:
                 manhattan_distance=manhattan_dist,
                 local_pellet_count=local_pellets,
                 num_exits=num_exits,
-                frightened_timer=(random.randint(0, 5) if mode == "CHASE" else 0),
+                frightened_timer=(
+                    random.randint(0, 5) if mode == "CHASE" else 0
+                ),
             )
         )
 
@@ -175,8 +177,12 @@ def get_randoms() -> TrainingSample:
             player_position=player,
             player_direction="NONE",
             player_powered=False,
-            remaining_pellets=sum(cell == 1 for row in pellets for cell in row),
-            remaining_super_pellets=sum(cell == 2 for row in pellets for cell in row),
+            remaining_pellets=sum(
+                cell == 1 for row in pellets for cell in row
+            ),
+            remaining_super_pellets=sum(
+                cell == 2 for row in pellets for cell in row
+            ),
         ),
         ghosts=ghosts,
     )
@@ -210,7 +216,9 @@ def collect(
         for i in range(num_samples):
             sample = get_randoms()
 
-            ghosts_to_write = [0] if single_ghost else list(range(len(sample.ghosts)))
+            ghosts_to_write = (
+                [0] if single_ghost else list(range(len(sample.ghosts)))
+            )
 
             for g_idx in ghosts_to_write:
                 mlp_record = MLPFormatter.format_line(

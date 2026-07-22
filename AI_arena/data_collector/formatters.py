@@ -94,6 +94,7 @@ class MLPFormatter:
             mode_chase,  # 18 mode == CHASE
             mode_frightened,  # 19 mode == FRIGHTENED
             fright_timer,  # 20 frightened timer
+
         ]
 
         # --- Cross-ghost context ---

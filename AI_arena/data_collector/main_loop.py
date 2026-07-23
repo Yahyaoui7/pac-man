@@ -260,11 +260,11 @@ def collect(
     cnn_sw: StreamWriter | None = None
 
     try:
-        mlp_w = open(mlp_path, "w")
+        mlp_w = open(mlp_path, "a")
         mlp_sw = StreamWriter(mlp_w)
 
-        cnn_w = open(cnn_path, "w")
-        cnn_sw = StreamWriter(cnn_w)
+        # cnn_w = open(cnn_path, "w")
+        # cnn_sw = StreamWriter(cnn_w)
 
         mlp_lines = 0
         cnn_lines = 0
@@ -294,21 +294,22 @@ def collect(
                 for channel_name, channel in zip(
                     CNN_CHANNELS, cnn_record["grid"]
                 ):
-                    print(f"\n--- Channel: {channel_name} ---")
-                    pprint(channel, width=120)
+                    ...
+                    # print(f"\n--- Channel: {channel_name} ---")
+                    # print(channel, width=120)
 
-                print("\n--- Non-spatial CNN data ---")
-                pprint(
-                    {
-                        key: value
-                        for key, value in cnn_record.items()
-                        if key != "grid"
-                    },
-                    sort_dicts=False,
-                    width=120,
-                )
+                # print("\n--- Non-spatial CNN data ---")
+                # pprint(
+                #    {
+                #        key: value
+                #        for key, value in cnn_record.items()
+                #        if key != "grid"
+                #    },
+                #    sort_dicts=False,
+                #    width=120,
+                # )
 
-            cnn_sw.write_line(cnn_record)
+            # cnn_sw.write_line(cnn_record)
             cnn_lines += 1
 
             if (i + 1) % 1000 == 0:
@@ -338,7 +339,7 @@ def collect(
 def main():
 
     collect(
-        num_samples=1,
+        num_samples=10000,
         mlp_path="AI_arena/data/MLP_DATA.jsonl",
         cnn_path="AI_arena/data/CNN_DATA.jsonl",
         single_ghost=True,

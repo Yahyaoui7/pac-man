@@ -1,9 +1,11 @@
 import math
+import json
 
 import pygame
 import pygame.draw as dr
 from typing import Any, List
 
+from AI_arena.cnn_controller import CNNGhostController
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
 from src.logic.movement import MovementSystem
@@ -31,6 +33,10 @@ class PlayingState(State):
 
         self.active_cheats: set[str] = set()
         self.player_speed: float = 0.0
+        self.ghost_controller: CNNGhostController | None = None
+        self.ghost_decision_sources: dict[str, str] = {}
+        self.ghost_predictions: dict[str, str | None] = {}
+        self.ghost_decision_cells: dict[str, tuple[int, int]] = {}
 
     def enter(self) -> None:
         self.game.level_manager.load_level(
@@ -49,6 +55,12 @@ class PlayingState(State):
 
         curr_idx = self.game.level_manager.current_level_index
         self.movement = MovementSystem(self.maze)
+        try:
+            self.ghost_controller = CNNGhostController()
+            self.ghost_controller.init_observation(self.maze)
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            print(f"Ghost CNN unavailable; using scripted movement: {exc}")
+            self.ghost_controller = None
         self.msg_text = f"LEVEL {curr_idx + 1}"
         self.msg_timer = 2.0
 
@@ -120,17 +132,47 @@ class PlayingState(State):
             self.player_invincible_until = 999999999999 if turning_on else 0
         elif name == "speed boost":
             player = self.game.entity_manager.player
-            player.speed = (
-                self.player_speed * 2 if turning_on else self.player_speed
-                )
+            player.speed = self.player_speed * 2 if turning_on else self.player_speed
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
         self.movement.update_entity(em.player)
 
         if "ghost freeze" not in self.active_cheats:
+            controller = self.ghost_controller
+            decision_names: set[str] = set()
+            if controller is not None:
+                for ghost in em.ghosts:
+                    if (
+                        self.movement.is_centered(ghost)
+                        and not ghost.going_to_prison
+                        and not ghost.in_prison
+                        and not ghost.is_eaten
+                    ):
+                        self.movement.update_cell_position(ghost)
+                        cell = (ghost.grid_x, ghost.grid_y)
+                        if self.ghost_decision_cells.get(ghost.name) != cell:
+                            decision_names.add(ghost.name)
+
+            if controller is not None and decision_names:
+                self.ghost_predictions = controller.predict(
+                    self.maze,
+                    em.pellets,
+                    em.player,
+                    em.ghosts,
+                    self.movement,
+                )
+                for name in decision_names:
+                    ghost = next(g for g in em.ghosts if g.name == name)
+                    self.ghost_decision_cells[name] = (
+                        ghost.grid_x,
+                        ghost.grid_y,
+                    )
+                # self._print_model_decision(decision_names)
+
             for gst in em.ghosts:
                 if gst.going_to_prison:
+                    self.ghost_decision_sources[gst.name] = "PRISON"
                     if gst.prison_target is not None:
                         target_y, target_x = gst.prison_target
 
@@ -145,6 +187,7 @@ class PlayingState(State):
                             gst.respawn_timer = after(10000)
 
                 elif gst.in_prison:
+                    self.ghost_decision_sources[gst.name] = "WAIT"
                     if expired(gst.respawn_timer):
                         gst.reset()
                         gst.is_eaten = False
@@ -158,17 +201,30 @@ class PlayingState(State):
 
                     self.movement.move_inside_prison(gst)
                 elif gst.is_eaten:
+                    self.ghost_decision_sources[gst.name] = "RESPAWN"
                     self.movement.update_ghost_to_target(
                         gst,
                         gst.spawn_y,
                         gst.spawn_x,
                     )
 
-                elif gst.is_edible:
-                    self.movement.update_runaway_ghost(gst, em.player)
-
                 else:
-                    self.movement.update_bfs_ghost(gst, em.player)
+                    predicted_direction = self.ghost_predictions.get(gst.name)
+                    if controller is not None and predicted_direction is not None:
+                        self.ghost_decision_sources[gst.name] = "CNN"
+                        if gst.name in decision_names:
+                            self.movement.update_cnn_ghost(
+                                gst,
+                                predicted_direction,
+                            )
+                        else:
+                            self.movement.update_entity(gst)
+                    elif gst.is_edible:
+                        self.ghost_decision_sources[gst.name] = "RUNAWAY"
+                        self.movement.update_runaway_ghost(gst, em.player)
+                    else:
+                        self.ghost_decision_sources[gst.name] = "BFS"
+                        self.movement.update_bfs_ghost(gst, em.player)
         self.check_collision(em.player, em.ghosts)
         em.update(self.maze, 1 / 60.0)
 
@@ -212,6 +268,68 @@ class PlayingState(State):
         self._draw_hud(screen)
         self._draw_message(screen)
         self._draw_cheat_banner(screen)
+
+    def _print_model_decision(self, decision_names: set[str]) -> None:
+        """Print one JSON record for each distinct CNN decision state."""
+        if self.ghost_controller is None:
+            return
+
+        em = self.game.entity_manager
+        player = em.player
+        diagnostics = self.ghost_controller.last_diagnostics
+        ghosts = []
+        for ghost in em.ghosts:
+            if ghost.name not in decision_names:
+                continue
+            diagnostic = diagnostics.get(ghost.name)
+            if diagnostic is None:
+                continue
+            bfs_result = self.movement.get_bfs_next_move(
+                (ghost.grid_x, ghost.grid_y),
+                (player.grid_x, player.grid_y),
+            )
+            bfs_direction = (
+                bfs_result[0][0] if bfs_result is not None and bfs_result[0] else None
+            )
+            ghosts.append(
+                {
+                    "name": ghost.name,
+                    "position": [ghost.grid_x, ghost.grid_y],
+                    "mode": "FRIGHTENED" if ghost.is_edible else "CHASE",
+                    "delta_to_player": [
+                        player.grid_x - ghost.grid_x,
+                        player.grid_y - ghost.grid_y,
+                    ],
+                    "manhattan_distance": (
+                        abs(player.grid_x - ghost.grid_x)
+                        + abs(player.grid_y - ghost.grid_y)
+                    ),
+                    "chosen": diagnostic["chosen"],
+                    "confidence": round(diagnostic["confidence"], 4),
+                    "probabilities": {
+                        direction: round(probability, 4)
+                        for direction, probability in diagnostic[
+                            "probabilities"
+                        ].items()
+                    },
+                    "legal_actions": diagnostic["legal"],
+                    "bfs_teacher_direction": bfs_direction,
+                    "matches_bfs": diagnostic["chosen"] == bfs_direction,
+                }
+            )
+
+        record = {
+            "event": "cnn_ghost_decision",
+            "time_ms": pygame.time.get_ticks(),
+            "player": {
+                "position": [player.grid_x, player.grid_y],
+                "live_direction": player.direction,
+                "model_direction_input": player.direction,
+                "powered": any(ghost.is_edible for ghost in em.ghosts),
+            },
+            "ghosts": ghosts,
+        }
+        print(json.dumps(record, separators=(",", ":")), flush=True)
 
     # ------------------------------------------------------------------
     # HUD

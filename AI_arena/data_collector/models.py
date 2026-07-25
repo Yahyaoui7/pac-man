@@ -21,6 +21,7 @@ class GhostState:
     local_pellet_count: int
     num_exits: int
     frightened_timer: float
+    previous_direction: Direction = "NONE"
 
 
 @dataclass

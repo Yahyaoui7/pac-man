@@ -65,7 +65,9 @@ class MovementSystem:
         if direction not in directions:
             return False
 
-        if not (0 <= grid_y < len(self.maze)) or not (0 <= grid_x < len(self.maze[0])):
+        if not (0 <= grid_y < len(self.maze)) or not (
+            0 <= grid_x < len(self.maze[0])
+        ):
             return False
 
         d_grid_y, d_grid_x = directions[direction]
@@ -194,6 +196,40 @@ class MovementSystem:
 
         return []
 
+    def bfs_distances(
+        self, source: tuple[int, int]
+    ) -> list[int]:
+        """Single BFS from source returning flat distance array.
+
+        Returns a flat list of length height*width where
+        result[y * width + x] = shortest distance from source to (y,x),
+        or -1 if unreachable.
+        """
+        h = len(self.maze)
+        w = len(self.maze[0])
+        dist = [-1] * (h * w)
+        sy, sx = source
+        dist[sy * w + sx] = 0
+        queue = deque([source])
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        wall_bits = [NORTH, SOUTH, WEST, EAST]
+        while queue:
+            cy, cx = queue.popleft()
+            cd = dist[cy * w + cx]
+            cell = self.maze[cy][cx]
+            for i, (dy, dx) in enumerate(directions):
+                ny, nx = cy + dy, cx + dx
+                if (
+                    0 <= ny < h
+                    and 0 <= nx < w
+                    and not (cell & wall_bits[i])
+                ):
+                    idx = ny * w + nx
+                    if dist[idx] == -1:
+                        dist[idx] = cd + 1
+                        queue.append((ny, nx))
+        return dist
+
     def direction_to_next_cell(
         self,
         current: tuple[int, int],
@@ -214,7 +250,7 @@ class MovementSystem:
 
         return None
 
-    def move_inside_son(self, ghost: Any) -> None:
+    def move_inside_prison(self, ghost: Any) -> None:
         self.pattern_42 = ghost.prison_cells
 
         try:
@@ -293,6 +329,26 @@ class MovementSystem:
         """Move ghost toward player when ghost is not edible."""
         self.pattern_42 = None
         self._navigate_bfs(ghost, player.grid_y, player.grid_x)
+
+    def update_cnn_ghost(
+        self,
+        ghost: Any,
+        predicted_direction: str,
+    ) -> None:
+        """Apply a legal CNN direction at a cell center and move the ghost.
+
+        Assumes update_cell_position was already called by the game loop
+        when the ghost was detected as centered.
+        """
+        self.pattern_42 = None
+        if self.is_centered(ghost):
+            if self.can_move(
+                ghost.grid_y,
+                ghost.grid_x,
+                predicted_direction,
+            ):
+                self.set_direction(ghost, predicted_direction)
+        self.update_entity(ghost)
 
     # ----------------------------
     # EDIBLE GHOST MOVEMENT
@@ -418,7 +474,7 @@ class MovementSystem:
         start: tuple[int, int],
         target: tuple[int, int],
     ) -> tuple[list[str | None], int] | None:
-        """Return (directions_list, path_length) from start (x,y) to target (x,y).
+        """Return directions and path length from start to target.
 
         directions_list[i] is the direction from path[i] to path[i+1].
         The first direction is the immediate next move.

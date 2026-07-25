@@ -1,16 +1,17 @@
+import argparse
 import random
 import time
-from pprint import pprint
-from typing import Literal, TextIO
+from pathlib import Path
+from typing import Literal, TextIO, cast
+from AI_arena.cnn_dataset import CNNJSONLDataset, EPISODE_LENGTH
 
 from AI_arena.data_collector.formatters import (
-    CNN_CHANNELS,
     CNNFormatter,
-    MLPFormatter,
     StreamWriter,
 )
 from AI_arena.data_collector.models import (
     LOCAL_PELLET_RADIUS,
+    Direction,
     GhostState,
     TrainingSample,
     WorldState,
@@ -19,10 +20,15 @@ from mazegenerator import MazeGenerator  # type: ignore
 from src.logic.movement import MovementSystem  # type: ignore
 
 GHOST_NAMES = ["Blinky", "Pinky", "Inky", "Clyde"]
+MIN_MAZE_WIDTH = 10
+MAX_MAZE_WIDTH = 25
+MIN_MAZE_HEIGHT = 10
+MAX_MAZE_HEIGHT = 50
 # Include powered states in the synthetic dataset so the models can learn both
 # chase and frightened behavior instead of seeing constant zero mode features.
-POWERED_SAMPLE_PROBABILITY = 0.2
+POWERED_SAMPLE_PROBABILITY = 0.35
 MAX_FRIGHTENED_TIMER = 10
+DEFAULT_CNN_PATH = Path(__file__).parents[1] / "data" / "CNN_DATA.jsonl"
 
 DIRECTION_DELTAS = {
     "LEFT": (0, -1),
@@ -99,9 +105,10 @@ def generate_pellets(width, height, valid_cells, player, ghosts):
 
 
 def get_randoms() -> TrainingSample:
-    width = random.randint(10, 25)
-    height = random.randint(10, 50)
-    print(f"\nwidth: {width}, height: {height}")
+    # Choose dimensions for every sample so the CNN learns across differently
+    # sized mazes. CNNFormatter pads each result to the fixed 25x50 tensor.
+    width = random.randint(MIN_MAZE_WIDTH, MAX_MAZE_WIDTH)
+    height = random.randint(MIN_MAZE_HEIGHT, MAX_MAZE_HEIGHT)
     seed = random.randint(0, 88888)
 
     maze = MazeGenerator(
@@ -214,6 +221,7 @@ def get_randoms() -> TrainingSample:
                 local_pellet_count=local_pellets,
                 num_exits=num_exits,
                 frightened_timer=frightened_timer,
+                previous_direction="NONE",
             )
         )
 
@@ -247,102 +255,219 @@ def get_randoms() -> TrainingSample:
     return sample
 
 
+def advance_sample(
+    sample: TrainingSample,
+    episode_id: int,
+    episode_step: int,
+) -> TrainingSample:
+    """Advance Pac-Man and all ghosts by one legal teacher-controlled move."""
+
+    maze = sample.world.maze
+    pellets = [row.copy() for row in sample.world.pellets]
+    movement = MovementSystem(maze)
+
+    player_x, player_y = sample.world.player_position
+    player_moves = [
+        direction
+        for direction in DIRECTION_DELTAS
+        if movement.can_move(player_y, player_x, direction)
+    ]
+    if not player_moves:
+        raise ValueError("Pac-Man has no legal move in generated episode")
+    player_direction = cast(Direction, random.choice(player_moves))
+    player_dy, player_dx = DIRECTION_DELTAS[player_direction]
+    player = (player_x + player_dx, player_y + player_dy)
+    pellets[player[1]][player[0]] = 0
+
+    ghost_positions = []
+    ghost_directions: list[Direction] = []
+    for ghost in sample.ghosts:
+        if not ghost.bfs_directions or ghost.bfs_directions[0] is None:
+            raise ValueError(f"{ghost.name} has no teacher action")
+        direction = ghost.bfs_directions[0]
+        typed_direction = cast(Direction, direction)
+        ghost_directions.append(typed_direction)
+        ghost_dy, ghost_dx = DIRECTION_DELTAS[direction]
+        ghost_positions.append(
+            (
+                ghost.position[0] + ghost_dx,
+                ghost.position[1] + ghost_dy,
+            )
+        )
+
+    powered = sample.world.player_powered
+    frightened_timer = max(
+        0,
+        max((ghost.frightened_timer for ghost in sample.ghosts), default=0)
+        - 1,
+    )
+    ghosts = []
+    for name, (ghost_x, ghost_y), previous_direction in zip(
+        GHOST_NAMES,
+        ghost_positions,
+        ghost_directions,
+    ):
+        available_moves = [
+            direction
+            for direction in DIRECTION_DELTAS
+            if movement.can_move(ghost_y, ghost_x, direction)
+        ]
+        result = movement.get_bfs_next_move(
+            (ghost_x, ghost_y),
+            player,
+        )
+        if result is None or not available_moves:
+            raise ValueError(f"{name} cannot continue generated episode")
+        chase_directions, path_length = result
+        mode: Literal["CHASE", "FRIGHTENED"] = (
+            "FRIGHTENED" if powered else "CHASE"
+        )
+        if mode == "FRIGHTENED":
+            teacher_directions: list[str | None] = [
+                choose_frightened_direction(
+                    movement,
+                    (ghost_x, ghost_y),
+                    player,
+                    available_moves,
+                )
+            ]
+        else:
+            teacher_directions = chase_directions
+
+        path_yx = movement.bfs_path(
+            (ghost_y, ghost_x),
+            (player[1], player[0]),
+        )
+        bfs_path = [(x, y) for y, x in path_yx]
+        ghosts.append(
+            GhostState(
+                name=name,
+                position=(ghost_x, ghost_y),
+                mode=mode,
+                distance_to_player=path_length,
+                bfs_path=bfs_path,
+                bfs_directions=teacher_directions,
+                path_length=path_length,
+                available_moves=available_moves,
+                manhattan_distance=manhattan((ghost_x, ghost_y), player),
+                local_pellet_count=count_local_pellets(
+                    pellets,
+                    ghost_x,
+                    ghost_y,
+                ),
+                num_exits=len(available_moves),
+                frightened_timer=frightened_timer,
+                previous_direction=previous_direction,
+            )
+        )
+
+    return TrainingSample(
+        metadata={
+            **sample.metadata,
+            "episode_id": episode_id,
+            "episode_step": episode_step,
+        },
+        world=WorldState(
+            maze=maze,
+            pellets=pellets,
+            player_available_moves=[
+                direction
+                for direction in DIRECTION_DELTAS
+                if movement.can_move(player[1], player[0], direction)
+            ],
+            player_position=player,
+            player_direction=player_direction,
+            player_powered=powered,
+            remaining_pellets=sum(
+                cell == 1 for row in pellets for cell in row
+            ),
+            remaining_super_pellets=sum(
+                cell == 2 for row in pellets for cell in row
+            ),
+        ),
+        ghosts=ghosts,
+    )
+
+
+def generate_episode(episode_id: int) -> list[TrainingSample]:
+    """Generate five consecutive snapshots from one maze and initial state."""
+
+    while True:
+        sample = get_randoms()
+        episode = []
+        try:
+            for episode_step in range(EPISODE_LENGTH):
+                sample = advance_sample(sample, episode_id, episode_step)
+                episode.append(sample)
+        except ValueError:
+            continue
+        return episode
+
+
 def collect(
     num_samples: int,
-    mlp_path: str = "MLP_DATA.jsonl",
-    cnn_path: str = "CNN_DATA.jsonl",
-    debug_first: int = 2,  # Only print first N samples for verification
-    single_ghost: bool = True,
+    cnn_path: str | Path = DEFAULT_CNN_PATH,
 ) -> None:
-    mlp_w: TextIO | None = None
+    if num_samples < EPISODE_LENGTH or num_samples % EPISODE_LENGTH:
+        raise ValueError(
+            f"num_samples must be a positive multiple of {EPISODE_LENGTH}"
+        )
+    destination = Path(cnn_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
     cnn_w: TextIO | None = None
-    mlp_sw: StreamWriter | None = None
     cnn_sw: StreamWriter | None = None
 
     try:
-        mlp_w = open(mlp_path, "w")
-        mlp_sw = StreamWriter(mlp_w)
-
-        cnn_w = open(cnn_path, "w")
+        # A collection run creates one self-contained dataset with exactly
+        # num_samples records instead of silently appending old records.
+        cnn_w = destination.open("w")
         cnn_sw = StreamWriter(cnn_w)
 
-        mlp_lines = 0
         cnn_lines = 0
         start_time = time.time()
 
-        for i in range(num_samples):
+        episode_id = 0
+        while cnn_lines < num_samples:
+            episode = generate_episode(episode_id)
+            episode_id += 1
+            for sample in episode:
+                if cnn_lines >= num_samples:
+                    break
+                cnn_sw.write_line(CNNFormatter.format_line(sample))
+                cnn_lines += 1
 
-            sample = get_randoms()
-
-            ghosts_to_write = (
-                [0] if single_ghost else list(range(len(sample.ghosts)))
-            )
-
-            for g_idx in ghosts_to_write:
-                mlp_record = MLPFormatter.format_line(
-                    sample, g_idx, single_ghost=single_ghost
-                )
-                mlp_sw.write_line(mlp_record)
-                mlp_lines += 1
-
-            # CNN: one record for all 4 ghosts
-            cnn_record = CNNFormatter.format_line(sample)
-
-            # DEBUG: print only first N samples, then never again
-            if i < debug_first:
-                print(f"\n=== CNN Sample {i + 1} ===")
-                for channel_name, channel in zip(
-                    CNN_CHANNELS, cnn_record["grid"]
-                ):
-                    print(f"\n--- Channel: {channel_name} ---")
-                    pprint(channel, width=120)
-
-                print("\n--- Non-spatial CNN data ---")
-                pprint(
-                    {
-                        key: value
-                        for key, value in cnn_record.items()
-                        if key != "grid"
-                    },
-                    sort_dicts=False,
-                    width=120,
-                )
-
-            cnn_sw.write_line(cnn_record)
-            cnn_lines += 1
-
-            if (i + 1) % 1000 == 0:
+            if cnn_lines % 1000 == 0:
                 elapsed = time.time() - start_time
-                rate = (i + 1) / elapsed if elapsed > 0 else 0
+                rate = cnn_lines / elapsed if elapsed > 0 else 0
                 print(
-                    f"[{i + 1}/{num_samples}] "
+                    f"[{cnn_lines}/{num_samples}] "
                     f"{rate:.0f} samples/s | "
-                    f"MLP: {mlp_lines} lines | "
                     f"CNN: {cnn_lines} lines"
                 )
 
     finally:
-        if mlp_w is not None:
-            mlp_w.close()
         if cnn_w is not None:
             cnn_w.close()
 
-    # elapsed = time.time() - start_time
-    # mode = "single-ghost" if single_ghost else "all-ghosts"
-    # feature_count = len(MLPFormatter.feature_names(single_ghost))
-    # print(f"\nDone in {elapsed:.1f}s ({mode}, {feature_count} features)")
-    # print(f"  MLP: {mlp_lines} lines -> {mlp_path}")
-    # print(f"  CNN: {cnn_lines} lines -> {cnn_path}")
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Collect sequential CNN ghost-training episodes."
+    )
+    parser.add_argument("--samples", type=int, default=50000)
+    parser.add_argument("--output", type=Path, default=DEFAULT_CNN_PATH)
+    return parser.parse_args()
 
 
 def main():
+    args = parse_args()
 
     collect(
-        num_samples=1,
-        mlp_path="AI_arena/data/MLP_DATA.jsonl",
-        cnn_path="AI_arena/data/CNN_DATA.jsonl",
-        single_ghost=True,
+        num_samples=args.samples,
+        cnn_path=args.output,
     )
+    dataset = CNNJSONLDataset(args.output)
+    print(f"Dataset validated: {len(dataset)} samples")
 
 
 if __name__ == "__main__":

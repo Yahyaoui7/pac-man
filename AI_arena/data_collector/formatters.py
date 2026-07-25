@@ -210,7 +210,10 @@ class CNNFormatter:
         # Use one fixed tensor shape so records can be batched directly. The
         # valid-cell channel distinguishes real maze cells from zero padding.
         grid = [
-            [[0 for _ in range(width)] for _ in range(height)]
+            [
+                [0 for _ in range(MAX_MAZE_WIDTH)]
+                for _ in range(MAX_MAZE_HEIGHT)
+            ]
             for _ in CNN_CHANNELS
         ]
 
@@ -273,13 +276,38 @@ class CNNFormatter:
                 for name in GHOST_NAMES
             ),
         ]
+        max_dimension = max(width, height, 1)
+        for name in GHOST_NAMES:
+            ghost = ghosts_by_name[name]
+            ghost_x, ghost_y = ghost.position
+            extra_features.extend(
+                [
+                    (player_x - ghost_x) / max_dimension,
+                    (player_y - ghost_y) / max_dimension,
+                    ghost.path_length / max_dimension,
+                ]
+            )
+        # Previous movement gives every output head temporal context. In
+        # particular, it lets the model learn that immediately selecting the
+        # opposite direction usually wastes progress by backtracking.
+        for name in GHOST_NAMES:
+            previous_direction = ghosts_by_name[name].previous_direction
+            extra_features.extend(
+                [
+                    float(previous_direction == direction)
+                    for direction in DIRECTION_INDEX
+                ]
+            )
 
         return {
             "grid": grid,
-            # Retain source dimensions for masks, diagnostics, and inference.
+            "maze_width": width,
+            "maze_height": height,
             "extra_features": extra_features,
             "valid_actions": valid_actions,
             "labels": labels,
+            "episode_id": sample.metadata["episode_id"],
+            "episode_step": sample.metadata["episode_step"],
         }
 
 

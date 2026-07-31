@@ -138,21 +138,31 @@ class Player(Entity):
         cell = maze[row][col]
         return cell != (NORTH | EAST | SOUTH | WEST)
 
-    def find_player_spawn(self, game: Any, maze: list[list[int]]) -> bool:
-        middle_row = game.curr_level.height // 2
-        middle_col = game.curr_level.width // 2
+    def find_player_spawn(
+        self,
+        game: Any | None,
+        maze: list[list[int]],
+    ) -> bool:
+        # The graphical game exposes dimensions through curr_level; the
+        # headless RL environment only provides the maze itself.
+        if game is None:
+            height = len(maze)
+            width = len(maze[0])
+        else:
+            height = game.curr_level.height
+            width = game.curr_level.width
+
+        middle_row = height // 2
+        middle_col = width // 2
 
         for radius in range(
-            max(
-                game.curr_level.width,
-                game.curr_level.height,
-            )
+            max(width, height)
         ):
             for row in range(middle_row - radius, middle_row + radius + 1):
                 for col in range(middle_col - radius, middle_col + radius + 1):
                     if (
-                        0 <= row < game.curr_level.height
-                        and 0 <= col < game.curr_level.width
+                        0 <= row < height
+                        and 0 <= col < width
                         and self.is_valid_spawn(row, col, maze)
                     ):
                         self.spawn_x = col

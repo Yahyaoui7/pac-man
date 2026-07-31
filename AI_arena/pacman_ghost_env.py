@@ -15,13 +15,17 @@ import torch
 from AI_arena.cnn_controller import DIRECTIONS
 from AI_arena.cnn_dataset import ACTION_COUNT, GHOST_COUNT
 from src.logic.movement import MovementSystem
-from mazegenerator import MazeGenerator
 
 GHOST_NAMES = ["Blinky", "Pinky", "Inky", "Clyde"]
 MIN_MAZE_WIDTH = 10
 MAX_MAZE_WIDTH = 25
 MIN_MAZE_HEIGHT = 10
 MAX_MAZE_HEIGHT = 50
+
+NORTH = 1 << 0
+EAST = 1 << 1
+SOUTH = 1 << 2
+WEST = 1 << 3
 
 
 class PacmanGhostEnv:
@@ -36,9 +40,10 @@ class PacmanGhostEnv:
     ) -> None:
         # Store episode configuration.
         self.max_steps = max_steps
-        self.maze_width = (maze_width,)
-        self.maze_hiegth = (maze_height,)
+        self.maze_width = maze_width
+        self.maze_hiegth = maze_height
         self.step_count = 0
+        self.seed = seed
         self.rng = random.Random(seed)
 
         # These objects are created/reset by reset().
@@ -47,6 +52,9 @@ class PacmanGhostEnv:
         self.player: Any | None = None
         self.ghosts: list[Any] = []
         self.pellets: list[list[int]] | None = None
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
     def reset(
         self,
@@ -114,17 +122,84 @@ class PacmanGhostEnv:
         }
         return self._get_observation(), reward, done, info
 
+    def _init_pellet_grid(self) -> None:
+        """Initialize the pellet grid and count pellets."""
+
+        if self.maze is None:
+            raise RuntimeError("Maze has not been created.")
+
+        height = len(self.maze)
+        width = len(self.maze[0])
+
+        pellets = [[0] * width for _ in range(height)]
+        self.total_pellets = 0
+
+        corners = [
+            (0, 0),
+            (width - 1, 0),
+            (0, height - 1),
+            (width - 1, height - 1),
+        ]
+
+        center = (width // 2, height // 2)
+
+        for y in range(height):
+            for x in range(width):
+                if self.maze[y][x] == 15:
+                    pellets[y][x] = 0
+                elif (x, y) == center:
+                    pellets[y][x] = 0
+                elif (x, y) in corners:
+                    pellets[y][x] = 2
+                    self.total_pellets += 1
+                else:
+                    pellets[y][x] = 1
+                    self.total_pellets += 1
+
+        self.pellets = pellets
+
     def _get_observation(
         self,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Build the CNN grid, extra features, and legal-action mask."""
 
-        # TODO: Adapt the observation construction from
-        # CNNGhostController.predict(). Return shapes:
-        #   grid           = [1, 12, 50, 25]
-        #   extra_features = [1, 37]
-        #   valid_actions  = [1, 4, 4]
-        raise NotImplementedError
+        if (
+            self.maze is None
+            or self.player is None
+            or self.pellets is None
+            or self.movement is None
+        ):
+            raise RuntimeError("...")
+        height = len(self.maze)
+        width = len(self.maze[0])
+        grid = torch.zeros(
+            (1, 12, MAX_MAZE_HEIGHT, MAX_MAZE_WIDTH),
+            dtype=torch.float32,
+            device=self.device,
+        )
+        for y, row in enumerate(self.maze):
+            for x, cell in enumerate(row):
+                grid[0, 0, y, x] = bool(cell & NORTH)
+                grid[0, 1, y, x] = bool(cell & SOUTH)
+                grid[0, 2, y, x] = bool(cell & WEST)
+                grid[0, 3, y, x] = bool(cell & EAST)
+                grid[0, 11, y, x] = cell != 15
+
+        pellet_t = torch.zeros(
+            (1, MAX_MAZE_HEIGHT, MAX_MAZE_WIDTH),
+            dtype=torch.float32,
+            device=self.device,
+        )
+
+        pellet_t[:, :height, :width] = torch.tensor(
+            [self.pellets],
+            dtype=torch.float32,
+            device=self.device,
+        )
+
+        grid[0, 4] = (pellet_t == 1).float()
+        grid[0, 5] = (pellet_t == 2).float()
+        grid[0, 6, self.player.grid_y, self.player.grid_x] = 1
 
     def _apply_ghost_action(
         self,
@@ -203,7 +278,7 @@ class PacmanGhostEnv:
         return maze_generator.maze
 
     def _create_entities(self) -> tuple[Any, list[Any]]:
-        """Create Pac-Man near the centre and ghosts near the four corners."""
+        """Create Pac-Man and four ghosts at valid spawn positions."""
         if self.maze is None or not self.maze or not self.maze[0]:
             raise RuntimeError("A maze must be created before entities")
 
@@ -212,49 +287,23 @@ class PacmanGhostEnv:
 
         height = len(self.maze)
         width = len(self.maze[0])
-        walkable = [
-            (y, x)
-            for y in range(height)
-            for x in range(width)
-            if self.maze[y][x] != 15
-        ]
-        if len(walkable) < GHOST_COUNT + 1:
-            raise RuntimeError("Maze does not contain enough walkable cells")
-
-        # Start Pac-Man at the centre when possible.  If the centre is a wall,
-        # Player.find_player_spawn() searches outward for the nearest legal
-        # cell, just as the graphical game does.
-        center_y, center_x = height // 2, width // 2
+        # Create Pac-Man at the centre, or search outward if that cell is a wall.
+        center_y = height // 2
+        center_x = width // 2
         player = Player(center_y, center_x)
         if not player.is_valid_spawn(center_y, center_x, self.maze):
             if not player.find_player_spawn(None, self.maze):
-                raise RuntimeError("Could not find a valid Pac-Man spawn cell")
-        # Player() already initializes normal mode.  Do not call
-        # reset_location() here: that is a death/respawn reset and would clear
-        # any powered-mode state.  Initial creation only needs no powered mode.
+                raise RuntimeError("Could not find a valid Pac-Man spawn.")
+        # Do not call reset_location() during construction: it is a respawn
+        # reset and clears gameplay state such as powered_mode.
         player.powered_mode = None
-        player_cell = (player.grid_y, player.grid_x)
-
-        # Pick the nearest available walkable cell to each corner.  Generated
-        # mazes commonly have walls in the literal corners, so using the
-        # nearest legal cell gives ghosts a stable corner spawn without ever
-        # placing one on a wall or on another entity.
-        chosen: list[tuple[int, int]] = [player_cell]
-        corner_order = [
+        # Spawn ghosts directly in the four corners, in ghost order.
+        ghost_cells = [
             (0, 0),
             (0, width - 1),
             (height - 1, 0),
             (height - 1, width - 1),
         ]
-        for corner in corner_order:
-            candidates = sorted(
-                (cell for cell in walkable if cell not in chosen),
-                key=lambda cell: abs(cell[0] - corner[0])
-                + abs(cell[1] - corner[1]),
-            )
-            if not candidates:
-                raise RuntimeError("Maze does not contain enough distinct spawn cells")
-            chosen.append(candidates[0])
 
         ghost_specs = [
             ("Blinky", (255, 0, 0)),
@@ -262,13 +311,11 @@ class PacmanGhostEnv:
             ("Inky", (0, 255, 255)),
             ("Clyde", (255, 165, 0)),
         ]
-        ghosts = [
-            Ghost(y, x, color, name)
-            for (y, x), (name, color) in zip(chosen[1:], ghost_specs)
-        ]
-        # Use each ghost's normal respawn/reset path for initial state too.
-        for ghost in ghosts:
+        ghosts = []
+        for (y, x), (name, color) in zip(ghost_cells, ghost_specs):
+            ghost = Ghost(y, x, color, name)
             ghost.reset()
+            ghosts.append(ghost)
         return player, ghosts
 
     def _create_pellets(self) -> list[list[int]]:

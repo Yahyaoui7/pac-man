@@ -4,4 +4,3 @@ __pycache__/
 .highscores.json
 .venv/
 .mypy_cache/
-AI_arena/data

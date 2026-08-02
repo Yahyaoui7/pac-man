@@ -87,9 +87,7 @@ class PacmanPlayerEnv:
         self.last_action = None
 
         current_seed = (
-            self.seed
-            if self.seed is not None
-            else self.rng.randint(0, 1_000_000)
+            self.seed if self.seed is not None else self.rng.randint(0, 1_000_000)
         )
         maze_gen = LevelManager.build_maze(
             self.maze_width,
@@ -146,15 +144,17 @@ class PacmanPlayerEnv:
 
         sub_ticks = 2
         for _ in range(sub_ticks):
+            old_pos = self.player.grid_x, self.player.grid_y
             self._update_entities()
-            tick_events = self._check_events()
+            if old_pos != (self.player.grid_x, self.player.grid_y):
+                tick_events = self._check_events()
 
-            for key, val in tick_events.items():
-                if val:
-                    events[key] = True
+                for key, val in tick_events.items():
+                    if val:
+                        events[key] = True
 
-            if events["pacman_died"] or events["level_completed"]:
-                break
+                if events["pacman_died"] or events["level_completed"]:
+                    break
 
         pos = (self.player.grid_y, self.player.grid_x)
         if pos not in self.visited_tiles:
@@ -291,11 +291,7 @@ class PacmanPlayerEnv:
             "level_completed": False,
         }
 
-        if (
-            self.player is None
-            or self.pellets is None
-            or self.maze is None
-        ):
+        if self.player is None or self.pellets is None or self.maze is None:
             return events
 
         py, px = self.player.grid_y, self.player.grid_x
@@ -326,7 +322,9 @@ class PacmanPlayerEnv:
                 continue
 
             dist_sq = (self.player.x - ghost.x) ** 2 + (self.player.y - ghost.y) ** 2
-            if (ghost.grid_y == py and ghost.grid_x == px) or dist_sq <= (CELL_SIZE * 0.6) ** 2:
+            if (ghost.grid_y == py and ghost.grid_x == px) or dist_sq <= (
+                CELL_SIZE * 0.6
+            ) ** 2:
                 if ghost.is_edible:
                     events["ghost_eaten"] = True
                     ghost.is_edible = False

@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 
 import torch
 
-from AI_arena.data.constants import CNN_HEIGHT, CNN_WIDTH
+# from AI_arena.data.constants import CNN_HEIGHT, CNN_WIDTH
 from AI_arena.models.cnn_ghost import GhostCNN
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 

@@ -14,7 +14,7 @@ collect:
 	uv run python -m AI_arena.data_collector.main_loop 
 
 train:
-	uv run python -m AI_arena.cnn_training --epochs 30 --patience 5
+	uv run python -m AI_arena.ghosts.ghost_training --epochs 30 --patience 5
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

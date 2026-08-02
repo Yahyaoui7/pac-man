@@ -145,7 +145,7 @@ class Player(Entity):
     ) -> bool:
         # The graphical game exposes dimensions through curr_level; the
         # headless RL environment only provides the maze itself.
-        if game is None:
+        if game is None or not getattr(game, "curr_level", None):
             height = len(maze)
             width = len(maze[0])
         else:

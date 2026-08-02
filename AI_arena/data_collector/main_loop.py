@@ -3,7 +3,7 @@ import random
 import time
 from pathlib import Path
 from typing import Literal, TextIO, cast
-from AI_arena.data import CNNJSONLDataset, EPISODE_LENGTH
+# from AI_arena.data import CNNJSONLDataset, EPISODE_LENGTH
 
 from AI_arena.data_collector.formatters import (
     CNNFormatter,

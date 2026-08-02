@@ -45,6 +45,7 @@ class GameStarter:
         self.entity_manager: Any = None
 
         self.lives: int = config.lives
+        self.use_ai_player: bool = False
 
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""
@@ -79,7 +80,12 @@ class GameStarter:
         clock = pygame.time.Clock()
         input_manager = InputManager()
 
-        self.state_manager.change_state(HomeState(self))
+        if self.use_ai_player:
+            from src.graphics.states.playing import PlayingState
+
+            self.state_manager.change_state(PlayingState(self))
+        else:
+            self.state_manager.change_state(HomeState(self))
 
         while self.running:
 

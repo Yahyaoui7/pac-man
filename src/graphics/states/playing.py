@@ -5,7 +5,8 @@ import pygame
 import pygame.draw as dr
 from typing import Any, List
 
-from AI_arena.cnn_controller import CNNGhostController
+from AI_arena.ghosts.ghost_controller import CNNGhostController
+from AI_arena.player.player_controller import CNNPlayerController
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
 from src.logic.movement import MovementSystem
@@ -38,6 +39,11 @@ class PlayingState(State):
         self.ghost_predictions: dict[str, str | None] = {}
         self.ghost_decision_cells: dict[str, tuple[int, int]] = {}
 
+        self.player_controller: CNNPlayerController | None = None
+        self.use_ai_player: bool = getattr(game, "use_ai_player", False)
+        self.ai_player_decision: str | None = None
+        self.ai_frame_counter: int = 0
+
     def enter(self) -> None:
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
@@ -57,10 +63,18 @@ class PlayingState(State):
         self.movement = MovementSystem(self.maze)
         try:
             self.ghost_controller = CNNGhostController()
-            self.ghost_controller.init_observation(self.maze)
+            if hasattr(self.ghost_controller, "init_observation"):
+                self.ghost_controller.init_observation(self.maze)
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             print(f"Ghost CNN unavailable; using scripted movement: {exc}")
             self.ghost_controller = None
+
+        try:
+            self.player_controller = CNNPlayerController()
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            print(f"Player RL model unavailable: {exc}")
+            self.player_controller = None
+
         self.msg_text = f"LEVEL {curr_idx + 1}"
         self.msg_timer = 2.0
 
@@ -87,6 +101,10 @@ class PlayingState(State):
 
             self.game.state_manager.push_state(PauseState(self.game, self))
             return
+
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key in (pygame.K_p, pygame.K_a):
+                self.use_ai_player = not self.use_ai_player
 
         self._handle_input(input_state)
         self._update_entities()
@@ -136,6 +154,32 @@ class PlayingState(State):
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
+
+        if self.use_ai_player and self.player_controller is not None:
+            self.ai_frame_counter += 1
+            if self.ai_frame_counter % 4 == 0:
+                self.movement.update_cell_position(em.player)
+                action = self.player_controller.get_action(
+                    self.maze,
+                    em.pellets,
+                    em.player,
+                    em.ghosts,
+                    self.movement,
+                    sample=True,
+                )
+                if action:
+                    em.player.next_direction = action
+                    self.ai_player_decision = action
+                    diag = self.player_controller.last_diagnostics
+                    probs_str = " | ".join(
+                        f"{d}:{p*100:.0f}%" for d, p in diag.get("probabilities", {}).items()
+                    )
+                    val = diag.get("estimated_value", 0.0)
+                    print(
+                        f"🤖 [PLAYER AI] Frame {self.ai_frame_counter:04d} Node ({em.player.grid_x:02d},{em.player.grid_y:02d}) "
+                        f"-> Choice: {action:<5s} | V(s): {val:+.2f} | Probs: [{probs_str}]"
+                    )
+
         self.movement.update_entity(em.player)
 
         if "ghost freeze" not in self.active_cheats:
@@ -268,6 +312,7 @@ class PlayingState(State):
         self._draw_hud(screen)
         self._draw_message(screen)
         self._draw_cheat_banner(screen)
+        self._draw_ai_banner(screen)
 
     def _print_model_decision(self, decision_names: set[str]) -> None:
         """Print one JSON record for each distinct CNN decision state."""
@@ -634,6 +679,44 @@ class PlayingState(State):
         )
         screen.blit(bubble, bubble_rect.topleft)
         screen.blit(surf, rect)
+
+    def _draw_ai_banner(self, screen: pygame.Surface) -> None:
+        if not self.use_ai_player:
+            return
+
+        decision = self.ai_player_decision or "EVALUATING"
+        diag = getattr(self.player_controller, "last_diagnostics", {}) if self.player_controller else {}
+        val = diag.get("estimated_value", 0.0)
+        probs = diag.get("probabilities", {})
+
+        probs_text = " | ".join(
+            f"{d}:{probs.get(d, 0.0)*100:.0f}%" for d in ("UP", "DOWN", "LEFT", "RIGHT")
+        ) if probs else "EVALUATING..."
+
+        line1 = f"🤖 AI PLAYER | MOVE: {decision} | V(s): {val:+.2f}"
+        line2 = f"PROBS: {probs_text}"
+
+        font1 = ui.get_scaled_font(line1, max_width=screen.get_width() - 24, base_size=15)
+        font2 = ui.get_scaled_font(line2, max_width=screen.get_width() - 24, base_size=13)
+
+        surf1 = font1.render(line1, True, ui.COLOR_NEON_CYAN)
+        surf2 = font2.render(line2, True, ui.COLOR_WHITE)
+
+        w = max(surf1.get_width(), surf2.get_width()) + 20
+        h = surf1.get_height() + surf2.get_height() + 10
+        cx = screen.get_width() // 2
+        bottom_y = screen.get_height() - 26 if self.active_cheats else screen.get_height() - 8
+
+        bubble_rect = pygame.Rect(0, 0, w, h)
+        bubble_rect.midbottom = (cx, bottom_y)
+
+        bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(bubble, (0, 0, 0, 200), bubble.get_rect(), border_radius=8)
+        pygame.draw.rect(bubble, (*ui.COLOR_NEON_CYAN, 220), bubble.get_rect(), width=1, border_radius=8)
+
+        screen.blit(bubble, bubble_rect.topleft)
+        screen.blit(surf1, surf1.get_rect(midtop=(cx, bubble_rect.top + 4)))
+        screen.blit(surf2, surf2.get_rect(midtop=(cx, bubble_rect.top + 4 + surf1.get_height())))
 
     def give_target(self, ghost: Any) -> None:
         if ghost.name == "Blinky":

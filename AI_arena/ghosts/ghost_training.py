@@ -10,15 +10,15 @@ import torch
 from torch import Tensor, nn
 from torch.utils.data import DataLoader, Subset
 
-from AI_arena.cnn_dataset import (
+from AI_arena.data.constants import (
     ACTION_COUNT,
     EPISODE_LENGTH,
-    CNNJSONLDataset,
 )
-from AI_arena.cnn_model import GhostCNN
+from AI_arena.data.dataset import CNNJSONLDataset
+from AI_arena.models.cnn_ghost import GhostCNN
 
-DEFAULT_DATASET_PATH = Path(__file__).parent / "data" / "CNN_DATA.jsonl"
-DEFAULT_MODEL_PATH = Path(__file__).parent / "models" / "ghost_ai.pt"
+DEFAULT_DATASET_PATH = Path(__file__).parent.parent / "data" / "CNN_DATA.jsonl"
+DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models" / "ghost_ai.pt"
 
 
 def masked_cross_entropy(
@@ -27,7 +27,6 @@ def masked_cross_entropy(
     labels: Tensor,
 ) -> Tensor:
     """Calculate action loss after excluding movements blocked by walls."""
-
     masked_logits = logits.masked_fill(~valid_actions, float("-inf"))
     return nn.functional.cross_entropy(
         masked_logits.reshape(-1, ACTION_COUNT),
@@ -47,7 +46,6 @@ def train(
     patience: int = 5,
 ) -> GhostCNN:
     """Train a GhostCNN and save its state dictionary."""
-
     if epochs < 1:
         raise ValueError("epochs must be at least 1")
     if learning_rate <= 0:
@@ -159,7 +157,6 @@ def evaluate(
     device: torch.device,
 ) -> tuple[float, float]:
     """Return masked validation loss and per-ghost action accuracy."""
-
     model.eval()
     total_loss = 0.0
     sample_count = 0

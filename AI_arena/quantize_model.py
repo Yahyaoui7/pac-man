@@ -9,7 +9,7 @@ from __future__ import annotations
 import torch
 import torch.ao.quantization as quant
 
-from AI_arena.cnn_model import GhostCNN
+from AI_arena.models.cnn_ghost import GhostCNN
 
 WEIGHTS_PATH = "AI_arena/models/ghost_ai.pt"
 OUTPUT_PATH = "AI_arena/models/ghost_ai_quantized.pt"

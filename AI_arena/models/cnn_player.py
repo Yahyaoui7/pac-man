@@ -5,42 +5,20 @@ from __future__ import annotations
 import torch
 from torch import Tensor, nn
 
-from AI_arena.cnn_dataset import (
+from AI_arena.data.constants import (
     ACTION_COUNT,
     CNN_CHANNEL_COUNT,
     EXTRA_FEATURE_COUNT,
 )
+from AI_arena.models.cnn_backbone import PacmanCNNBackbone
 
 
 class PlayerActorCritic(nn.Module):
-    """Actor-Critic neural network taking spatial grid and extra state features to output action logits and state value."""
+    """Actor-Critic model taking spatial grid and state features to output action logits and state value."""
 
     def __init__(self) -> None:
         super().__init__()
-
-        self.cnn = nn.Sequential(
-            nn.Conv2d(CNN_CHANNEL_COUNT, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-        )
-
-        # 50x25 spatial input undergoes two 2x2 max-pooling operations -> 12x6 grid
-        flattened_cnn_dim = 128 * 12 * 6
-        total_feature_dim = flattened_cnn_dim + EXTRA_FEATURE_COUNT
-
-        self.trunk = nn.Sequential(
-            nn.Linear(total_feature_dim, 256),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-        )
-
+        self.backbone = PacmanCNNBackbone(dropout_prob=0.1)
         self.actor = nn.Linear(128, ACTION_COUNT)
         self.critic = nn.Linear(128, 1)
 
@@ -50,13 +28,9 @@ class PlayerActorCritic(nn.Module):
         extra_features: Tensor,
     ) -> tuple[Tensor, Tensor]:
         """Return (action_logits [batch, 4], state_value [batch, 1])."""
-        spatial = torch.flatten(self.cnn(grid), start_dim=1)
-        combined = torch.cat((spatial, extra_features), dim=1)
-        hidden = self.trunk(combined)
-
-        logits = self.actor(hidden)
-        value = self.critic(hidden)
-
+        latent = self.backbone.extract_features(grid, extra_features)
+        logits = self.actor(latent)
+        value = self.critic(latent)
         return logits, value
 
 

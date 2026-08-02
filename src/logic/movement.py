@@ -209,6 +209,8 @@ class MovementSystem:
         w = len(self.maze[0])
         dist = [-1] * (h * w)
         sy, sx = source
+        if not (0 <= sy < h and 0 <= sx < w):
+            return dist
         dist[sy * w + sx] = 0
         queue = deque([source])
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]

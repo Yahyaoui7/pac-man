@@ -114,3 +114,12 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 - Training data covers updates 1–2155 (2823 episodes).
 - Log window size: last 20 completed episodes per update.
 - Oscillation penalty introduced in this run to combat node-to-node back-and-forth behavior.
+
+
+```uv run python -u -m AI_arena.player.player_training \
+                                                 --stage 1 \
+                                                 --num-updates 100 \
+                                                 --save-interval 50 \
+                                                 2>&1 | tee RL_logs.txt
+                                        
+```

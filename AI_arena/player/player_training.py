@@ -131,7 +131,7 @@ def train_player_ppo(
     rollout_steps: int = 1024,
     ppo_epochs: int = 4,
     minibatch_size: int = 64,
-    learning_rate: float = 3e-4,
+    learning_rate: float = 1e-4,
     gamma: float = 0.99,
     gae_lambda: float = 0.95,
     clip_eps: float = 0.2,
@@ -179,11 +179,18 @@ def train_player_ppo(
 
     from collections import deque
 
-    recent_episodes: deque[dict[str, float]] = deque(maxlen=20)
+    recent_episodes: deque[dict[str, float]] = deque(
+        maxlen=100
+    )  # 100-ep window smooths random-maze variance
     current_ep_reward = 0.0
     current_ep_steps = 0
     total_completed_episodes = 0
     last_update_completed = 0
+
+    # Best-checkpoint tracking — saves the peak policy, not just the last one.
+    best_checkpoint_path = model_dir / f"player_rl_stage{stage}_best.pt"
+    best_avg_pct: float = 0.0
+    best_avg_pellets: float = 0.0
 
     try:
         for update in range(1, num_updates + 1):
@@ -349,7 +356,15 @@ def train_player_ppo(
             avg_policy_loss = total_policy_loss / (ppo_epochs * dataset_size)
             avg_value_loss = total_value_loss / (ppo_epochs * dataset_size)
 
+            # Save best checkpoint whenever avg_pct improves
+            is_best = bool(recent_episodes and avg_pct > best_avg_pct)
+            if is_best:
+                best_avg_pct = avg_pct
+                best_avg_pellets = avg_pellets
+                torch.save(policy.state_dict(), best_checkpoint_path)
+
             if update % 5 == 0 or update == 1 or update == num_updates:
+                best_marker = " ★ BEST" if is_best else ""
                 print(
                     f"Upd {update:03d}/{num_updates:03d} | "
                     f"Tot Ep: {total_completed_episodes:03d} | "
@@ -358,6 +373,7 @@ def train_player_ppo(
                     f"Max Pellets: {max_pellets:3d} ({max_pct:4.1f}%) | "
                     f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
                     f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
+                    f"{best_marker}"
                 )
 
             if update % save_interval == 0 or update == num_updates:
@@ -367,6 +383,9 @@ def train_player_ppo(
                 print(f"\n'q' pressed — stopping after update {update}/{num_updates}.")
                 torch.save(policy.state_dict(), checkpoint_path)
                 print(f"Checkpoint saved to: {checkpoint_path}")
+                print(
+                    f"Best checkpoint (avg {best_avg_pct:.1f}%): {best_checkpoint_path}"
+                )
                 break
     except KeyboardInterrupt:
         # Also handle Ctrl+C gracefully with a final save.
@@ -375,6 +394,9 @@ def train_player_ppo(
         )
         torch.save(policy.state_dict(), checkpoint_path)
         print(f"Checkpoint saved to: {checkpoint_path}")
+        print(
+            f"Best checkpoint (avg {best_avg_pct:.1f}% | {best_avg_pellets:.0f} pellets): {best_checkpoint_path}"
+        )
     finally:
         quit_listener.stop()
 
@@ -384,6 +406,7 @@ def train_player_ppo(
         f"{time.time() - start_time:.1f}s!"
     )
     print(f"Checkpoint Path: {checkpoint_path}")
+    print(f"Best Checkpoint: {best_checkpoint_path} (peak avg_pct={best_avg_pct:.1f}%)")
     print(f"============================================================")
 
 
@@ -401,7 +424,7 @@ def main() -> None:
         "--num-updates", type=int, default=100, help="Number of PPO update iterations"
     )
     parser.add_argument(
-        "--rollout-steps", type=int, default=1024, help="Steps per rollout"
+        "--rollout-steps", type=int, default=1048, help="Steps per rollout"
     )
     parser.add_argument(
         "--save-interval", type=int, default=10, help="Snapshot save interval"

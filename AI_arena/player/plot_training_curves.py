@@ -12,6 +12,7 @@ Each call creates:
         03_value_loss.png
         README.md
 """
+
 import argparse
 import re
 import textwrap
@@ -22,6 +23,7 @@ import numpy as np
 
 try:
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
@@ -67,19 +69,20 @@ def parse_log(path: Path) -> dict[str, np.ndarray]:
             value_losses.append(float(m.group(9)))
 
     return {
-        "updates":       np.array(updates),
-        "tot_eps":       np.array(tot_eps),
-        "avg_rwds":      np.array(avg_rwds),
-        "avg_pellets":   np.array(avg_pellets),
-        "avg_pcts":      np.array(avg_pcts),
-        "max_pellets":   np.array(max_pellets),
-        "max_pcts":      np.array(max_pcts),
+        "updates": np.array(updates),
+        "tot_eps": np.array(tot_eps),
+        "avg_rwds": np.array(avg_rwds),
+        "avg_pellets": np.array(avg_pellets),
+        "avg_pcts": np.array(avg_pcts),
+        "max_pellets": np.array(max_pellets),
+        "max_pcts": np.array(max_pcts),
         "policy_losses": np.array(policy_losses),
-        "value_losses":  np.array(value_losses),
+        "value_losses": np.array(value_losses),
     }
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
+
 
 def smooth(arr: np.ndarray, window: int = 30) -> np.ndarray:
     if len(arr) < window:
@@ -112,6 +115,7 @@ def _save(fig: plt.Figure, out: Path, name: str) -> Path:
 
 # ─── Plots ──────────────────────────────────────────────────────────────────
 
+
 def plot_all(data: dict[str, np.ndarray], out: Path) -> dict[str, float]:
     upd = data["updates"]
     RAW_A, RAW_C, SM_C, MAX_C = 0.18, "#5b9bd5", "#1a4a7a", "#e05c00"
@@ -122,8 +126,11 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict[str, float]:
     ax.plot(upd, data["avg_rwds"], alpha=0.3, color=RAW_C, linewidth=0.8)
     ax.plot(upd, smooth(data["avg_rwds"]), color=SM_C, linewidth=2, label="Smoothed")
     ax.axhline(0, color="white", linestyle="--", linewidth=0.8, alpha=0.5)
-    ax.set(title="Average Episode Reward (20-ep sliding window)",
-           xlabel="PPO Update", ylabel="Avg Reward")
+    ax.set(
+        title="Average Episode Reward (20-ep sliding window)",
+        xlabel="PPO Update",
+        ylabel="Avg Reward",
+    )
     ax.legend(facecolor="#2a2a4e", labelcolor="white")
     _style(ax, fig)
     _save(fig, out, "01_avg_reward.png")
@@ -132,10 +139,21 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict[str, float]:
     fig, ax = plt.subplots(figsize=(11, 4))
     ax.fill_between(upd, data["avg_pcts"], alpha=RAW_A, color="#44bb77")
     ax.plot(upd, data["avg_pcts"], alpha=0.3, color="#44bb77", linewidth=0.8)
-    ax.plot(upd, smooth(data["avg_pcts"]), color="#1a7a44", linewidth=2, label="Avg pellet %")
-    ax.plot(upd, data["max_pcts"], color=MAX_C, linewidth=1, alpha=0.6, label="Max pellet %")
-    ax.set(title="Pellet Completion % (20-ep sliding window)",
-           xlabel="PPO Update", ylabel="Completion %")
+    ax.plot(
+        upd,
+        smooth(data["avg_pcts"]),
+        color="#1a7a44",
+        linewidth=2,
+        label="Avg pellet %",
+    )
+    ax.plot(
+        upd, data["max_pcts"], color=MAX_C, linewidth=1, alpha=0.6, label="Max pellet %"
+    )
+    ax.set(
+        title="Pellet Completion % (20-ep sliding window)",
+        xlabel="PPO Update",
+        ylabel="Completion %",
+    )
     ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f%%"))
     ax.legend(facecolor="#2a2a4e", labelcolor="white")
     _style(ax, fig)
@@ -145,7 +163,13 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict[str, float]:
     fig, ax = plt.subplots(figsize=(11, 4))
     ax.fill_between(upd, data["value_losses"], alpha=RAW_A, color="#e07b55")
     ax.plot(upd, data["value_losses"], alpha=0.3, color="#e07b55", linewidth=0.8)
-    ax.plot(upd, smooth(data["value_losses"]), color="#aa2200", linewidth=2, label="Smoothed")
+    ax.plot(
+        upd,
+        smooth(data["value_losses"]),
+        color="#aa2200",
+        linewidth=2,
+        label="Smoothed",
+    )
     ax.set(title="Value Network Loss", xlabel="PPO Update", ylabel="Value Loss")
     ax.legend(facecolor="#2a2a4e", labelcolor="white")
     _style(ax, fig)
@@ -154,7 +178,9 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict[str, float]:
     # 00 — Combined overview
     fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
     fig.patch.set_facecolor("#1a1a2e")
-    fig.suptitle("Pac-Man RL Training Summary", color="white", fontsize=14, fontweight="bold")
+    fig.suptitle(
+        "Pac-Man RL Training Summary", color="white", fontsize=14, fontweight="bold"
+    )
     for ax in axes:
         ax.set_facecolor("#242444")
         ax.tick_params(colors="white")
@@ -169,8 +195,12 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict[str, float]:
     axes[0].axhline(0, color="white", linestyle="--", linewidth=0.7, alpha=0.4)
     axes[0].set_ylabel("Avg Reward", color="white")
     axes[1].fill_between(upd, data["avg_pcts"], alpha=0.2, color="#44bb77")
-    axes[1].plot(upd, smooth(data["avg_pcts"]), color="#1a7a44", linewidth=2, label="Avg %")
-    axes[1].plot(upd, data["max_pcts"], color=MAX_C, linewidth=1, alpha=0.6, label="Max %")
+    axes[1].plot(
+        upd, smooth(data["avg_pcts"]), color="#1a7a44", linewidth=2, label="Avg %"
+    )
+    axes[1].plot(
+        upd, data["max_pcts"], color=MAX_C, linewidth=1, alpha=0.6, label="Max %"
+    )
     axes[1].set_ylabel("Pellet %", color="white")
     axes[1].legend(facecolor="#2a2a4e", labelcolor="white", fontsize=8)
     axes[2].fill_between(upd, data["value_losses"], alpha=0.2, color="#e07b55")
@@ -184,21 +214,21 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict[str, float]:
     sm_rwd = smooth(data["avg_rwds"])
     best_sm_idx = int(np.argmax(sm_rwd))
     return {
-        "total_updates":      int(len(upd)),
-        "total_episodes":     int(data["tot_eps"][-1]),
-        "best_avg_rwd":       float(data["avg_rwds"].max()),
-        "best_avg_rwd_upd":   int(upd[int(np.argmax(data["avg_rwds"]))]),
-        "best_sm_rwd":        float(sm_rwd[best_sm_idx]),
-        "best_sm_rwd_upd":    int(upd[best_sm_idx]),
-        "best_avg_pct":       float(data["avg_pcts"].max()),
-        "best_avg_pct_upd":   int(upd[int(np.argmax(data["avg_pcts"]))]),
-        "best_max_pct":       float(data["max_pcts"].max()),
-        "best_max_pct_upd":   int(upd[int(np.argmax(data["max_pcts"]))]),
-        "final_avg_rwd":      float(data["avg_rwds"][-1]),
-        "final_avg_pct":      float(data["avg_pcts"][-1]),
-        "final_max_pct":      float(data["max_pcts"][-1]),
-        "start_upd":          int(upd[0]),
-        "end_upd":            int(upd[-1]),
+        "total_updates": int(len(upd)),
+        "total_episodes": int(data["tot_eps"][-1]),
+        "best_avg_rwd": float(data["avg_rwds"].max()),
+        "best_avg_rwd_upd": int(upd[int(np.argmax(data["avg_rwds"]))]),
+        "best_sm_rwd": float(sm_rwd[best_sm_idx]),
+        "best_sm_rwd_upd": int(upd[best_sm_idx]),
+        "best_avg_pct": float(data["avg_pcts"].max()),
+        "best_avg_pct_upd": int(upd[int(np.argmax(data["avg_pcts"]))]),
+        "best_max_pct": float(data["max_pcts"].max()),
+        "best_max_pct_upd": int(upd[int(np.argmax(data["max_pcts"]))]),
+        "final_avg_rwd": float(data["avg_rwds"][-1]),
+        "final_avg_pct": float(data["avg_pcts"][-1]),
+        "final_max_pct": float(data["max_pcts"][-1]),
+        "start_upd": int(upd[0]),
+        "end_upd": int(upd[-1]),
     }
 
 
@@ -332,11 +362,16 @@ def write_readme(out: Path, num: int, title: str, log_file: str, stats: dict) ->
 
 # ─── Report numbering ────────────────────────────────────────────────────────
 
+
 def next_report_dir(reports_root: Path) -> tuple[int, Path]:
     """Return (report_number, path) for the next auto-numbered report."""
     reports_root.mkdir(parents=True, exist_ok=True)
     existing = sorted(
-        [d for d in reports_root.iterdir() if d.is_dir() and d.name.startswith("report_")],
+        [
+            d
+            for d in reports_root.iterdir()
+            if d.is_dir() and d.name.startswith("report_")
+        ],
         key=lambda d: d.name,
     )
     num = int(existing[-1].name.split("_")[1]) + 1 if existing else 1
@@ -347,13 +382,25 @@ def next_report_dir(reports_root: Path) -> tuple[int, Path]:
 
 # ─── Entry point ────────────────────────────────────────────────────────────
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate a numbered RL training report.")
-    parser.add_argument("logfile", nargs="?", default="RL-logs.txt",
-                        help="Path to the training log file (default: RL-logs.txt)")
-    parser.add_argument("--title", default="PPO Stage-1", help="Short title for this report")
-    parser.add_argument("--reports-dir", default="reports",
-                        help="Root reports directory (default: reports/)")
+    parser = argparse.ArgumentParser(
+        description="Generate a numbered RL training report."
+    )
+    parser.add_argument(
+        "logfile",
+        nargs="?",
+        default="RL_logs.txt",
+        help="Path to the training log file (default: RL-logs.txt)",
+    )
+    parser.add_argument(
+        "--title", default="PPO Stage-1", help="Short title for this report"
+    )
+    parser.add_argument(
+        "--reports-dir",
+        default="reports",
+        help="Root reports directory (default: reports/)",
+    )
     args = parser.parse_args()
 
     log_path = Path(args.logfile)
@@ -372,8 +419,12 @@ def main() -> None:
     print(f"\n✓ Report {num:03d} ready at: {out_dir}/")
     print(f"  Episodes : {stats['total_episodes']}")
     print(f"  Updates  : {stats['start_upd']}→{stats['end_upd']}")
-    print(f"  Best avg reward : {stats['best_avg_rwd']:.1f}  (upd {stats['best_avg_rwd_upd']})")
-    print(f"  Best pellet %   : {stats['best_max_pct']:.1f}% (upd {stats['best_max_pct_upd']})")
+    print(
+        f"  Best avg reward : {stats['best_avg_rwd']:.1f}  (upd {stats['best_avg_rwd_upd']})"
+    )
+    print(
+        f"  Best pellet %   : {stats['best_max_pct']:.1f}% (upd {stats['best_max_pct_upd']})"
+    )
 
 
 if __name__ == "__main__":

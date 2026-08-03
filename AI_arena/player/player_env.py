@@ -37,15 +37,32 @@ GHOST_SPECS = [
 ]
 
 
+# Random maze size range — upper bounds are the CNN tensor dimensions so the
+# observation grid never overflows.  Lower bound is the minimum playable size.
+# CNN_WIDTH  = 25  (columns / x-axis)
+# CNN_HEIGHT = 50  (rows / y-axis, but LevelManager caps height at 23 anyway)
+MAZE_WIDTH_MIN = 10
+MAZE_WIDTH_MAX = CNN_WIDTH  # 25 — do not exceed CNN_WIDTH or formatter will fail
+MAZE_HEIGHT_MIN = 10
+MAZE_HEIGHT_MAX = min(CNN_HEIGHT, 23)  # 23 — game engine hard cap
+
+# Physics safety cap: max ticks to advance before giving up on centering
+MAX_PHYSICS_TICKS = 300
+
+
 class PacmanPlayerEnv:
-    """Headless environment in which RL policy controls Pac-Man against 4 BFS ghosts."""
+    """Headless environment in which RL policy controls Pac-Man against 4 BFS ghosts.
+
+    Step semantics: each call to step() advances the physics simulation until
+    Pac-Man reaches the *center* of the next grid cell (or hits a wall and
+    stops).  Reward is computed exactly once per cell crossing, eliminating
+    the 5-7× reward-spam that occurs when observing every pixel tick.
+    """
 
     def __init__(
         self,
         seed: int | None = None,
-        maze_width: int = 20,
-        maze_height: int = 25,
-        max_steps: int = 1500,
+        max_steps: int = 800,
         stage: int = 1,
         device: str | torch.device = "cpu",
     ) -> None:
@@ -61,9 +78,7 @@ class PacmanPlayerEnv:
         SpriteLibrary.instance().load_ghosts(CELL_SIZE)
 
         self.stage = stage
-        self.max_steps = max_steps
-        self.maze_width = maze_width
-        self.maze_height = maze_height
+        self.max_steps = max_steps  # measured in cell crossings, not pixel ticks
         self.step_count = 0
         self.seed = seed
         self.rng = random.Random(seed)
@@ -80,20 +95,30 @@ class PacmanPlayerEnv:
         self.last_action: int | None = None
         self.device = torch.device(device)
 
+        # Anti-oscillation tracking (last two cell positions)
+        self.last_cell: tuple[int, int] | None = None
+        self.prev_prev_cell: tuple[int, int] | None = None
+
     def reset(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Reset episode state and return (grid, features, valid_actions)."""
+        """Reset episode state and return (grid, features, valid_actions).
+
+        A new random maze is generated each episode so the policy learns to
+        *navigate* rather than memorise a single fixed layout.
+        """
         self.step_count = 0
         self.visited_tiles = set()
         self.last_action = None
+        self.last_cell = None
+        self.prev_prev_cell = None
 
-        current_seed = (
-            self.seed if self.seed is not None else self.rng.randint(0, 1_000_000)
-        )
-        maze_gen = LevelManager.build_maze(
-            self.maze_width,
-            self.maze_height,
-            seed=current_seed,
-        )
+        # Sample a fresh random maze size for this episode.
+        maze_w = self.rng.randint(MAZE_WIDTH_MIN, MAZE_WIDTH_MAX)
+        maze_h = self.rng.randint(MAZE_HEIGHT_MIN, MAZE_HEIGHT_MAX)
+
+        # Episode seed: deterministic when outer seed is set, random otherwise.
+        current_seed = self.rng.randint(0, 1_000_000)
+
+        maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
         self.movement = MovementSystem(self.maze)
 
@@ -104,7 +129,9 @@ class PacmanPlayerEnv:
         self._create_pellets()
 
         if self.player is not None:
-            self.visited_tiles.add((self.player.grid_y, self.player.grid_x))
+            start_cell = (self.player.grid_y, self.player.grid_x)
+            self.visited_tiles.add(start_cell)
+            self.last_cell = start_cell
 
         return self._get_observation()
 
@@ -117,7 +144,11 @@ class PacmanPlayerEnv:
         bool,
         dict[str, Any],
     ]:
-        """Apply one action to Pac-Man and advance environment until next step."""
+        """Apply one action and advance physics until Pac-Man reaches a cell center.
+
+        Reward fires exactly ONCE per cell crossing (not once per pixel tick).
+        This removes the ~11× step-penalty spam that made exploration unprofitable.
+        """
         if isinstance(action, torch.Tensor):
             action = int(action.item())
 
@@ -140,15 +171,25 @@ class PacmanPlayerEnv:
             "pacman_died": False,
             "level_completed": False,
             "new_tile_visited": False,
+            "oscillating": False,
         }
 
-        sub_ticks = 2
-        for _ in range(sub_ticks):
-            old_pos = self.player.grid_x, self.player.grid_y
-            self._update_entities()
-            if old_pos != (self.player.grid_x, self.player.grid_y):
-                tick_events = self._check_events()
+        # ------------------------------------------------------------------ #
+        # Advance physics until player reaches the center of the next cell.   #
+        # We record the starting cell and stop as soon as the player both      #
+        # (a) occupies a NEW grid cell AND (b) is centered in it.             #
+        # A safety cap prevents infinite loops on wall collisions.             #
+        # ------------------------------------------------------------------ #
+        start_cell = (self.player.grid_y, self.player.grid_x)
+        cell_changed = False
 
+        for _ in range(MAX_PHYSICS_TICKS):
+            prev_grid = (self.player.grid_x, self.player.grid_y)
+            self._update_entities()
+
+            # Detect grid-cell change mid-transit for event checking
+            if prev_grid != (self.player.grid_x, self.player.grid_y):
+                tick_events = self._check_events()
                 for key, val in tick_events.items():
                     if val:
                         events[key] = True
@@ -156,13 +197,32 @@ class PacmanPlayerEnv:
                 if events["pacman_died"] or events["level_completed"]:
                     break
 
-        pos = (self.player.grid_y, self.player.grid_x)
-        if pos not in self.visited_tiles:
+            current_cell = (self.player.grid_y, self.player.grid_x)
+            if current_cell != start_cell and self.movement.is_centered(self.player):
+                cell_changed = True
+                break
+
+        # If the player didn't cross to a new cell (wall hit / no valid move),
+        # we still count it as a step so training doesn't freeze.
+        current_pos = (self.player.grid_y, self.player.grid_x)
+
+        # Track visited tiles
+        if current_pos not in self.visited_tiles:
             events["new_tile_visited"] = True
-            self.visited_tiles.add(pos)
+            self.visited_tiles.add(current_pos)
+
+        # Anti-oscillation: penalise A→B→A bouncing
+        if cell_changed and self.prev_prev_cell is not None:
+            if current_pos == self.prev_prev_cell:
+                events["oscillating"] = True
+
+        # Update oscillation history
+        if cell_changed:
+            self.prev_prev_cell = self.last_cell
+            self.last_cell = current_pos
 
         reward = self._calculate_reward(events)
-        self.step_count += 1
+        self.step_count += 1  # counts cell crossings, not pixel ticks
 
         terminated = bool(events["pacman_died"] or events["level_completed"])
         truncated = self.step_count >= self.max_steps
@@ -337,18 +397,37 @@ class PacmanPlayerEnv:
         return events
 
     def _calculate_reward(self, events: dict[str, bool]) -> float:
-        """Calculate step reward focused on pure navigation and pellet collection."""
-        reward = -0.1  # Mild step penalty to allow long-distance corridor traversal
+        """Calculate reward per cell crossing (not per pixel tick).
+
+        Net values (new cell):
+          Empty new tile:  -0.05 + 1.5         = +1.45  (exploration profitable)
+          Pellet new tile: -0.05 + 1.5 + 5.0   = +6.45  (strongly rewarded)
+          Revisited tile:  -0.05               = -0.05  (very mild cost)
+          Oscillating:     -0.05 - 0.5         = -0.55  (A->B->A discouraged)
+        """
+        reward = -0.05  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
+
         if events.get("new_tile_visited", False):
-            reward += 2.0  # Strong exploration bonus to drive Pac-Man into unexplored corridors
+            reward += 1.5  # Exploration bonus — net +1.45 for an empty new cell
+
+        if events.get("oscillating", False):
+            reward -= 0.5  # Discourage A→B→A oscillation without hard blocking
+
         if events["pellet_eaten"]:
-            reward += 5.0  # High pellet reward (+6.9 net on new tile)
+            reward += 5.0  # Net +6.45 on a new pellet tile
+
         if events["super_pellet_eaten"]:
             reward += 10.0
+
+        if events["ghost_eaten"]:
+            reward += 30.0
+
         if events["level_completed"]:
-            reward += 100.0
+            reward += 200.0  # Very strong completion incentive
+
         if events["pacman_died"]:
-            reward -= 20.0
+            reward -= 30.0
+
         return reward
 
     def _get_observation(

@@ -128,14 +128,14 @@ class QuitListener:
 def train_player_ppo(
     stage: int = 1,
     num_updates: int = 100,
-    rollout_steps: int = 512,
+    rollout_steps: int = 1024,
     ppo_epochs: int = 4,
     minibatch_size: int = 64,
     learning_rate: float = 3e-4,
     gamma: float = 0.99,
     gae_lambda: float = 0.95,
     clip_eps: float = 0.2,
-    entropy_coef: float = 0.02,
+    entropy_coef: float = 0.05,
     value_coef: float = 0.5,
     max_grad_norm: float = 0.5,
     model_dir: Path = DEFAULT_MODEL_DIR,
@@ -401,7 +401,7 @@ def main() -> None:
         "--num-updates", type=int, default=100, help="Number of PPO update iterations"
     )
     parser.add_argument(
-        "--rollout-steps", type=int, default=512, help="Steps per rollout"
+        "--rollout-steps", type=int, default=1024, help="Steps per rollout"
     )
     parser.add_argument(
         "--save-interval", type=int, default=10, help="Snapshot save interval"

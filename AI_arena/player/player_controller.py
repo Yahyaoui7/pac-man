@@ -20,7 +20,6 @@ from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 from AI_arena.data.formatter import ObservationFormatter
 
 DEFAULT_STAGE1_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage1.pt"
-DEFAULT_PLAYER_MODEL_PATH = Path(__file__).parent.parent / "models" / "player_rl.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
 
@@ -34,8 +33,7 @@ class CNNPlayerController:
         if model_path is None:
             if DEFAULT_STAGE1_PATH.exists():
                 path = DEFAULT_STAGE1_PATH
-            else:
-                path = DEFAULT_PLAYER_MODEL_PATH
+
         else:
             path = Path(model_path)
 
@@ -44,7 +42,9 @@ class CNNPlayerController:
             self.model.load_state_dict(weights)
             print(f"Loaded player RL checkpoint from {path}")
         else:
-            print(f"Warning: Player RL checkpoint {path} not found. Using untrained weights.")
+            print(
+                f"Warning: Player RL checkpoint {path} not found. Using untrained weights."
+            )
 
         self.model.eval()
         self.last_diagnostics: dict[str, Any] = {}
@@ -80,7 +80,8 @@ class CNNPlayerController:
                 d: round(float(probs[i].item()), 4) for i, d in enumerate(DIRECTIONS)
             },
             "logits": {
-                d: round(float(logits[0, i].item()), 4) for i, d in enumerate(DIRECTIONS)
+                d: round(float(logits[0, i].item()), 4)
+                for i, d in enumerate(DIRECTIONS)
             },
             "valid_actions": {
                 d: bool(valid_actions[0, i].item()) for i, d in enumerate(DIRECTIONS)

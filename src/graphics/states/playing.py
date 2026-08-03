@@ -43,6 +43,9 @@ class PlayingState(State):
         self.use_ai_player: bool = getattr(game, "use_ai_player", False)
         self.ai_player_decision: str | None = None
         self.ai_frame_counter: int = 0
+        # Last cell (grid_x, grid_y) at which the AI made a decision.
+        # Model is re-queried only when the player reaches a *new* cell center.
+        self.ai_last_decision_cell: tuple[int, int] | None = None
 
     def enter(self) -> None:
         self.game.level_manager.load_level(
@@ -157,8 +160,18 @@ class PlayingState(State):
 
         if self.use_ai_player and self.player_controller is not None:
             self.ai_frame_counter += 1
-            if self.ai_frame_counter % 4 == 0:
-                self.movement.update_cell_position(em.player)
+            self.movement.update_cell_position(em.player)
+            current_cell = (em.player.grid_x, em.player.grid_y)
+
+            # Only ask the model when the player has arrived at the center
+            # of a cell it hasn't been decided on yet.  This mirrors the
+            # training environment (one decision per cell crossing) and
+            # prevents the LEFT/RIGHT flicker seen when querying every frame.
+            if (
+                self.movement.is_centered(em.player)
+                and current_cell != self.ai_last_decision_cell
+            ):
+                self.ai_last_decision_cell = current_cell
                 action = self.player_controller.get_action(
                     self.maze,
                     em.pellets,
@@ -172,11 +185,13 @@ class PlayingState(State):
                     self.ai_player_decision = action
                     diag = self.player_controller.last_diagnostics
                     probs_str = " | ".join(
-                        f"{d}:{p*100:.0f}%" for d, p in diag.get("probabilities", {}).items()
+                        f"{d}:{p*100:.0f}%"
+                        for d, p in diag.get("probabilities", {}).items()
                     )
                     val = diag.get("estimated_value", 0.0)
                     print(
-                        f"🤖 [PLAYER AI] Frame {self.ai_frame_counter:04d} Node ({em.player.grid_x:02d},{em.player.grid_y:02d}) "
+                        f"🤖 [PLAYER AI] Frame {self.ai_frame_counter:04d} "
+                        f"Node ({em.player.grid_x:02d},{em.player.grid_y:02d}) "
                         f"-> Choice: {action:<5s} | V(s): {val:+.2f} | Probs: [{probs_str}]"
                     )
 
@@ -685,19 +700,32 @@ class PlayingState(State):
             return
 
         decision = self.ai_player_decision or "EVALUATING"
-        diag = getattr(self.player_controller, "last_diagnostics", {}) if self.player_controller else {}
+        diag = (
+            getattr(self.player_controller, "last_diagnostics", {})
+            if self.player_controller
+            else {}
+        )
         val = diag.get("estimated_value", 0.0)
         probs = diag.get("probabilities", {})
 
-        probs_text = " | ".join(
-            f"{d}:{probs.get(d, 0.0)*100:.0f}%" for d in ("UP", "DOWN", "LEFT", "RIGHT")
-        ) if probs else "EVALUATING..."
+        probs_text = (
+            " | ".join(
+                f"{d}:{probs.get(d, 0.0)*100:.0f}%"
+                for d in ("UP", "DOWN", "LEFT", "RIGHT")
+            )
+            if probs
+            else "EVALUATING..."
+        )
 
         line1 = f"🤖 AI PLAYER | MOVE: {decision} | V(s): {val:+.2f}"
         line2 = f"PROBS: {probs_text}"
 
-        font1 = ui.get_scaled_font(line1, max_width=screen.get_width() - 24, base_size=15)
-        font2 = ui.get_scaled_font(line2, max_width=screen.get_width() - 24, base_size=13)
+        font1 = ui.get_scaled_font(
+            line1, max_width=screen.get_width() - 24, base_size=15
+        )
+        font2 = ui.get_scaled_font(
+            line2, max_width=screen.get_width() - 24, base_size=13
+        )
 
         surf1 = font1.render(line1, True, ui.COLOR_NEON_CYAN)
         surf2 = font2.render(line2, True, ui.COLOR_WHITE)
@@ -705,18 +733,28 @@ class PlayingState(State):
         w = max(surf1.get_width(), surf2.get_width()) + 20
         h = surf1.get_height() + surf2.get_height() + 10
         cx = screen.get_width() // 2
-        bottom_y = screen.get_height() - 26 if self.active_cheats else screen.get_height() - 8
+        bottom_y = (
+            screen.get_height() - 26 if self.active_cheats else screen.get_height() - 8
+        )
 
         bubble_rect = pygame.Rect(0, 0, w, h)
         bubble_rect.midbottom = (cx, bottom_y)
 
         bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
         pygame.draw.rect(bubble, (0, 0, 0, 200), bubble.get_rect(), border_radius=8)
-        pygame.draw.rect(bubble, (*ui.COLOR_NEON_CYAN, 220), bubble.get_rect(), width=1, border_radius=8)
+        pygame.draw.rect(
+            bubble,
+            (*ui.COLOR_NEON_CYAN, 220),
+            bubble.get_rect(),
+            width=1,
+            border_radius=8,
+        )
 
         screen.blit(bubble, bubble_rect.topleft)
         screen.blit(surf1, surf1.get_rect(midtop=(cx, bubble_rect.top + 4)))
-        screen.blit(surf2, surf2.get_rect(midtop=(cx, bubble_rect.top + 4 + surf1.get_height())))
+        screen.blit(
+            surf2, surf2.get_rect(midtop=(cx, bubble_rect.top + 4 + surf1.get_height()))
+        )
 
     def give_target(self, ghost: Any) -> None:
         if ghost.name == "Blinky":

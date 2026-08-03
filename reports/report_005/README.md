@@ -1,6 +1,6 @@
-# Training Report 004 — PPO Stage-1
+# Training Report 005 — PPO Stage-1
 
-Generated: 2026-08-03 03:38  
+Generated: 2026-08-03 08:04  
 Log file: `RL_logs.txt`
 
 ---
@@ -9,8 +9,8 @@ Log file: `RL_logs.txt`
 
 | Parameter | Value |
 |-----------|-------|
-| PPO Updates | 1815 → 5000 (637 logged) |
-| Total Episodes | 800 |
+| PPO Updates | 1 → 2155 (432 logged) |
+| Total Episodes | 2823 |
 | Rollout Steps / Update | 512 |
 | PPO Epochs | 4 |
 | Mini-batch Size | 64 |
@@ -53,16 +53,8 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 
 ---
 
-    def _calculate_reward(self, events: dict[str, bool]) -> float:
-        """Calculate reward per cell crossing (not per pixel tick).
-
-        Net values (new cell):
-          Empty new tile:  -0.05 + 1.5         = +1.45  (exploration profitable)
-          Pellet new tile: -0.05 + 1.5 + 5.0   = +6.45  (strongly rewarded)
-          Revisited tile:  -0.05               = -0.05  (very mild cost)
-          Oscillating:     -0.05 - 0.5         = -0.55  (A->B->A discouraged)
-        """
-        reward = -0.1  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
+## Reward System
+        reward = -0.5  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
 
         if events.get("new_tile_visited", False):
             reward += 1.5  # Exploration bonus — net +1.45 for an empty new cell
@@ -85,25 +77,7 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
         if events["pacman_died"]:
             reward -= 30.0
 
-
-## Reward System
-
-| Event | Reward |
-|-------|--------|
-| Every step (base penalty) | **−0.2** |
-| Oscillating move (reversed within 6 steps) | **−0.3** *(active from report_002)* |
-| First visit to a new grid tile | **+0.5** |
-| Pellet eaten | **+5.0** |
-| Super-pellet eaten | **+15.0** |
-| Ghost eaten (in powered mode) | **+30.0** |
-| Level completed | **+100.0** |
-| Pac-Man died | **−20.0** |
-
-**Net examples:**
-- Step forward into a new pellet tile: `−0.2 + 0.5 + 5.0 = +5.3`
-- Step forward into a new empty tile: `−0.2 + 0.5 = +0.3`
-- Step forward into an already-visited tile: `−0.2`
-- Oscillating move (back-track): `−0.2 − 0.3 = −0.5` *(active from report_002)*
+        return reward
 
 ---
 
@@ -111,13 +85,13 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 
 | Metric | Value | At Update |
 |--------|-------|-----------|
-| Best raw avg reward | 400.5 | 3345 |
-| Best smoothed avg reward | 369.1 | 2715 |
-| Best avg pellet % | 46.3% | 3125 |
-| Best max pellet % | 85.3% | 2935 |
-| Final avg reward | 282.3 | 5000 |
-| Final avg pellet % | 29.5% | 5000 |
-| Final max pellet % | 46.5% | 5000 |
+| Best raw avg reward | 152.9 | 740 |
+| Best smoothed avg reward | 123.1 | 435 |
+| Best avg pellet % | 53.9% | 5 |
+| Best max pellet % | 93.7% | 1215 |
+| Final avg reward | 102.8 | 2155 |
+| Final avg pellet % | 41.7% | 2155 |
+| Final max pellet % | 77.4% | 2155 |
 
 ---
 
@@ -137,6 +111,6 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 ## Notes / Observations
 
 <!-- Add manual notes about this run here -->
-- Training data covers updates 1815–5000 (800 episodes).
+- Training data covers updates 1–2155 (2823 episodes).
 - Log window size: last 20 completed episodes per update.
 - Oscillation penalty introduced in this run to combat node-to-node back-and-forth behavior.

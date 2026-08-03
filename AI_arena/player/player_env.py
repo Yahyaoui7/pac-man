@@ -400,12 +400,12 @@ class PacmanPlayerEnv:
         """Calculate reward per cell crossing (not per pixel tick).
 
         Net values (new cell):
-          Empty new tile:  -0.05 + 1.5         = +1.45  (exploration profitable)
-          Pellet new tile: -0.05 + 1.5 + 5.0   = +6.45  (strongly rewarded)
-          Revisited tile:  -0.05               = -0.05  (very mild cost)
-          Oscillating:     -0.05 - 0.5         = -0.55  (A->B->A discouraged)
+          Empty new tile:  -0.5 + 1.5         = +1.0   (exploration profitable)
+          Pellet new tile: -0.5 + 1.5 + 5.0   = +6.0   (strongly rewarded)
+          Revisited tile:  -0.5               = -0.5   (strong push to explore new tiles)
+          Oscillating:     -0.5 - 0.5         = -1.0   (A->B->A firmly discouraged)
         """
-        reward = -0.05  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
+        reward = -0.5  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
 
         if events.get("new_tile_visited", False):
             reward += 1.5  # Exploration bonus — net +1.45 for an empty new cell

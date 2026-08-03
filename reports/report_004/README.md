@@ -1,6 +1,6 @@
 # Training Report 004 — PPO Stage-1
 
-Generated: 2026-08-03 03:38  
+Generated: 2026-08-03 05:13  
 Log file: `RL_logs.txt`
 
 ---
@@ -9,8 +9,8 @@ Log file: `RL_logs.txt`
 
 | Parameter | Value |
 |-----------|-------|
-| PPO Updates | 1815 → 5000 (637 logged) |
-| Total Episodes | 800 |
+| PPO Updates | 1 → 500 (101 logged) |
+| Total Episodes | 655 |
 | Rollout Steps / Update | 512 |
 | PPO Epochs | 4 |
 | Mini-batch Size | 64 |
@@ -53,39 +53,6 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 
 ---
 
-    def _calculate_reward(self, events: dict[str, bool]) -> float:
-        """Calculate reward per cell crossing (not per pixel tick).
-
-        Net values (new cell):
-          Empty new tile:  -0.05 + 1.5         = +1.45  (exploration profitable)
-          Pellet new tile: -0.05 + 1.5 + 5.0   = +6.45  (strongly rewarded)
-          Revisited tile:  -0.05               = -0.05  (very mild cost)
-          Oscillating:     -0.05 - 0.5         = -0.55  (A->B->A discouraged)
-        """
-        reward = -0.1  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
-
-        if events.get("new_tile_visited", False):
-            reward += 1.5  # Exploration bonus — net +1.45 for an empty new cell
-
-        if events.get("oscillating", False):
-            reward -= 0.5  # Discourage A→B→A oscillation without hard blocking
-
-        if events["pellet_eaten"]:
-            reward += 5.0  # Net +6.45 on a new pellet tile
-
-        if events["super_pellet_eaten"]:
-            reward += 10.0
-
-        if events["ghost_eaten"]:
-            reward += 30.0
-
-        if events["level_completed"]:
-            reward += 200.0  # Very strong completion incentive
-
-        if events["pacman_died"]:
-            reward -= 30.0
-
-
 ## Reward System
 
 | Event | Reward |
@@ -111,13 +78,13 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 
 | Metric | Value | At Update |
 |--------|-------|-----------|
-| Best raw avg reward | 400.5 | 3345 |
-| Best smoothed avg reward | 369.1 | 2715 |
-| Best avg pellet % | 46.3% | 3125 |
-| Best max pellet % | 85.3% | 2935 |
-| Final avg reward | 282.3 | 5000 |
-| Final avg pellet % | 29.5% | 5000 |
-| Final max pellet % | 46.5% | 5000 |
+| Best raw avg reward | 174.5 | 105 |
+| Best smoothed avg reward | 148.6 | 135 |
+| Best avg pellet % | 68.2% | 1 |
+| Best max pellet % | 89.9% | 375 |
+| Final avg reward | 81.1 | 500 |
+| Final avg pellet % | 40.5% | 500 |
+| Final max pellet % | 83.2% | 500 |
 
 ---
 
@@ -137,6 +104,6 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 ## Notes / Observations
 
 <!-- Add manual notes about this run here -->
-- Training data covers updates 1815–5000 (800 episodes).
+- Training data covers updates 1–500 (655 episodes).
 - Log window size: last 20 completed episodes per update.
 - Oscillation penalty introduced in this run to combat node-to-node back-and-forth behavior.

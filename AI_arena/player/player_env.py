@@ -116,7 +116,7 @@ class PacmanPlayerEnv:
         maze_h = self.rng.randint(MAZE_HEIGHT_MIN, MAZE_HEIGHT_MAX)
 
         # Episode seed: deterministic when outer seed is set, random otherwise.
-        current_seed = self.rng.randint(0, 1_000_000)
+        current_seed = random.randint(1, 44444)
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
@@ -391,7 +391,8 @@ class PacmanPlayerEnv:
                     ghost.in_prison = True
                     ghost.reset()
                 else:
-                    events["pacman_died"] = True
+                    # TODO: make true latter
+                    events["pacman_died"] = False
                     break
 
         return events
@@ -423,9 +424,11 @@ class PacmanPlayerEnv:
             reward += 30.0
 
         if events["level_completed"]:
+            print("level completed")
             reward += 200.0  # Very strong completion incentive
 
         if events["pacman_died"]:
+            print("pacman died here -30")
             reward -= 30.0
 
         return reward

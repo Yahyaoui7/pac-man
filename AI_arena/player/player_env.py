@@ -41,10 +41,13 @@ GHOST_SPECS = [
 # observation grid never overflows.  Lower bound is the minimum playable size.
 # CNN_WIDTH  = 25  (columns / x-axis)
 # CNN_HEIGHT = 50  (rows / y-axis, but LevelManager caps height at 23 anyway)
-MAZE_WIDTH_MIN = 10
-MAZE_WIDTH_MAX = CNN_WIDTH  # 25 — do not exceed CNN_WIDTH or formatter will fail
-MAZE_HEIGHT_MIN = 10
-MAZE_HEIGHT_MAX = min(CNN_HEIGHT, 23)  # 23 — game engine hard cap
+MAZE_WIDTH_MIN = 8
+# MAZE_WIDTH_MAX = CNN_WIDTH  # 25 — do not exceed CNN_WIDTH or formatter will fail
+MAZE_WIDTH_MAX = 14
+
+MAZE_HEIGHT_MIN = 8
+MAZE_HEIGHT_MAX = 14
+# MAZE_HEIGHT_MAX = min(CNN_HEIGHT, 23)  # 23 — game engine hard cap
 
 # Physics safety cap: max ticks to advance before giving up on centering
 MAX_PHYSICS_TICKS = 300
@@ -114,9 +117,9 @@ class PacmanPlayerEnv:
         # Sample a fresh random maze size for this episode.
         maze_w = self.rng.randint(MAZE_WIDTH_MIN, MAZE_WIDTH_MAX)
         maze_h = self.rng.randint(MAZE_HEIGHT_MIN, MAZE_HEIGHT_MAX)
-
         # Episode seed: deterministic when outer seed is set, random otherwise.
         current_seed = random.randint(1, 44444)
+        print((maze_w, maze_h, current_seed))
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze

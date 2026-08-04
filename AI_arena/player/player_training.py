@@ -342,17 +342,14 @@ def train_player_ppo(
                 avg_pellets = sum(ep["pellets"] for ep in recent_episodes) / len(
                     recent_episodes
                 )
-                max_pellets = int(max(ep["pellets"] for ep in recent_episodes))
+
                 avg_pct = sum(ep["pct"] for ep in recent_episodes) / len(
                     recent_episodes
                 )
-                max_pct = max(ep["pct"] for ep in recent_episodes)
             else:
                 avg_reward = current_ep_reward
                 avg_pellets = float(info.get("pellets_eaten", 0))
-                max_pellets = int(info.get("pellets_eaten", 0))
                 avg_pct = float(info.get("completion_pct", 0.0))
-                max_pct = float(info.get("completion_pct", 0.0))
 
             avg_policy_loss = total_policy_loss / (ppo_epochs * dataset_size)
             avg_value_loss = total_value_loss / (ppo_epochs * dataset_size)
@@ -365,26 +362,23 @@ def train_player_ppo(
                 torch.save(policy.state_dict(), best_checkpoint_path)
             if save_window_episodes:
                 window_max_pct = max(ep["pct"] for ep in save_window_episodes)
-                window_completions = sum(
-                    1 for ep in save_window_episodes if ep["pct"] >= 100.0
-                )
+                max_pellets = int(max(ep["pellets"] for ep in save_window_episodes))
                 # window_episode_count = len(save_window_episodes)
             else:
                 window_max_pct = 0.0
-                window_completions = 0
+                max_pellets = 0
                 # window_episode_count = 0
 
             if update % 1 == 0 or update == 1 or update == num_updates:
-                best_marker = " ★ BEST" if is_best else ""
+
                 print(
                     f"Upd {update:03d}/{num_updates:03d} | "
                     f"Tot Ep: {total_completed_episodes:03d} | "
                     f"Avg Rwd: {avg_reward:6.1f} | "
                     f"Avg Pellets: {avg_pellets:5.1f} ({avg_pct:4.1f}%) | "
-                    f"Max Pellets: {window_completions:3d} ({window_max_pct:4.1f}%) | "
+                    f"Max Pellets: {max_pellets:3d} ({window_max_pct:4.1f}%) | "
                     f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
                     f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
-                    f"{best_marker}"
                 )
 
             if update % save_interval == 0 or update == num_updates:

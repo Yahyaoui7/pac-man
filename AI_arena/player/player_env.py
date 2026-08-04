@@ -109,6 +109,14 @@ class PacmanPlayerEnv:
         self.last_cell: tuple[int, int] | None = None
         self.prev_prev_cell: tuple[int, int] | None = None
 
+        self.use_bfs_shaping = True
+        self.bfs_shaping_coef = 0.3  # start small; this only nudges navigation,
+        # it shouldn't compete with the +5/+10 eat rewards
+        self.bfs_shaping_gamma = 0.99  # match your PPO gamma
+
+        self._pellet_dist_grid: list[list[int]] | None = None
+        self._cached_potential: float = 0.0
+
     def reset(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Reset episode state and return (grid, features, valid_actions).
 
@@ -143,6 +151,11 @@ class PacmanPlayerEnv:
 
         # Create Pellets
         self._create_pellets()
+        if self.use_bfs_shaping:
+            self._pellet_dist_grid = self._compute_pellet_distance_grid()
+            self._cached_potential = self._potential_at(
+                self.player.grid_y, self.player.grid_x
+            )
 
         if self.player is not None:
             start_cell = (self.player.grid_y, self.player.grid_x)
@@ -150,6 +163,49 @@ class PacmanPlayerEnv:
             self.last_cell = start_cell
 
         return self._get_observation()
+
+    def _compute_pellet_distance_grid(self) -> list[list[int]]:
+        """Multi-source BFS from every remaining pellet cell at once — gives
+        distance-to-nearest-pellet for every walkable cell in a single O(H*W)
+        pass. Independent of player position, so it only needs recomputing
+        when the pellet set actually changes (i.e. a pellet was just eaten).
+        """
+        from collections import deque
+
+        h, w = len(self.maze), len(self.maze[0])
+        dist = [[-1] * w for _ in range(h)]
+        q: deque[tuple[int, int]] = deque()
+        for y in range(h):
+            for x in range(w):
+                if self.pellets[y][x] in (1, 2):
+                    dist[y][x] = 0
+                    q.append((y, x))
+        while q:
+            y, x = q.popleft()
+            d = dist[y][x]
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = y + dy, x + dx
+                if (
+                    0 <= ny < h
+                    and 0 <= nx < w
+                    and dist[ny][nx] == -1
+                    and self.maze[ny][nx] != 15  # not a wall
+                ):
+                    dist[ny][nx] = d + 1
+                    q.append((ny, nx))
+        return dist
+
+    def _potential_at(self, y: int, x: int) -> float:
+        """Phi(s) = -distance to nearest remaining pellet. 0 pellets left
+        (episode about to end) or an unreachable pocket both map to a finite
+        value rather than blowing up."""
+        if self.remaining_pellets <= 0 or self._pellet_dist_grid is None:
+            return 0.0
+        d = self._pellet_dist_grid[y][x]
+        if d < 0:  # unreachable from here — shouldn't happen on a connected
+            sentinel = len(self.maze) + len(self.maze[0])  # maze, but be safe
+            return -float(sentinel)
+        return -float(d)
 
     def step(
         self,
@@ -190,13 +246,8 @@ class PacmanPlayerEnv:
             "oscillating": False,
         }
 
-        # ------------------------------------------------------------------ #
-        # Advance physics until player reaches the center of the next cell.   #
-        # We record the starting cell and stop as soon as the player both      #
-        # (a) occupies a NEW grid cell AND (b) is centered in it.             #
-        # A safety cap prevents infinite loops on wall collisions.             #
-        # ------------------------------------------------------------------ #
         start_cell = (self.player.grid_y, self.player.grid_x)
+        potential_before = self._cached_potential if self.use_bfs_shaping else 0.0
         cell_changed = False
 
         for _ in range(MAX_PHYSICS_TICKS):
@@ -237,7 +288,16 @@ class PacmanPlayerEnv:
             self.prev_prev_cell = self.last_cell
             self.last_cell = current_pos
 
-        reward = self._calculate_reward(events)
+        bfs_shaping = 0.0
+        if self.use_bfs_shaping:
+            if events["pellet_eaten"] or events["super_pellet_eaten"]:
+                self._pellet_dist_grid = self._compute_pellet_distance_grid()
+            potential_after = self._potential_at(*current_pos)
+            bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
+            self._cached_potential = potential_after
+
+        reward = self._calculate_reward(events, bfs_shaping)
+
         self.step_count += 1  # counts cell crossings, not pixel ticks
 
         terminated = bool(events["pacman_died"] or events["level_completed"])
@@ -420,42 +480,25 @@ class PacmanPlayerEnv:
 
         return events
 
-    def _calculate_reward(self, events: dict[str, bool]) -> float:
-        """Calculate reward per cell crossing (not per pixel tick).
-
-        Net values (new cell):
-          Empty new tile:  -0.5 + 1.5         = +1.0   (exploration profitable)
-          Pellet new tile: -0.5 + 1.5 + 5.0   = +6.0   (strongly rewarded)
-          Revisited tile:  -0.5               = -0.5   (strong push to explore new tiles)
-          Oscillating:     -0.5 - 0.5         = -1.0   (A->B->A firmly discouraged)
-        """
-        reward = -0.1  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
-
-        if events.get("new_tile_visited", False):
-            reward += 1.5  # Exploration bonus — net +1.45 for an empty new cell
-
+    def _calculate_reward(
+        self, events: dict[str, bool], bfs_shaping: float = 0.0
+    ) -> float:
+        reward = -0.01
         if events.get("oscillating", False):
-            reward -= 2  # Discourage A→B→A oscillation without hard blocking
-
+            reward -= 3
         if events["pellet_eaten"]:
-            reward += 5.0  # Net +6.45 on a new pellet tile
-
+            reward += 5.0
         if events["super_pellet_eaten"]:
             reward += 10.0
-
         if events["ghost_eaten"]:
             reward += 30.0
-
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            time_bonus = float(remaining_steps)
-            reward += 200.0 + time_bonus
-            print(f"level completion and remaining steps bonus = {reward}")
-
+            reward += 200.0 + float(remaining_steps)
         if events["pacman_died"]:
-            print("pacman died here -30")
             reward -= 30.0
 
+        reward += self.bfs_shaping_coef * bfs_shaping
         return reward
 
     def _get_observation(

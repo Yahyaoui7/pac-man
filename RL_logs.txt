@@ -1,112 +1,51 @@
-pygame 2.6.1 (SDL 2.28.4, Python 3.10.12)
-Hello from the pygame community. https://www.pygame.org/contribute.html
-/usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'AI_arena.player.player_training' found in sys.modules after import of package 'AI_arena.player', but prior to execution of 'AI_arena.player.player_training'; this may result in unpredictable behaviour
-  warn(RuntimeWarning(msg))
-============================================================
-Starting Stage 1 PPO Training for Pac-Man
-Device: cpu | Total Updates: 4000 | Rollout Steps: 512
-============================================================
-SUCCESS: Resumed training from checkpoint: player_rl_stage1.pt
-Press 'q' at any time to stop training gracefully and save a checkpoint.
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 001/4000 | Tot Ep: 001 | Avg Rwd:   19.0 | Avg Pellets:  40.0 (81.6%) | Max Pellets:  40 (81.6%) | Loss (P/V): -0.0001/1.7553 | Time:   1.3s (1.26s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 002/4000 | Tot Ep: 003 | Avg Rwd:  -12.7 | Avg Pellets:  35.3 (68.5%) | Max Pellets:  46 (66.7%) | Loss (P/V): 0.0000/1.6330 | Time:   2.6s (1.24s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 003/4000 | Tot Ep: 005 | Avg Rwd:   -1.5 | Avg Pellets:  40.4 (65.5%) | Max Pellets:  76 (76.8%) | Loss (P/V): -0.0001/3.3613 | Time:   3.8s (1.17s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 004/4000 | Tot Ep: 008 | Avg Rwd:   18.1 | Avg Pellets:  36.9 (74.5%) | Max Pellets:  41 (93.2%) | Loss (P/V): -0.0000/1.7644 | Time:   4.9s (1.15s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 005/4000 | Tot Ep: 009 | Avg Rwd:    0.6 | Avg Pellets:  35.7 (71.1%) | Max Pellets:  26 (44.1%) | Loss (P/V): 0.0001/1.5007 | Time:   6.1s (1.18s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 006/4000 | Tot Ep: 011 | Avg Rwd:  -17.9 | Avg Pellets:  35.9 (67.7%) | Max Pellets:  52 (58.4%) | Loss (P/V): 0.0001/1.9959 | Time:   7.3s (1.18s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 007/4000 | Tot Ep: 012 | Avg Rwd:  -17.1 | Avg Pellets:  34.7 (67.2%) | Max Pellets:  21 (61.8%) | Loss (P/V): 0.0001/1.4456 | Time:   8.5s (1.20s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 008/4000 | Tot Ep: 015 | Avg Rwd:  -22.6 | Avg Pellets:  34.0 (67.1%) | Max Pellets:  39 (94.1%) | Loss (P/V): -0.0000/1.8416 | Time:  10.1s (1.68s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 009/4000 | Tot Ep: 017 | Avg Rwd:  -27.6 | Avg Pellets:  33.8 (67.0%) | Max Pellets:  35 (76.9%) | Loss (P/V): -0.0000/2.1087 | Time:  11.8s (1.67s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 010/4000 | Tot Ep: 019 | Avg Rwd:  -27.9 | Avg Pellets:  34.1 (68.1%) | Max Pellets:  41 (83.7%) | Loss (P/V): -0.0000/2.3636 | Time:  13.4s (1.54s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 011/4000 | Tot Ep: 020 | Avg Rwd:  -27.6 | Avg Pellets:  33.9 (68.1%) | Max Pellets:  30 (68.2%) | Loss (P/V): -0.0000/3.1126 | Time:  14.9s (1.58s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 012/4000 | Tot Ep: 022 | Avg Rwd:  -31.6 | Avg Pellets:  35.0 (68.0%) | Max Pellets:  58 (67.9%) | Loss (P/V): 0.0001/2.7704 | Time:  16.6s (1.62s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 013/4000 | Tot Ep: 025 | Avg Rwd:  -24.7 | Avg Pellets:  34.8 (69.4%) | Max Pellets:  44 (89.8%) | Loss (P/V): 0.0001/2.5711 | Time:  18.2s (1.64s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 014/4000 | Tot Ep: 027 | Avg Rwd:  -30.3 | Avg Pellets:  34.7 (68.3%) | Max Pellets:  46 (58.2%) | Loss (P/V): 0.0000/1.9425 | Time:  19.8s (1.62s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 015/4000 | Tot Ep: 028 | Avg Rwd:  -26.9 | Avg Pellets:  35.5 (69.3%) | Max Pellets:  56 (94.9%) | Loss (P/V): 0.0002/2.5437 | Time:  21.3s (1.48s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 016/4000 | Tot Ep: 030 | Avg Rwd:  -26.7 | Avg Pellets:  36.3 (69.5%) | Max Pellets:  56 (88.6%) | Loss (P/V): 0.0000/1.6349 | Time:  22.8s (1.52s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 017/4000 | Tot Ep: 032 | Avg Rwd:  -27.9 | Avg Pellets:  35.9 (68.9%) | Max Pellets:  35 (66.0%) | Loss (P/V): -0.0000/1.4190 | Time:  24.3s (1.46s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 018/4000 | Tot Ep: 033 | Avg Rwd:  -32.8 | Avg Pellets:  35.5 (67.8%) | Max Pellets:  23 (33.3%) | Loss (P/V): 0.0002/1.3202 | Time:  25.7s (1.46s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 019/4000 | Tot Ep: 035 | Avg Rwd:  -32.8 | Avg Pellets:  34.9 (67.5%) | Max Pellets:  25 (82.8%) | Loss (P/V): -0.0001/1.7891 | Time:  27.2s (1.47s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 020/4000 | Tot Ep: 037 | Avg Rwd:  -30.9 | Avg Pellets:  34.7 (67.7%) | Max Pellets:  46 (83.6%) | Loss (P/V): 0.0001/1.4342 | Time:  28.7s (1.53s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 021/4000 | Tot Ep: 039 | Avg Rwd:  -30.9 | Avg Pellets:  35.5 (67.7%) | Max Pellets:  68 (86.1%) | Loss (P/V): 0.0000/3.4412 | Time:  30.2s (1.51s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 022/4000 | Tot Ep: 040 | Avg Rwd:  -29.4 | Avg Pellets:  36.1 (67.9%) | Max Pellets:  60 (75.9%) | Loss (P/V): -0.0000/3.6450 | Time:  31.8s (1.61s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 023/4000 | Tot Ep: 042 | Avg Rwd:  -33.3 | Avg Pellets:  36.4 (68.1%) | Max Pellets:  46 (90.2%) | Loss (P/V): 0.0002/5.6283 | Time:  33.8s (1.98s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 024/4000 | Tot Ep: 043 | Avg Rwd:  -33.7 | Avg Pellets:  36.8 (68.2%) | Max Pellets:  52 (75.4%) | Loss (P/V): -0.0001/2.6098 | Time:  36.0s (2.14s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 025/4000 | Tot Ep: 045 | Avg Rwd:  -35.9 | Avg Pellets:  36.5 (67.7%) | Max Pellets:  34 (63.4%) | Loss (P/V): 0.0000/2.5595 | Time:  37.5s (1.58s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 026/4000 | Tot Ep: 047 | Avg Rwd:  -34.2 | Avg Pellets:  36.3 (67.9%) | Max Pellets:  47 (79.2%) | Loss (P/V): 0.0000/2.0139 | Time:  39.5s (1.91s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 027/4000 | Tot Ep: 049 | Avg Rwd:  -31.5 | Avg Pellets:  36.7 (68.8%) | Max Pellets:  53 (90.9%) | Loss (P/V): 0.0000/1.5180 | Time:  41.5s (2.05s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 028/4000 | Tot Ep: 051 | Avg Rwd:  -32.2 | Avg Pellets:  36.8 (68.4%) | Max Pellets:  41 (66.1%) | Loss (P/V): 0.0001/1.7120 | Time:  43.2s (1.66s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 029/4000 | Tot Ep: 052 | Avg Rwd:  -31.8 | Avg Pellets:  36.8 (68.5%) | Max Pellets:  35 (71.4%) | Loss (P/V): 0.0001/1.7471 | Time:  45.1s (1.94s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 030/4000 | Tot Ep: 053 | Avg Rwd:  -32.3 | Avg Pellets:  37.1 (68.3%) | Max Pellets:  53 (59.6%) | Loss (P/V): -0.0002/2.4605 | Time:  46.7s (1.58s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 031/4000 | Tot Ep: 056 | Avg Rwd:  -34.6 | Avg Pellets:  36.8 (67.8%) | Max Pellets:  37 (71.8%) | Loss (P/V): 0.0000/2.1681 | Time:  48.2s (1.47s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 032/4000 | Tot Ep: 057 | Avg Rwd:  -33.8 | Avg Pellets:  36.9 (68.0%) | Max Pellets:  41 (77.4%) | Loss (P/V): 0.0002/1.9620 | Time:  50.2s (2.01s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 033/4000 | Tot Ep: 059 | Avg Rwd:  -36.2 | Avg Pellets:  36.9 (67.7%) | Max Pellets:  44 (69.4%) | Loss (P/V): 0.0002/1.1509 | Time:  52.2s (2.06s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 034/4000 | Tot Ep: 061 | Avg Rwd:  -35.8 | Avg Pellets:  36.7 (67.7%) | Max Pellets:  38 (71.7%) | Loss (P/V): -0.0001/2.2129 | Time:  54.1s (1.89s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-Upd 035/4000 | Tot Ep: 063 | Avg Rwd:  -33.9 | Avg Pellets:  36.6 (68.1%) | Max Pellets:  34 (87.2%) | Loss (P/V): 0.0000/1.8800 | Time:  56.1s (2.01s/upd)
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
-MazeGenerator Warning: maze is too small to add '42' in it
+Upd 001/4000 | Tot Ep: 003 | Averge Epoch Rwd: -112.8 | Max Epoch Pellets:  63 (91.3%) | Avg Pellets:  41.3 (80.4%) | Avg Rwd: -112.8 | Loss (P/V): 0.0001/2.2592 | Time:   3.3s (3.26s/upd)
+Upd 002/4000 | Tot Ep: 008 | Averge Epoch Rwd: -142.7 | Max Epoch Pellets:  74 (97.7%) | Avg Pellets:  38.5 (76.7%) | Avg Rwd: -131.5 | Loss (P/V): -0.0000/2.1286 | Time:   7.1s (3.79s/upd)
+Upd 003/4000 | Tot Ep: 011 | Averge Epoch Rwd: -264.3 | Max Epoch Pellets:  47 (79.7%) | Avg Pellets:  38.1 (72.3%) | Avg Rwd: -167.7 | Loss (P/V): 0.0001/2.4977 | Time:  10.6s (3.51s/upd)
+Upd 004/4000 | Tot Ep: 015 | Averge Epoch Rwd: -192.1 | Max Epoch Pellets:  30 (88.2%) | Avg Pellets:  34.9 (70.4%) | Avg Rwd: -174.2 | Loss (P/V): -0.0001/1.8444 | Time:  13.8s (3.16s/upd)
+Upd 005/4000 | Tot Ep: 019 | Averge Epoch Rwd: -136.2 | Max Epoch Pellets:  52 (84.6%) | Avg Pellets:  34.5 (69.8%) | Avg Rwd: -166.2 | Loss (P/V): -0.0000/1.8832 | Time:  17.0s (3.26s/upd)
+Upd 006/4000 | Tot Ep: 022 | Averge Epoch Rwd: -269.7 | Max Epoch Pellets:  45 (73.6%) | Avg Pellets:  34.6 (68.2%) | Avg Rwd: -180.4 | Loss (P/V): -0.0000/2.2728 | Time:  21.0s (4.01s/upd)
+Upd 007/4000 | Tot Ep: 027 | Averge Epoch Rwd: -142.2 | Max Epoch Pellets:  51 (75.6%) | Avg Pellets:  34.0 (67.4%) | Avg Rwd: -173.3 | Loss (P/V): 0.0001/2.2974 | Time:  24.6s (3.57s/upd)
+Upd 008/4000 | Tot Ep: 030 | Averge Epoch Rwd: -252.4 | Max Epoch Pellets:  53 (89.8%) | Avg Pellets:  34.7 (67.2%) | Avg Rwd: -181.2 | Loss (P/V): 0.0001/2.7596 | Time:  28.1s (3.53s/upd)
+Upd 009/4000 | Tot Ep: 033 | Averge Epoch Rwd: -119.6 | Max Epoch Pellets:  45 (76.6%) | Avg Pellets:  35.2 (67.6%) | Avg Rwd: -175.6 | Loss (P/V): 0.0000/2.0426 | Time:  31.2s (3.05s/upd)
+Upd 010/4000 | Tot Ep: 037 | Averge Epoch Rwd: -146.4 | Max Epoch Pellets:  34 (86.2%) | Avg Pellets:  34.2 (66.9%) | Avg Rwd: -172.4 | Loss (P/V): 0.0001/2.8611 | Time:  35.3s (4.11s/upd)
+Upd 011/4000 | Tot Ep: 040 | Averge Epoch Rwd: -258.0 | Max Epoch Pellets:  59 (74.7%) | Avg Pellets:  35.5 (67.0%) | Avg Rwd: -178.8 | Loss (P/V): 0.0001/2.9116 | Time:  39.8s (4.51s/upd)
+Upd 012/4000 | Tot Ep: 043 | Averge Epoch Rwd: -221.8 | Max Epoch Pellets:  61 (80.5%) | Avg Pellets:  35.8 (66.7%) | Avg Rwd: -181.8 | Loss (P/V): 0.0000/2.5609 | Time:  44.3s (4.46s/upd)
+Upd 013/4000 | Tot Ep: 047 | Averge Epoch Rwd: -224.8 | Max Epoch Pellets:  31 (79.2%) | Avg Pellets:  35.0 (65.7%) | Avg Rwd: -185.5 | Loss (P/V): 0.0001/3.0194 | Time:  48.2s (3.89s/upd)
+Upd 014/4000 | Tot Ep: 051 | Averge Epoch Rwd: -166.5 | Max Epoch Pellets:  57 (91.9%) | Avg Pellets:  35.6 (66.4%) | Avg Rwd: -184.0 | Loss (P/V): -0.0000/2.4876 | Time:  52.5s (4.36s/upd)
+Upd 015/4000 | Tot Ep: 053 | Averge Epoch Rwd: -167.5 | Max Epoch Pellets:  64 (79.6%) | Avg Pellets:  36.2 (66.8%) | Avg Rwd: -183.4 | Loss (P/V): -0.0000/1.6872 | Time:  57.5s (5.01s/upd)
+Upd 016/4000 | Tot Ep: 057 | Averge Epoch Rwd: -185.8 | Max Epoch Pellets:  45 (84.9%) | Avg Pellets:  36.2 (66.8%) | Avg Rwd: -183.6 | Loss (P/V): 0.0001/2.2068 | Time:  61.8s (4.30s/upd)
+Upd 017/4000 | Tot Ep: 061 | Averge Epoch Rwd: -200.4 | Max Epoch Pellets:  44 (77.4%) | Avg Pellets:  35.9 (66.3%) | Avg Rwd: -184.7 | Loss (P/V): 0.0000/2.3694 | Time:  66.4s (4.58s/upd)
+Upd 018/4000 | Tot Ep: 066 | Averge Epoch Rwd: -137.2 | Max Epoch Pellets:  40 (90.9%) | Avg Pellets:  35.1 (66.6%) | Avg Rwd: -181.1 | Loss (P/V): 0.0001/2.2823 | Time:  70.6s (4.15s/upd)
+Upd 019/4000 | Tot Ep: 070 | Averge Epoch Rwd: -162.5 | Max Epoch Pellets:  63 (88.1%) | Avg Pellets:  35.5 (66.8%) | Avg Rwd: -180.0 | Loss (P/V): 0.0000/2.2673 | Time:  75.1s (4.52s/upd)
+Upd 020/4000 | Tot Ep: 072 | Averge Epoch Rwd: -151.8 | Max Epoch Pellets:  42 (79.2%) | Avg Pellets:  35.6 (66.7%) | Avg Rwd: -179.2 | Loss (P/V): 0.0001/1.7403 | Time:  79.0s (3.89s/upd)
+Upd 021/4000 | Tot Ep: 076 | Averge Epoch Rwd: -177.0 | Max Epoch Pellets:  66 (85.3%) | Avg Pellets:  35.8 (66.9%) | Avg Rwd: -179.1 | Loss (P/V): 0.0002/2.4348 | Time:  83.2s (4.19s/upd)
+Upd 022/4000 | Tot Ep: 081 | Averge Epoch Rwd: -208.3 | Max Epoch Pellets:  32 (96.6%) | Avg Pellets:  35.2 (66.5%) | Avg Rwd: -180.9 | Loss (P/V): 0.0002/2.7055 | Time:  87.5s (4.36s/upd)
+Upd 023/4000 | Tot Ep: 084 | Averge Epoch Rwd: -205.1 | Max Epoch Pellets:  52 (84.9%) | Avg Pellets:  35.4 (66.4%) | Avg Rwd: -181.8 | Loss (P/V): 0.0001/2.2401 | Time:  92.6s (5.06s/upd)
+Upd 024/4000 | Tot Ep: 088 | Averge Epoch Rwd: -192.5 | Max Epoch Pellets:  51 (87.5%) | Avg Pellets:  35.3 (66.4%) | Avg Rwd: -182.3 | Loss (P/V): 0.0000/2.0909 | Time:  96.7s (4.14s/upd)
+Upd 025/4000 | Tot Ep: 091 | Averge Epoch Rwd: -183.9 | Max Epoch Pellets:  64 (91.7%) | Avg Pellets:  35.5 (66.6%) | Avg Rwd: -182.3 | Loss (P/V): 0.0000/1.7808 | Time: 101.5s (4.82s/upd)
+Upd 026/4000 | Tot Ep: 095 | Averge Epoch Rwd: -190.9 | Max Epoch Pellets:  53 (83.0%) | Avg Pellets:  35.5 (66.5%) | Avg Rwd: -182.7 | Loss (P/V): 0.0001/2.5792 | Time: 105.8s (4.28s/upd)
+Upd 027/4000 | Tot Ep: 099 | Averge Epoch Rwd: -173.0 | Max Epoch Pellets:  40 (81.6%) | Avg Pellets:  35.2 (66.4%) | Avg Rwd: -182.3 | Loss (P/V): 0.0001/2.7686 | Time: 110.0s (4.20s/upd)
+Upd 028/4000 | Tot Ep: 104 | Averge Epoch Rwd: -119.2 | Max Epoch Pellets:  40 (87.2%) | Avg Pellets:  34.5 (66.4%) | Avg Rwd: -179.7 | Loss (P/V): 0.0001/2.7565 | Time: 114.2s (4.21s/upd)
+Upd 029/4000 | Tot Ep: 106 | Averge Epoch Rwd: -441.2 | Max Epoch Pellets:  54 (54.5%) | Avg Pellets:  35.1 (66.1%) | Avg Rwd: -186.2 | Loss (P/V): -0.0001/1.9333 | Time: 118.3s (4.02s/upd)
+Upd 030/4000 | Tot Ep: 109 | Averge Epoch Rwd: -173.0 | Max Epoch Pellets:  67 (75.3%) | Avg Pellets:  34.9 (65.3%) | Avg Rwd: -188.8 | Loss (P/V): 0.0000/2.1892 | Time: 121.4s (3.13s/upd)
+Upd 031/4000 | Tot Ep: 113 | Averge Epoch Rwd: -234.3 | Max Epoch Pellets:  45 (70.5%) | Avg Pellets:  35.2 (65.6%) | Avg Rwd: -186.0 | Loss (P/V): -0.0001/2.8802 | Time: 125.6s (4.16s/upd)
+Upd 032/4000 | Tot Ep: 118 | Averge Epoch Rwd: -122.1 | Max Epoch Pellets:  35 (76.9%) | Avg Pellets:  35.1 (65.5%) | Avg Rwd: -185.7 | Loss (P/V): 0.0000/2.8418 | Time: 129.8s (4.23s/upd)
+Upd 033/4000 | Tot Ep: 121 | Averge Epoch Rwd: -304.4 | Max Epoch Pellets:  33 (70.7%) | Avg Pellets:  35.0 (65.4%) | Avg Rwd: -187.2 | Loss (P/V): 0.0001/2.5987 | Time: 133.4s (3.58s/upd)
+Upd 034/4000 | Tot Ep: 123 | Averge Epoch Rwd: -163.0 | Max Epoch Pellets:  46 (74.5%) | Avg Pellets:  35.2 (65.4%) | Avg Rwd: -187.2 | Loss (P/V): 0.0000/1.7797 | Time: 137.3s (3.97s/upd)
+Upd 035/4000 | Tot Ep: 127 | Averge Epoch Rwd: -232.5 | Max Epoch Pellets:  48 (87.2%) | Avg Pellets:  35.4 (65.5%) | Avg Rwd: -190.8 | Loss (P/V): -0.0001/3.1854 | Time: 142.0s (4.69s/upd)
+Upd 036/4000 | Tot Ep: 131 | Averge Epoch Rwd: -140.4 | Max Epoch Pellets:  38 (71.7%) | Avg Pellets:  34.7 (65.1%) | Avg Rwd: -187.7 | Loss (P/V): 0.0001/2.2100 | Time: 145.7s (3.68s/upd)
+Upd 037/4000 | Tot Ep: 134 | Averge Epoch Rwd: -289.5 | Max Epoch Pellets:  62 (69.7%) | Avg Pellets:  35.0 (64.9%) | Avg Rwd: -191.9 | Loss (P/V): 0.0000/1.7703 | Time: 149.2s (3.51s/upd)
+Upd 038/4000 | Tot Ep: 139 | Averge Epoch Rwd: -221.4 | Max Epoch Pellets:  31 (75.6%) | Avg Pellets:  34.5 (64.2%) | Avg Rwd: -195.0 | Loss (P/V): -0.0001/3.0267 | Time: 153.8s (4.55s/upd)
+Upd 039/4000 | Tot Ep: 142 | Averge Epoch Rwd: -179.9 | Max Epoch Pellets:  37 (82.4%) | Avg Pellets:  34.0 (64.1%) | Avg Rwd: -193.2 | Loss (P/V): -0.0001/2.2450 | Time: 157.3s (3.56s/upd)
+Upd 040/4000 | Tot Ep: 146 | Averge Epoch Rwd: -179.6 | Max Epoch Pellets:  55 (91.7%) | Avg Pellets:  34.4 (65.1%) | Avg Rwd: -189.0 | Loss (P/V): -0.0000/2.8190 | Time: 160.7s (3.35s/upd)
+Upd 041/4000 | Tot Ep: 150 | Averge Epoch Rwd: -195.1 | Max Epoch Pellets:  65 (73.0%) | Avg Pellets:  34.5 (64.8%) | Avg Rwd: -190.6 | Loss (P/V): 0.0001/2.4627 | Time: 163.7s (3.07s/upd)
+Upd 042/4000 | Tot Ep: 153 | Averge Epoch Rwd: -110.9 | Max Epoch Pellets:  69 (86.2%) | Avg Pellets:  34.3 (64.7%) | Avg Rwd: -189.5 | Loss (P/V): 0.0001/2.4308 | Time: 167.5s (3.77s/upd)
+Upd 043/4000 | Tot Ep: 157 | Averge Epoch Rwd: -159.2 | Max Epoch Pellets:  49 (87.8%) | Avg Pellets:  34.5 (65.0%) | Avg Rwd: -188.4 | Loss (P/V): 0.0000/2.3143 | Time: 171.9s (4.38s/upd)
+Upd 044/4000 | Tot Ep: 161 | Averge Epoch Rwd: -124.0 | Max Epoch Pellets:  51 (92.7%) | Avg Pellets:  34.7 (66.0%) | Avg Rwd: -185.4 | Loss (P/V): 0.0001/2.4951 | Time: 177.0s (5.13s/upd)
+Upd 045/4000 | Tot Ep: 166 | Averge Epoch Rwd: -140.7 | Max Epoch Pellets:  33 (93.1%) | Avg Pellets:  34.7 (65.9%) | Avg Rwd: -185.5 | Loss (P/V): 0.0000/2.6846 | Time: 180.7s (3.71s/upd)
+Upd 046/4000 | Tot Ep: 170 | Averge Epoch Rwd: -188.3 | Max Epoch Pellets:  55 (79.7%) | Avg Pellets:  34.4 (65.8%) | Avg Rwd: -186.6 | Loss (P/V): 0.0001/2.3140 | Time: 184.4s (3.63s/upd)
+Upd 047/4000 | Tot Ep: 174 | Averge Epoch Rwd: -188.9 | Max Epoch Pellets:  44 (79.4%) | Avg Pellets:  33.8 (65.8%) | Avg Rwd: -185.9 | Loss (P/V): -0.0001/2.5549 | Time: 188.8s (4.48s/upd)
+Upd 048/4000 | Tot Ep: 177 | Averge Epoch Rwd: -255.0 | Max Epoch Pellets:  36 (76.5%) | Avg Pellets:  34.0 (65.5%) | Avg Rwd: -187.7 | Loss (P/V): 0.0001/2.3392 | Time: 192.2s (3.40s/upd)
+Upd 049/4000 | Tot Ep: 180 | Averge Epoch Rwd: -207.6 | Max Epoch Pellets:  47 (90.2%) | Avg Pellets:  34.4 (65.6%) | Avg Rwd: -188.5 | Loss (P/V): 0.0002/1.8607 | Time: 196.0s (3.72s/upd)
+Upd 050/4000 | Tot Ep: 184 | Averge Epoch Rwd: -138.8 | Max Epoch Pellets:  52 (83.9%) | Avg Pellets:  34.5 (65.9%) | Avg Rwd: -186.9 | Loss (P/V): 0.0001/1.9818 | Time: 200.6s (4.65s/upd)
+Upd 051/4000 | Tot Ep: 187 | Averge Epoch Rwd: -123.9 | Max Epoch Pellets:  58 (84.1%) | Avg Pellets:  34.8 (66.3%) | Avg Rwd: -184.4 | Loss (P/V): 0.0001/2.2152 | Time: 205.2s (4.51s/upd)

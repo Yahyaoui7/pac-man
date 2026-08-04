@@ -183,3 +183,70 @@ MazeGenerator Warning: maze is too small to add '42' in it
 Upd 061/4000 | Tot Ep: 111 | Avg Rwd:  -32.6 | Avg Pellets:  36.6 (67.2%) | Max Pellets:   0 (95.7%) | Loss (P/V): 0.0000/1.1200 | Time: 114.1s (1.81s/upd)
 MazeGenerator Warning: maze is too small to add '42' in it
 MazeGenerator Warning: maze is too small to add '42' in it
+Upd 062/4000 | Tot Ep: 113 | Avg Rwd:  -33.2 | Avg Pellets:  36.6 (66.9%) | Max Pellets:   0 (67.5%) | Loss (P/V): -0.0001/1.7556 | Time: 115.7s (1.61s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 063/4000 | Tot Ep: 116 | Avg Rwd:  -34.2 | Avg Pellets:  36.5 (66.6%) | Max Pellets:   0 (86.2%) | Loss (P/V): 0.0000/2.4973 | Time: 117.7s (1.97s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 064/4000 | Tot Ep: 118 | Avg Rwd:  -35.7 | Avg Pellets:  36.2 (66.2%) | Max Pellets:   0 (65.9%) | Loss (P/V): -0.0001/1.6884 | Time: 119.3s (1.66s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 065/4000 | Tot Ep: 119 | Avg Rwd:  -38.5 | Avg Pellets:  36.2 (65.9%) | Max Pellets:   0 (32.9%) | Loss (P/V): 0.0002/1.6298 | Time: 121.1s (1.81s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 066/4000 | Tot Ep: 121 | Avg Rwd:  -38.3 | Avg Pellets:  36.1 (66.2%) | Max Pellets:   0 (92.7%) | Loss (P/V): -0.0001/2.2898 | Time: 122.7s (1.59s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 067/4000 | Tot Ep: 122 | Avg Rwd:  -36.7 | Avg Pellets:  36.4 (66.5%) | Max Pellets:   0 (73.9%) | Loss (P/V): 0.0001/2.4161 | Time: 125.2s (2.47s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 068/4000 | Tot Ep: 123 | Avg Rwd:  -38.4 | Avg Pellets:  36.3 (66.3%) | Max Pellets:   0 (67.3%) | Loss (P/V): 0.0001/2.7447 | Time: 127.6s (2.43s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 069/4000 | Tot Ep: 125 | Avg Rwd:  -40.6 | Avg Pellets:  36.6 (65.9%) | Max Pellets:   0 (65.5%) | Loss (P/V): -0.0001/1.6529 | Time: 129.6s (1.94s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 070/4000 | Tot Ep: 127 | Avg Rwd:  -38.7 | Avg Pellets:  36.5 (66.2%) | Max Pellets:   0 (97.4%) | Loss (P/V): -0.0002/2.1721 | Time: 131.7s (2.15s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 071/4000 | Tot Ep: 130 | Avg Rwd:  -38.4 | Avg Pellets:  36.0 (66.3%) | Max Pellets:   0 (79.3%) | Loss (P/V): -0.0000/2.3828 | Time: 134.1s (2.41s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 072/4000 | Tot Ep: 131 | Avg Rwd:  -39.0 | Avg Pellets:  35.9 (66.3%) | Max Pellets:   0 (70.7%) | Loss (P/V): -0.0000/2.2991 | Time: 136.4s (2.27s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 073/4000 | Tot Ep: 133 | Avg Rwd:  -38.7 | Avg Pellets:  36.4 (66.3%) | Max Pellets:   0 (77.5%) | Loss (P/V): -0.0002/1.5669 | Time: 138.7s (2.26s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 074/4000 | Tot Ep: 134 | Avg Rwd:  -38.6 | Avg Pellets:  36.3 (66.3%) | Max Pellets:   0 (93.9%) | Loss (P/V): -0.0001/1.8661 | Time: 141.1s (2.38s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 075/4000 | Tot Ep: 137 | Avg Rwd:  -38.4 | Avg Pellets:  36.6 (66.6%) | Max Pellets:   0 (73.2%) | Loss (P/V): -0.0001/1.5734 | Time: 143.0s (1.93s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 076/4000 | Tot Ep: 139 | Avg Rwd:  -38.7 | Avg Pellets:  36.2 (66.5%) | Max Pellets:   0 (87.8%) | Loss (P/V): -0.0001/2.9559 | Time: 144.8s (1.79s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 077/4000 | Tot Ep: 140 | Avg Rwd:  -38.1 | Avg Pellets:  36.0 (66.5%) | Max Pellets:   0 (81.4%) | Loss (P/V): 0.0001/1.9663 | Time: 146.4s (1.61s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 078/4000 | Tot Ep: 142 | Avg Rwd:  -34.0 | Avg Pellets:  36.2 (66.7%) | Max Pellets:   0 (75.8%) | Loss (P/V): -0.0000/1.9125 | Time: 148.3s (1.91s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 079/4000 | Tot Ep: 144 | Avg Rwd:  -30.9 | Avg Pellets:  36.2 (67.4%) | Max Pellets:   0 (95.8%) | Loss (P/V): -0.0001/2.1899 | Time: 149.8s (1.50s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 080/4000 | Tot Ep: 146 | Avg Rwd:  -29.8 | Avg Pellets:  36.4 (67.7%) | Max Pellets:   0 (83.1%) | Loss (P/V): -0.0002/2.3544 | Time: 151.8s (1.97s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 081/4000 | Tot Ep: 148 | Avg Rwd:  -27.7 | Avg Pellets:  36.9 (67.7%) | Max Pellets:   0 (77.5%) | Loss (P/V): -0.0000/2.1133 | Time: 153.9s (2.12s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 082/4000 | Tot Ep: 150 | Avg Rwd:  -28.0 | Avg Pellets:  36.7 (67.8%) | Max Pellets:   0 (79.5%) | Loss (P/V): -0.0001/3.0675 | Time: 155.7s (1.78s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 083/4000 | Tot Ep: 151 | Avg Rwd:  -26.8 | Avg Pellets:  37.0 (67.9%) | Max Pellets:   0 (72.5%) | Loss (P/V): -0.0000/1.5273 | Time: 157.2s (1.57s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 084/4000 | Tot Ep: 153 | Avg Rwd:  -25.2 | Avg Pellets:  36.9 (68.3%) | Max Pellets:   0 (80.9%) | Loss (P/V): 0.0000/1.9737 | Time: 159.4s (2.18s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it
+MazeGenerator Warning: maze is too small to add '42' in it
+Upd 085/4000 | Tot Ep: 155 | Avg Rwd:  -25.7 | Avg Pellets:  36.6 (68.2%) | Max Pellets:   0 (67.3%) | Loss (P/V): 0.0000/1.4438 | Time: 161.3s (1.91s/upd)
+MazeGenerator Warning: maze is too small to add '42' in it

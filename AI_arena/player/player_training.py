@@ -360,9 +360,13 @@ def train_player_ppo(
                 best_avg_pct = avg_pct
                 best_avg_pellets = avg_pellets
                 torch.save(policy.state_dict(), best_checkpoint_path)
+
             if save_window_episodes:
                 window_max_pct = max(ep["pct"] for ep in save_window_episodes)
                 max_pellets = int(max(ep["pellets"] for ep in save_window_episodes))
+                epoch_avg_reward = sum(
+                    ep["reward"] for ep in save_window_episodes
+                ) / len(save_window_episodes)
                 # window_episode_count = len(save_window_episodes)
             else:
                 window_max_pct = 0.0
@@ -374,9 +378,10 @@ def train_player_ppo(
                 print(
                     f"Upd {update:03d}/{num_updates:03d} | "
                     f"Tot Ep: {total_completed_episodes:03d} | "
-                    f"Avg Rwd: {avg_reward:6.1f} | "
+                    f"Averge Epoch Rwd: {epoch_avg_reward:6.1f} | "
+                    f"Max Epoch Pellets: {max_pellets:3d} ({window_max_pct:4.1f}%) | "
                     f"Avg Pellets: {avg_pellets:5.1f} ({avg_pct:4.1f}%) | "
-                    f"Max Pellets: {max_pellets:3d} ({window_max_pct:4.1f}%) | "
+                    f"Avg Rwd: {avg_reward:4.1f} | "
                     f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
                     f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
                 )
@@ -430,7 +435,7 @@ def main() -> None:
         "--num-updates", type=int, default=100, help="Number of PPO update iterations"
     )
     parser.add_argument(
-        "--rollout-steps", type=int, default=512, help="Steps per rollout"
+        "--rollout-steps", type=int, default=1024, help="Steps per rollout"
     )
     parser.add_argument(
         "--save-interval", type=int, default=2, help="Snapshot save interval"

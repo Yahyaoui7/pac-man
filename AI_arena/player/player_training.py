@@ -364,7 +364,7 @@ def train_player_ppo(
                 best_avg_pellets = avg_pellets
                 torch.save(policy.state_dict(), best_checkpoint_path)
 
-            if update % 5 == 0 or update == 1 or update == num_updates:
+            if update % 1 == 0 or update == 1 or update == num_updates:
                 best_marker = " ★ BEST" if is_best else ""
                 print(
                     f"Upd {update:03d}/{num_updates:03d} | "
@@ -425,10 +425,10 @@ def main() -> None:
         "--num-updates", type=int, default=100, help="Number of PPO update iterations"
     )
     parser.add_argument(
-        "--rollout-steps", type=int, default=1048, help="Steps per rollout"
+        "--rollout-steps", type=int, default=512, help="Steps per rollout"
     )
     parser.add_argument(
-        "--save-interval", type=int, default=10, help="Snapshot save interval"
+        "--save-interval", type=int, default=2, help="Snapshot save interval"
     )
     parser.add_argument(
         "--model-dir",

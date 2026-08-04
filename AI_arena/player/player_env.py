@@ -41,16 +41,20 @@ GHOST_SPECS = [
 # observation grid never overflows.  Lower bound is the minimum playable size.
 # CNN_WIDTH  = 25  (columns / x-axis)
 # CNN_HEIGHT = 50  (rows / y-axis, but LevelManager caps height at 23 anyway)
-MAZE_WIDTH_MIN = 8
+MAZE_WIDTH_MIN = 5
 # MAZE_WIDTH_MAX = CNN_WIDTH  # 25 — do not exceed CNN_WIDTH or formatter will fail
-MAZE_WIDTH_MAX = 14
+MAZE_WIDTH_MAX = 10
 
-MAZE_HEIGHT_MIN = 8
-MAZE_HEIGHT_MAX = 14
+MAZE_HEIGHT_MIN = 5
+MAZE_HEIGHT_MAX = 10
 # MAZE_HEIGHT_MAX = min(CNN_HEIGHT, 23)  # 23 — game engine hard cap
 
 # Physics safety cap: max ticks to advance before giving up on centering
 MAX_PHYSICS_TICKS = 300
+
+# Multiplier for episode step limits based on maze size (w * h)
+# e.g. 2.5 * (10 * 10) = 250 max steps per episode.
+MAZE_STEP_MULTIPLIER: float = 2.5
 
 
 class PacmanPlayerEnv:
@@ -65,7 +69,7 @@ class PacmanPlayerEnv:
     def __init__(
         self,
         seed: int | None = None,
-        max_steps: int = 800,
+        max_steps: int | None = None,
         stage: int = 1,
         device: str | torch.device = "cpu",
     ) -> None:
@@ -81,7 +85,8 @@ class PacmanPlayerEnv:
         SpriteLibrary.instance().load_ghosts(CELL_SIZE)
 
         self.stage = stage
-        self.max_steps = max_steps  # measured in cell crossings, not pixel ticks
+        self.user_max_steps = max_steps
+        self.max_steps = max_steps if max_steps is not None else 800  # measured in cell crossings
         self.step_count = 0
         self.seed = seed
         self.rng = random.Random(seed)
@@ -118,12 +123,18 @@ class PacmanPlayerEnv:
         maze_w = self.rng.randint(MAZE_WIDTH_MIN, MAZE_WIDTH_MAX)
         maze_h = self.rng.randint(MAZE_HEIGHT_MIN, MAZE_HEIGHT_MAX)
         # Episode seed: deterministic when outer seed is set, random otherwise.
-        current_seed = random.randint(1, 44444)
-        print((maze_w, maze_h, current_seed))
+        current_seed = self.rng.randint(1, 44444)
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
         self.movement = MovementSystem(self.maze)
+
+        # Dynamic max steps based on maze size (w * h * MAZE_STEP_MULTIPLIER)
+        maze_size = maze_w * maze_h
+        if self.user_max_steps is None:
+            self.max_steps = int(maze_size * MAZE_STEP_MULTIPLIER)
+        else:
+            self.max_steps = self.user_max_steps
 
         # Create Player and Ghosts
         self._create_entities()
@@ -297,13 +308,16 @@ class PacmanPlayerEnv:
             (height - 1, width - 1),
         ]
         center = (width // 2, height // 2)
+        player_spawn = (
+            (self.player.grid_x, self.player.grid_y) if self.player is not None else None
+        )
 
         total = 0
         for y in range(height):
             for x in range(width):
                 if self.maze[y][x] == 15:  # Wall block / prison
                     pellets[y][x] = 0
-                elif (x, y) == center:
+                elif (x, y) == center or (player_spawn is not None and (x, y) == player_spawn):
                     pellets[y][x] = 0
                 elif (x, y) in corners:
                     pellets[y][x] = 2  # Super power pellet
@@ -409,13 +423,13 @@ class PacmanPlayerEnv:
           Revisited tile:  -0.5               = -0.5   (strong push to explore new tiles)
           Oscillating:     -0.5 - 0.5         = -1.0   (A->B->A firmly discouraged)
         """
-        reward = -0.5  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
+        reward = -0.1  # One-time cost per cell crossing (was -0.1 × ~11 ticks)
 
         if events.get("new_tile_visited", False):
             reward += 1.5  # Exploration bonus — net +1.45 for an empty new cell
 
         if events.get("oscillating", False):
-            reward -= 0.5  # Discourage A→B→A oscillation without hard blocking
+            reward -= 2  # Discourage A→B→A oscillation without hard blocking
 
         if events["pellet_eaten"]:
             reward += 5.0  # Net +6.45 on a new pellet tile
@@ -427,8 +441,10 @@ class PacmanPlayerEnv:
             reward += 30.0
 
         if events["level_completed"]:
-            print("level completed")
-            reward += 200.0  # Very strong completion incentive
+            remaining_steps = max(0, self.max_steps - self.step_count)
+            time_bonus = float(remaining_steps)
+            print(f"level completed (bonus: +{remaining_steps} remaining steps)")
+            reward += 200.0 + time_bonus  # Very strong completion incentive + speed bonus
 
         if events["pacman_died"]:
             print("pacman died here -30")

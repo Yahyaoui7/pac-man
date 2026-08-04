@@ -205,7 +205,7 @@ def train_player_ppo(
             rollout_values = []
 
             completed_episodes_in_update = 0
-
+            save_window_episodes: list[dict[str, float]] = []
             # Fast Rollout Collection Phase (CPU -> GPU)
 
             for _ in range(rollout_steps):
@@ -233,18 +233,18 @@ def train_player_ppo(
 
                 if done:
                     obs = env.reset()
-                    recent_episodes.append(
-                        {
-                            "reward": current_ep_reward,
-                            "pellets": float(info["pellets_eaten"]),
-                            "pct": float(info["completion_pct"]),
-                            "steps": float(current_ep_steps),
-                        }
-                    )
+                    ep_record = {
+                        "reward": current_ep_reward,
+                        "pellets": float(info["pellets_eaten"]),
+                        "pct": float(info["completion_pct"]),
+                        "steps": float(current_ep_steps),
+                    }
                     current_ep_reward = 0.0
                     current_ep_steps = 0
                     completed_episodes_in_update += 1
                     total_completed_episodes += 1
+                    recent_episodes.append(ep_record)
+                    save_window_episodes.append(ep_record)
                 else:
                     obs = next_obs
 
@@ -363,6 +363,16 @@ def train_player_ppo(
                 best_avg_pct = avg_pct
                 best_avg_pellets = avg_pellets
                 torch.save(policy.state_dict(), best_checkpoint_path)
+            if save_window_episodes:
+                window_max_pct = max(ep["pct"] for ep in save_window_episodes)
+                window_completions = sum(
+                    1 for ep in save_window_episodes if ep["pct"] >= 100.0
+                )
+                # window_episode_count = len(save_window_episodes)
+            else:
+                window_max_pct = 0.0
+                window_completions = 0
+                # window_episode_count = 0
 
             if update % 1 == 0 or update == 1 or update == num_updates:
                 best_marker = " ★ BEST" if is_best else ""
@@ -371,7 +381,7 @@ def train_player_ppo(
                     f"Tot Ep: {total_completed_episodes:03d} | "
                     f"Avg Rwd: {avg_reward:6.1f} | "
                     f"Avg Pellets: {avg_pellets:5.1f} ({avg_pct:4.1f}%) | "
-                    f"Max Pellets: {max_pellets:3d} ({max_pct:4.1f}%) | "
+                    f"Max Pellets: {window_completions:3d} ({window_max_pct:4.1f}%) | "
                     f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
                     f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
                     f"{best_marker}"
@@ -379,6 +389,7 @@ def train_player_ppo(
 
             if update % save_interval == 0 or update == num_updates:
                 torch.save(policy.state_dict(), checkpoint_path)
+                save_window_episodes = []
 
             if quit_listener.stop_requested:
                 print(f"\n'q' pressed — stopping after update {update}/{num_updates}.")

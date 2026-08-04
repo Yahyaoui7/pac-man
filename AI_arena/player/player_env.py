@@ -54,7 +54,7 @@ MAX_PHYSICS_TICKS = 300
 
 # Multiplier for episode step limits based on maze size (w * h)
 # e.g. 2.5 * (10 * 10) = 250 max steps per episode.
-MAZE_STEP_MULTIPLIER: float = 2.5
+MAZE_STEP_MULTIPLIER: float = 5
 
 
 class PacmanPlayerEnv:
@@ -86,7 +86,9 @@ class PacmanPlayerEnv:
 
         self.stage = stage
         self.user_max_steps = max_steps
-        self.max_steps = max_steps if max_steps is not None else 800  # measured in cell crossings
+        self.max_steps = (
+            max_steps if max_steps is not None else 800
+        )  # measured in cell crossings
         self.step_count = 0
         self.seed = seed
         self.rng = random.Random(seed)
@@ -309,7 +311,9 @@ class PacmanPlayerEnv:
         ]
         center = (width // 2, height // 2)
         player_spawn = (
-            (self.player.grid_x, self.player.grid_y) if self.player is not None else None
+            (self.player.grid_x, self.player.grid_y)
+            if self.player is not None
+            else None
         )
 
         total = 0
@@ -317,7 +321,9 @@ class PacmanPlayerEnv:
             for x in range(width):
                 if self.maze[y][x] == 15:  # Wall block / prison
                     pellets[y][x] = 0
-                elif (x, y) == center or (player_spawn is not None and (x, y) == player_spawn):
+                elif (x, y) == center or (
+                    player_spawn is not None and (x, y) == player_spawn
+                ):
                     pellets[y][x] = 0
                 elif (x, y) in corners:
                     pellets[y][x] = 2  # Super power pellet
@@ -443,8 +449,8 @@ class PacmanPlayerEnv:
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
             time_bonus = float(remaining_steps)
-            print(f"level completed (bonus: +{remaining_steps} remaining steps)")
-            reward += 200.0 + time_bonus  # Very strong completion incentive + speed bonus
+            reward += 200.0 + time_bonus
+            print(f"level completion and remaining steps bonus = {reward}")
 
         if events["pacman_died"]:
             print("pacman died here -30")

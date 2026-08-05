@@ -6,7 +6,10 @@ import argparse
 import sys
 import threading
 import time
+from collections import deque
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -17,6 +20,42 @@ from AI_arena.models.cnn_player import PlayerActorCritic
 from AI_arena.player.player_env import PacmanPlayerEnv
 
 DEFAULT_MODEL_DIR = Path(__file__).parent.parent / "models"
+
+BD_LABELS = {
+    "step": "Step",
+    "oscillation": "Osc",
+    "pellet": "Pellet",
+    "super_pellet": "Super",
+    "ghost": "Ghost",
+    "complete": "Complete",
+    "death": "Death",
+    "bfs": "BFS",
+}
+
+
+class TrainingLogger:
+    """Appends every log line to a file and optionally mirrors to stdout."""
+
+    def __init__(self, log_path: Path, quiet: bool = False) -> None:
+        self.quiet = quiet
+        self.log_path = log_path
+        self._file = open(log_path, "a", encoding="utf-8", buffering=1)
+        self._file.write(
+            f"\n{'='*70}\n"
+            f"Training session started at {datetime.now().isoformat()}\n"
+            f"{'='*70}\n"
+        )
+        self._file.flush()
+
+    def log(self, message: str) -> None:
+        if not self.quiet:
+            print(message)
+        self._file.write(message + "\n")
+        self._file.flush()
+
+    def close(self) -> None:
+        if not self._file.closed:
+            self._file.close()
 
 
 class QuitListener:
@@ -125,6 +164,20 @@ class QuitListener:
                 pass
 
 
+def _format_breakdown_line(recent_episodes: deque[dict[str, Any]]) -> str:
+    """Return a compact ' | Key: +X.X' string averaged over the last window."""
+    if not recent_episodes:
+        return " | ".join(f"{label}: +0.0" for label in BD_LABELS.values())
+
+    parts = []
+    for key, label in BD_LABELS.items():
+        avg = sum(
+            ep["episode_reward_breakdown"].get(key, 0.0) for ep in recent_episodes
+        ) / len(recent_episodes)
+        parts.append(f"{label}: {avg:+.1f}")
+    return " | ".join(parts)
+
+
 def train_player_ppo(
     stage: int = 1,
     num_updates: int = 100,
@@ -143,15 +196,19 @@ def train_player_ppo(
     seed: int = 42,
     resume: bool = True,
     resume_path: Path | None = None,
+    log_file: Path = Path("training_log.txt"),
+    quiet: bool = False,
 ) -> None:
     """Train Pac-Man player model using PPO with continuous checkpoint resuming."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"============================================================")
-    print(f"Starting Stage {stage} PPO Training for Pac-Man")
-    print(
+    logger = TrainingLogger(log_file, quiet)
+
+    logger.log(f"============================================================")
+    logger.log(f"Starting Stage {stage} PPO Training for Pac-Man")
+    logger.log(
         f"Device: {device} | Total Updates: {num_updates} | Rollout Steps: {rollout_steps}"
     )
-    print(f"============================================================")
+    logger.log(f"============================================================")
 
     model_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = model_dir / f"player_rl_stage{stage}.pt"
@@ -165,11 +222,13 @@ def train_player_ppo(
         if target_load.exists():
             weights = torch.load(target_load, map_location=device, weights_only=True)
             policy.load_state_dict(weights)
-            print(f"SUCCESS: Resumed training from checkpoint: {target_load.name}")
+            logger.log(f"SUCCESS: Resumed training from checkpoint: {target_load.name}")
         else:
-            print("No existing checkpoint found. Starting with fresh initial weights.")
+            logger.log(
+                "No existing checkpoint found. Starting with fresh initial weights."
+            )
     else:
-        print("Starting training with fresh initial weights (--fresh specified).")
+        logger.log("Starting training with fresh initial weights (--fresh specified).")
 
     quit_listener = QuitListener()
     quit_listener.start()
@@ -177,11 +236,7 @@ def train_player_ppo(
     start_time = time.time()
     obs = env.reset()
 
-    from collections import deque
-
-    recent_episodes: deque[dict[str, float]] = deque(
-        maxlen=100
-    )  # 100-ep window smooths random-maze variance
+    recent_episodes: deque[dict[str, Any]] = deque(maxlen=100)
     current_ep_reward = 0.0
     current_ep_steps = 0
     total_completed_episodes = 0
@@ -238,6 +293,9 @@ def train_player_ppo(
                         "pellets": float(info["pellets_eaten"]),
                         "pct": float(info["completion_pct"]),
                         "steps": float(current_ep_steps),
+                        "maze": info["maze"],
+                        "episode_event_counts": info["episode_event_counts"],
+                        "episode_reward_breakdown": info["episode_reward_breakdown"],
                     }
                     current_ep_reward = 0.0
                     current_ep_steps = 0
@@ -367,23 +425,38 @@ def train_player_ppo(
                 epoch_avg_reward = sum(
                     ep["reward"] for ep in save_window_episodes
                 ) / len(save_window_episodes)
-                # window_episode_count = len(save_window_episodes)
+                avg_area = sum(
+                    ep["maze"][0] * ep["maze"][1] for ep in save_window_episodes
+                ) / len(save_window_episodes)
+                avg_w = sum(ep["maze"][0] for ep in save_window_episodes) / len(
+                    save_window_episodes
+                )
+                avg_h = sum(ep["maze"][1] for ep in save_window_episodes) / len(
+                    save_window_episodes
+                )
             else:
                 window_max_pct = 0.0
                 max_pellets = 0
-                # window_episode_count = 0
+                epoch_avg_reward = 0.0
+                avg_area = 0.0
+                avg_w = 0.0
+                avg_h = 0.0
+
+            # Build the reward-breakdown chunk (averaged over the 100-ep window)
+            breakdown_line = _format_breakdown_line(save_window_episodes)
 
             if update % 1 == 0 or update == 1 or update == num_updates:
-
-                print(
+                logger.log(
                     f"Upd {update:03d}/{num_updates:03d} | "
                     f"Tot Ep: {total_completed_episodes:03d} | "
                     f"Averge Epoch Rwd: {epoch_avg_reward:6.1f} | "
                     f"Max Epoch Pellets: {max_pellets:3d} ({window_max_pct:4.1f}%) | "
                     f"Avg Pellets: {avg_pellets:5.1f} ({avg_pct:4.1f}%) | "
                     f"Avg Rwd: {avg_reward:4.1f} | "
+                    f"{breakdown_line} | "
                     f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
                     f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
+                    f"| Avg Maze Area: {avg_area:.1f} ({avg_w:.1f}x{avg_h:.1f})"
                 )
 
             if update % save_interval == 0 or update == num_updates:
@@ -391,34 +464,38 @@ def train_player_ppo(
                 save_window_episodes = []
 
             if quit_listener.stop_requested:
-                print(f"\n'q' pressed — stopping after update {update}/{num_updates}.")
+                logger.log(
+                    f"\n'q' pressed — stopping after update {update}/{num_updates}."
+                )
                 torch.save(policy.state_dict(), checkpoint_path)
-                print(f"Checkpoint saved to: {checkpoint_path}")
-                print(
+                logger.log(f"Checkpoint saved to: {checkpoint_path}")
+                logger.log(
                     f"Best checkpoint (avg {best_avg_pct:.1f}%): {best_checkpoint_path}"
                 )
                 break
     except KeyboardInterrupt:
         # Also handle Ctrl+C gracefully with a final save.
-        print(
+        logger.log(
             f"\nKeyboardInterrupt — saving checkpoint at update {last_update_completed}."
         )
         torch.save(policy.state_dict(), checkpoint_path)
-        print(f"Checkpoint saved to: {checkpoint_path}")
-        print(
+        logger.log(f"Checkpoint saved to: {checkpoint_path}")
+        logger.log(
             f"Best checkpoint (avg {best_avg_pct:.1f}% | {best_avg_pellets:.0f} pellets): {best_checkpoint_path}"
         )
     finally:
+        logger.log(f"============================================================")
+        logger.log(
+            f"Stage {stage} Training Stopped/Completed after {last_update_completed} update(s), "
+            f"{time.time() - start_time:.1f}s!"
+        )
+        logger.log(f"Checkpoint Path: {checkpoint_path}")
+        logger.log(
+            f"Best Checkpoint: {best_checkpoint_path} (peak avg_pct={best_avg_pct:.1f}%)"
+        )
+        logger.log(f"============================================================")
         quit_listener.stop()
-
-    print(f"============================================================")
-    print(
-        f"Stage {stage} Training Stopped/Completed after {last_update_completed} update(s), "
-        f"{time.time() - start_time:.1f}s!"
-    )
-    print(f"Checkpoint Path: {checkpoint_path}")
-    print(f"Best Checkpoint: {best_checkpoint_path} (peak avg_pct={best_avg_pct:.1f}%)")
-    print(f"============================================================")
+        logger.close()
 
 
 def main() -> None:
@@ -457,6 +534,17 @@ def main() -> None:
         default="",
         help="Custom checkpoint path to resume from",
     )
+    parser.add_argument(
+        "--log-file",
+        type=str,
+        default="training_log.txt",
+        help="Path to training log file (append mode)",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress stdout output (log to file only)",
+    )
     args = parser.parse_args()
 
     train_player_ppo(
@@ -467,6 +555,8 @@ def main() -> None:
         model_dir=Path(args.model_dir),
         resume=not args.fresh,
         resume_path=Path(args.resume_path) if args.resume_path else None,
+        log_file=Path(args.log_file),
+        quiet=args.quiet,
     )
 
 

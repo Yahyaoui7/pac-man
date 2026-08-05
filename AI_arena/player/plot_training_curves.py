@@ -13,14 +13,16 @@ Each call creates:
         04_reward_trend.png
         05_reward_vs_pellets.png
         06_epoch_vs_window_reward.png   (only if epoch reward is in the log)
+        07_reward_vs_maze_size.png      (only if maze-size field is in the log)
+        08_smoothing_window_check.png
+        09_reward_breakdown.png         (reward component lines)
+        10_positive_composition.png     (stacked positive rewards)
+        11_penalty_composition.png      (stacked penalties)
+        12_component_importance.png     (% of total |reward|)
         README.md
 
 Log line formats supported (fields are matched independently, so order
-and presence don't matter — old and new log formats both parse fine):
-
-    Upd 1724/4000 | Tot Ep: 3105 | Averge Epoch Rwd: 31.0 | Max Epoch Pellets: 35 (89.7%) \
-    | Avg Pellets: 39.5 (69.5%) | Avg Rwd: -20.5 | Loss (P/V): -0.0000/2.0153 \
-    | Time: 3256.0s (2.42s/upd)
+and presence don't matter — old and new log formats both parse fine).
 """
 
 import argparse
@@ -41,23 +43,28 @@ except ImportError:
     raise SystemExit("ERROR: matplotlib not installed. Run: uv pip install matplotlib")
 
 # ─── Log parsing ────────────────────────────────────────────────────────────
-#
-# Each field is matched independently with its own regex and searched for
-# anywhere in the line. This makes parsing robust to fields being reordered
-# or added/removed between log format revisions (which is exactly what
-# happened here: "Max Pellets" -> "Max Epoch Pellets", and a new
-# "Averge Epoch Rwd" field was inserted before Max/Avg Pellets).
 
 UPD_RE = re.compile(r"Upd\s+(\d+)/\d+")
 TOT_EP_RE = re.compile(r"Tot Ep:\s*(\d+)")
-# "Averge" is the typo actually present in the logger — kept as-is, but also
-# tolerate the correct spelling in case it gets fixed later.
 EPOCH_RWD_RE = re.compile(r"Averge?\s+Epoch Rwd:\s*([+-]?\d+\.?\d*)")
 AVG_RWD_RE = re.compile(r"(?<!Epoch )Avg Rwd:\s*([+-]?\d+\.?\d*)")
 AVG_PELLETS_RE = re.compile(r"Avg Pellets:\s*(\d+\.?\d*)\s*\(\s*(\d+\.?\d*)%\)")
 MAX_PELLETS_RE = re.compile(r"Max (?:Epoch )?Pellets:\s*(\d+)\s*\(\s*(\d+\.?\d*)%\)")
 LOSS_RE = re.compile(r"Loss \(P/V\):\s*([+-]?\d+\.\d+)/(\d+\.\d+)")
 TIME_RE = re.compile(r"Time:\s*([\d.]+)s\s*\(\s*([\d.]+)s/upd\)")
+MAZE_AREA_RE = re.compile(
+    r"Avg Maze Area:\s*(\d+\.?\d*)\s*\(\s*(\d+\.?\d*)x(\d+\.?\d*)\)"
+)
+
+# Reward-breakdown regexes (new)
+BD_STEP_RE = re.compile(r"\|\s*Step:\s*([+-]?\d+\.?\d*)")
+BD_OSC_RE = re.compile(r"\|\s*Osc:\s*([+-]?\d+\.?\d*)")
+BD_PELLET_RE = re.compile(r"\|\s*Pellet:\s*([+-]?\d+\.?\d*)")
+BD_SUPER_RE = re.compile(r"\|\s*Super:\s*([+-]?\d+\.?\d*)")
+BD_GHOST_RE = re.compile(r"\|\s*Ghost:\s*([+-]?\d+\.?\d*)")
+BD_COMPLETE_RE = re.compile(r"\|\s*Complete:\s*([+-]?\d+\.?\d*)")
+BD_DEATH_RE = re.compile(r"\|\s*Death:\s*([+-]?\d+\.?\d*)")
+BD_BFS_RE = re.compile(r"\|\s*BFS:\s*([+-]?\d+\.?\d*)")
 
 
 def parse_log(path: Path) -> dict[str, np.ndarray]:
@@ -67,9 +74,16 @@ def parse_log(path: Path) -> dict[str, np.ndarray]:
     max_pellets, max_pcts = [], []
     policy_losses, value_losses = [], []
     sec_per_upd = []
+    maze_areas, maze_widths, maze_heights = [], [], []
+
+    # Breakdown arrays (new)
+    bd_step, bd_osc, bd_pellet, bd_super = [], [], [], []
+    bd_ghost, bd_complete, bd_death, bd_bfs = [], [], [], []
 
     seen: set[int] = set()
     n_epoch_rwd_found = 0
+    n_maze_found = 0
+    n_bd_found = 0
     with open(path, encoding="utf-8") as f:
         for line in f:
             m_upd = UPD_RE.search(line)
@@ -108,8 +122,43 @@ def parse_log(path: Path) -> dict[str, np.ndarray]:
             m_time = TIME_RE.search(line)
             sec_per_upd.append(float(m_time.group(2)) if m_time else np.nan)
 
+            m_maze = MAZE_AREA_RE.search(line)
+            if m_maze:
+                maze_areas.append(float(m_maze.group(1)))
+                maze_widths.append(float(m_maze.group(2)))
+                maze_heights.append(float(m_maze.group(3)))
+                n_maze_found += 1
+            else:
+                maze_areas.append(np.nan)
+                maze_widths.append(np.nan)
+                maze_heights.append(np.nan)
+
+            # Parse breakdown fields (new)
+            has_bd = False
+            for regex, arr in (
+                (BD_STEP_RE, bd_step),
+                (BD_OSC_RE, bd_osc),
+                (BD_PELLET_RE, bd_pellet),
+                (BD_SUPER_RE, bd_super),
+                (BD_GHOST_RE, bd_ghost),
+                (BD_COMPLETE_RE, bd_complete),
+                (BD_DEATH_RE, bd_death),
+                (BD_BFS_RE, bd_bfs),
+            ):
+                m = regex.search(line)
+                if m:
+                    arr.append(float(m.group(1)))
+                    has_bd = True
+                else:
+                    arr.append(np.nan)
+            if has_bd:
+                n_bd_found += 1
+
     has_epoch_rwd = n_epoch_rwd_found > 0
-    return {
+    has_maze = n_maze_found > 0
+    has_breakdown = n_bd_found > 0
+
+    result: dict[str, np.ndarray | None] = {
         "updates": np.array(updates),
         "tot_eps": np.array(tot_eps),
         "epoch_rwds": np.array(epoch_rwds) if has_epoch_rwd else None,
@@ -121,18 +170,28 @@ def parse_log(path: Path) -> dict[str, np.ndarray]:
         "policy_losses": np.array(policy_losses),
         "value_losses": np.array(value_losses),
         "sec_per_upd": np.array(sec_per_upd),
+        "maze_areas": np.array(maze_areas) if has_maze else None,
+        "maze_widths": np.array(maze_widths) if has_maze else None,
+        "maze_heights": np.array(maze_heights) if has_maze else None,
+        "bd_step": np.array(bd_step) if has_breakdown else None,
+        "bd_osc": np.array(bd_osc) if has_breakdown else None,
+        "bd_pellet": np.array(bd_pellet) if has_breakdown else None,
+        "bd_super": np.array(bd_super) if has_breakdown else None,
+        "bd_ghost": np.array(bd_ghost) if has_breakdown else None,
+        "bd_complete": np.array(bd_complete) if has_breakdown else None,
+        "bd_death": np.array(bd_death) if has_breakdown else None,
+        "bd_bfs": np.array(bd_bfs) if has_breakdown else None,
     }
+    return result
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
 
-def smooth(arr: np.ndarray, window: int = 150) -> np.ndarray:
+def smooth(arr: np.ndarray, window: int = 30) -> np.ndarray:
     arr = np.asarray(arr, dtype=float)
     if len(arr) < window:
         return arr
-    # nan-safe: fill nans by interpolation before smoothing so a few missing
-    # entries don't poison the whole convolution window
     if np.isnan(arr).any():
         idx = np.arange(len(arr))
         good = ~np.isnan(arr)
@@ -143,8 +202,6 @@ def smooth(arr: np.ndarray, window: int = 150) -> np.ndarray:
 
 
 def rolling_slope(x: np.ndarray, y: np.ndarray, window: int = 100) -> np.ndarray:
-    """Local trend (units of y per unit of x) via a sliding linear fit,
-    centered on each point. Positive = improving, negative = declining."""
     n = len(y)
     if n < 4:
         return np.zeros(n)
@@ -163,9 +220,6 @@ def rolling_slope(x: np.ndarray, y: np.ndarray, window: int = 100) -> np.ndarray
 def segment_trends(
     upd: np.ndarray, slope: np.ndarray, flat_thresh: float
 ) -> list[tuple[int, int, str, float]]:
-    """Collapse a per-update slope series into contiguous
-    (start_upd, end_upd, label, mean_slope) segments."""
-
     def label_of(s: float) -> str:
         if s > flat_thresh:
             return "improving"
@@ -188,9 +242,6 @@ def segment_trends(
                 )
             )
             seg_start = i
-    # merge segments shorter than 3% of the run into neighbors' label context
-    # (kept simple: just drop noise segments under 15 updates long from the
-    # headline list, they'll still be reflected in the plot shading)
     min_len = max(15, int(0.01 * (upd[-1] - upd[0] + 1)))
     return [s for s in segments if (s[1] - s[0]) >= min_len] or segments
 
@@ -232,14 +283,11 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict:
     upd = data["updates"]
     RAW_A, RAW_C, SM_C, MAX_C = 0.18, "#5b9bd5", "#1a4a7a", "#e05c00"
     has_epoch = data["epoch_rwds"] is not None
+    has_breakdown = data["bd_step"] is not None
 
     sm_avg_rwd = smooth(data["avg_rwds"])
     trend_window = max(50, len(upd) // 20)
     slope = rolling_slope(upd.astype(float), sm_avg_rwd, window=trend_window)
-    # Self-normalizing threshold: the bottom ~40% of observed slope
-    # magnitudes counts as "flat", regardless of the reward scale. This
-    # adapts automatically instead of relying on a fixed constant that
-    # would need retuning for every reward-shaping change.
     abs_slope = np.abs(slope)
     slope_thresh = float(np.percentile(abs_slope, 40)) if len(abs_slope) else 0.0
     segments = segment_trends(upd, slope, flat_thresh=slope_thresh)
@@ -300,7 +348,7 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict:
     _style(ax, fig)
     _save(fig, out, "03_value_loss.png")
 
-    # 04 — Reward trend (rolling slope) — shows *when* reward is rising vs stuck
+    # 04 — Reward trend (rolling slope)
     fig, ax = plt.subplots(figsize=(11, 3.5))
     _shade_trends(ax, segments)
     ax.axhline(0, color="white", linestyle="--", linewidth=0.8, alpha=0.5)
@@ -322,8 +370,7 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict:
     _style(ax, fig)
     _save(fig, out, "04_reward_trend.png")
 
-    # 05 — Reward vs pellet completion (dual axis) — is reward tracking the
-    # actual objective (pellets) or drifting on other shaping terms?
+    # 05 — Reward vs pellet completion (dual axis)
     fig, ax1 = plt.subplots(figsize=(11, 4))
     ax2 = ax1.twinx()
     ax1.plot(upd, sm_avg_rwd, color=SM_C, linewidth=2, label="Avg reward (smoothed)")
@@ -359,12 +406,9 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict:
     )
     _save(fig, out, "05_reward_vs_pellets.png")
 
-    # correlation between smoothed reward and smoothed pellet % — tells us
-    # whether reward increases are actually coming from eating more pellets
     reward_pellet_corr = float(np.corrcoef(sm_avg_rwd, smooth(data["avg_pcts"]))[0, 1])
 
     # 06 — Epoch (instantaneous) reward vs sliding-window average reward.
-    # Only produced if the log has the new "Averge Epoch Rwd" field.
     epoch_volatility = None
     if has_epoch:
         epoch_rwds = data["epoch_rwds"]
@@ -399,11 +443,245 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict:
         ax.legend(facecolor="#2a2a4e", labelcolor="white")
         _style(ax, fig)
         _save(fig, out, "06_epoch_vs_window_reward.png")
-        # gap between raw epoch signal and the smoothed window average —
-        # large gap/spread = policy still unstable episode-to-episode
         epoch_volatility = float(
             np.nanstd(epoch_rwds - np.interp(upd, upd, data["avg_rwds"]))
         )
+
+    # 07 — Reward vs maze size
+    maze_reward_corr = None
+    if data["maze_areas"] is not None:
+        maze_areas = data["maze_areas"]
+        sm_maze = smooth(maze_areas)
+        fig, ax1 = plt.subplots(figsize=(11, 4))
+        ax2 = ax1.twinx()
+        ax1.plot(
+            upd, sm_avg_rwd, color=SM_C, linewidth=2, label="Avg reward (smoothed)"
+        )
+        ax2.plot(
+            upd,
+            sm_maze,
+            color="#e8b339",
+            linewidth=2,
+            alpha=0.9,
+            label="Avg maze area (smoothed)",
+        )
+        ax1.set_ylabel("Avg Reward", color=SM_C)
+        ax2.set_ylabel("Avg Maze Area (cells)", color="#e8b339")
+        ax1.set_xlabel("PPO Update")
+        ax1.set_title(
+            "Reward vs. Maze Size — is this the 20-ep window sampling harder mazes?"
+        )
+        for a in (ax1, ax2):
+            a.set_facecolor("#1a1a2e")
+            a.tick_params(colors="white")
+            a.title.set_color("white")
+            a.xaxis.label.set_color("white")
+        fig.patch.set_facecolor("#1a1a2e")
+        ax1.spines["top"].set_visible(False)
+        ax2.spines["top"].set_visible(False)
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(
+            lines1 + lines2,
+            labels1 + labels2,
+            facecolor="#2a2a4e",
+            labelcolor="white",
+            loc="lower right",
+        )
+        _save(fig, out, "07_reward_vs_maze_size.png")
+        maze_reward_corr = float(np.corrcoef(sm_avg_rwd, sm_maze)[0, 1])
+
+    # 08 — Smoothing-window check
+    wide_window = max(trend_window * 3, 150)
+    sm_wide = smooth(data["avg_rwds"], window=min(wide_window, max(4, len(upd) - 1)))
+    fig, ax = plt.subplots(figsize=(11, 4))
+    ax.plot(
+        upd,
+        sm_avg_rwd,
+        color=RAW_C,
+        linewidth=1.3,
+        alpha=0.7,
+        label=f"Standard smoothing (window=30)",
+    )
+    ax.plot(
+        upd,
+        sm_wide,
+        color="#e8b339",
+        linewidth=2.5,
+        label=f"Wide smoothing (window={wide_window})",
+    )
+    ax.set(
+        title="Smoothing-Window Check — does the oscillation flatten out at a wider window?",
+        xlabel="PPO Update",
+        ylabel="Avg Reward",
+    )
+    ax.legend(facecolor="#2a2a4e", labelcolor="white")
+    _style(ax, fig)
+    _save(fig, out, "08_smoothing_window_check.png")
+    residual_ratio = float(np.std(sm_avg_rwd - sm_wide) / (np.std(sm_avg_rwd) + 1e-9))
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # NEW: Reward-breakdown diagnostic plots (09–12)
+    # ═══════════════════════════════════════════════════════════════════════
+    breakdown_stats = {}
+    if has_breakdown:
+        bd_components = {
+            "Step": data["bd_step"],
+            "Oscillation": data["bd_osc"],
+            "Pellet": data["bd_pellet"],
+            "Super": data["bd_super"],
+            "Ghost": data["bd_ghost"],
+            "Complete": data["bd_complete"],
+            "Death": data["bd_death"],
+            "BFS": data["bd_bfs"],
+        }
+        bd_colors = {
+            "Step": "#ff6b6b",
+            "Oscillation": "#ff9f43",
+            "Pellet": "#1dd1a1",
+            "Super": "#54a0ff",
+            "Ghost": "#5f27cd",
+            "Complete": "#00d2d3",
+            "Death": "#ff4757",
+            "BFS": "#c8d6e5",
+        }
+
+        # 09 — Individual component lines (smoothed)
+        fig, ax = plt.subplots(figsize=(11, 5))
+        for name, arr in bd_components.items():
+            if arr is None or np.isnan(arr).all():
+                continue
+            sm = smooth(arr)
+            ax.plot(upd, sm, label=name, color=bd_colors[name], linewidth=1.5)
+        ax.axhline(0, color="white", linestyle="--", linewidth=0.8, alpha=0.5)
+        ax.set(
+            title="Reward Breakdown by Component (100-ep window, smoothed)",
+            xlabel="PPO Update",
+            ylabel="Avg Contribution per Episode",
+        )
+        ax.legend(facecolor="#2a2a4e", labelcolor="white", ncol=2)
+        _style(ax, fig)
+        _save(fig, out, "09_reward_breakdown.png")
+
+        # 10 — Positive reward composition (stacked area)
+        fig, ax = plt.subplots(figsize=(11, 4))
+        pos_keys = [
+            ("Pellet", "bd_pellet", "#1dd1a1"),
+            ("Super", "bd_super", "#54a0ff"),
+            ("Ghost", "bd_ghost", "#5f27cd"),
+            ("Complete", "bd_complete", "#00d2d3"),
+            ("BFS", "bd_bfs", "#c8d6e5"),
+        ]
+        pos_arrays = []
+        pos_labels = []
+        pos_colors = []
+        for label, key, color in pos_keys:
+            arr = data[key]
+            if arr is not None and not np.isnan(arr).all():
+                pos_arrays.append(np.maximum(smooth(np.nan_to_num(arr, nan=0.0)), 0))
+                pos_labels.append(label)
+                pos_colors.append(color)
+        if pos_arrays:
+            ax.stackplot(
+                upd, *pos_arrays, labels=pos_labels, colors=pos_colors, alpha=0.85
+            )
+        ax.set(
+            title="Positive Reward Composition",
+            xlabel="PPO Update",
+            ylabel="Positive Contribution",
+        )
+        ax.legend(facecolor="#2a2a4e", labelcolor="white", loc="upper left")
+        _style(ax, fig)
+        _save(fig, out, "10_positive_composition.png")
+
+        # 11 — Penalty composition (stacked area, negative values)
+        fig, ax = plt.subplots(figsize=(11, 4))
+        neg_keys = [
+            ("Step", "bd_step", "#ff6b6b"),
+            ("Oscillation", "bd_osc", "#ff9f43"),
+            ("Death", "bd_death", "#ff4757"),
+        ]
+        neg_arrays = []
+        neg_labels = []
+        neg_colors = []
+        for label, key, color in neg_keys:
+            arr = data[key]
+            if arr is not None and not np.isnan(arr).all():
+                neg_arrays.append(np.minimum(smooth(np.nan_to_num(arr, nan=0.0)), 0))
+                neg_labels.append(label)
+                neg_colors.append(color)
+        if neg_arrays:
+            ax.stackplot(
+                upd, *neg_arrays, labels=neg_labels, colors=neg_colors, alpha=0.85
+            )
+        ax.set(
+            title="Penalty Composition (negative values)",
+            xlabel="PPO Update",
+            ylabel="Penalty Contribution",
+        )
+        ax.legend(facecolor="#2a2a4e", labelcolor="white", loc="lower left")
+        _style(ax, fig)
+        _save(fig, out, "11_penalty_composition.png")
+
+        # 12 — Component importance (% of total |reward|)
+        fig, ax = plt.subplots(figsize=(11, 5))
+        total_abs = np.zeros_like(upd, dtype=float)
+        smoothed_comps = {}
+        for name, arr in bd_components.items():
+            if arr is None or np.isnan(arr).all():
+                continue
+            sm = smooth(np.nan_to_num(arr, nan=0.0))
+            smoothed_comps[name] = sm
+            total_abs += np.abs(sm)
+        total_abs = np.where(total_abs < 1e-9, 1.0, total_abs)
+        for name, sm in smoothed_comps.items():
+            pct = 100.0 * np.abs(sm) / total_abs
+            ax.plot(upd, pct, label=name, color=bd_colors[name], linewidth=1.5)
+        ax.set(
+            title="Reward Component Importance (% of total |reward|)",
+            xlabel="PPO Update",
+            ylabel="% of Total |Reward|",
+        )
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f%%"))
+        ax.legend(facecolor="#2a2a4e", labelcolor="white", ncol=2)
+        _style(ax, fig)
+        _save(fig, out, "12_component_importance.png")
+
+        # Breakdown-derived stats
+        breakdown_stats["dominant_positive"] = max(
+            [
+                ("Pellet", float(np.nanmean(data["bd_pellet"]))),
+                ("Super", float(np.nanmean(data["bd_super"]))),
+                ("Ghost", float(np.nanmean(data["bd_ghost"]))),
+                ("Complete", float(np.nanmean(data["bd_complete"]))),
+                ("BFS", float(np.nanmean(data["bd_bfs"]))),
+            ],
+            key=lambda x: x[1],
+        )
+        breakdown_stats["dominant_negative"] = min(
+            [
+                ("Step", float(np.nanmean(data["bd_step"]))),
+                ("Oscillation", float(np.nanmean(data["bd_osc"]))),
+                ("Death", float(np.nanmean(data["bd_death"]))),
+            ],
+            key=lambda x: x[1],
+        )
+        breakdown_stats["comp_corrs"] = {}
+        for name, key in [
+            ("Step", "bd_step"),
+            ("Osc", "bd_osc"),
+            ("Pellet", "bd_pellet"),
+            ("Super", "bd_super"),
+            ("Ghost", "bd_ghost"),
+            ("Complete", "bd_complete"),
+            ("Death", "bd_death"),
+            ("BFS", "bd_bfs"),
+        ]:
+            arr = data[key]
+            if arr is not None and not np.isnan(arr).all():
+                breakdown_stats["comp_corrs"][name] = float(
+                    np.corrcoef(sm_avg_rwd, smooth(arr))[0, 1]
+                )
 
     # 00 — Combined overview
     fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
@@ -450,7 +728,14 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict:
     trend_pct = {k: 100.0 * v / total_span for k, v in trend_totals.items()}
 
     diagnosis = _build_diagnosis(
-        trend_pct, reward_pellet_corr, epoch_volatility, segments, sm_avg_rwd
+        trend_pct,
+        reward_pellet_corr,
+        epoch_volatility,
+        segments,
+        sm_avg_rwd,
+        maze_reward_corr,
+        residual_ratio,
+        breakdown_stats if has_breakdown else None,
     )
 
     return {
@@ -472,9 +757,14 @@ def plot_all(data: dict[str, np.ndarray], out: Path) -> dict:
         "has_epoch_rwd": has_epoch,
         "epoch_volatility": epoch_volatility,
         "reward_pellet_corr": reward_pellet_corr,
+        "has_maze_data": data["maze_areas"] is not None,
+        "maze_reward_corr": maze_reward_corr,
+        "residual_ratio": residual_ratio,
+        "has_breakdown": has_breakdown,
         "segments": segments,
         "trend_pct": trend_pct,
         "diagnosis": diagnosis,
+        "breakdown_stats": breakdown_stats if has_breakdown else None,
     }
 
 
@@ -484,8 +774,10 @@ def _build_diagnosis(
     epoch_volatility: float | None,
     segments: list[tuple[int, int, str, float]],
     sm_avg_rwd: np.ndarray,
+    maze_reward_corr: float | None = None,
+    residual_ratio: float | None = None,
+    breakdown_stats: dict | None = None,
 ) -> list[str]:
-    """Heuristic, human-readable notes on what the curves suggest."""
     notes = []
 
     if trend_pct.get("plateau", 0) > 50:
@@ -523,9 +815,8 @@ def _build_diagnosis(
             notes.append(
                 f"Reward and pellet completion are weakly correlated (corr={corr:.2f}). "
                 "Reward is moving for reasons other than pellet progress — check "
-                "how much of it comes from the first-visit-tile bonus, the "
-                "oscillation penalty, or the per-step cost; the agent may be "
-                "optimizing those instead of clearing the maze."
+                "how much of it comes from the BFS shaping, oscillation penalty, "
+                "or per-step cost; the agent may be optimizing those instead."
             )
         else:
             notes.append(
@@ -542,6 +833,101 @@ def _build_diagnosis(
                 "size/seed randomization is creating too much variance per "
                 "update, or whether more PPO epochs/rollout steps would help "
                 "it settle."
+            )
+
+    if residual_ratio is not None:
+        if residual_ratio < 0.35:
+            maze_hint = (
+                " If maze-size data isn't logged yet, that's the next thing "
+                "to add to confirm it directly."
+                if maze_reward_corr is None
+                else " The maze-size correlation below points at how much of "
+                "that is coming from maze-mix specifically."
+            )
+            notes.append(
+                f"A much wider smoothing window removes most of the wiggle "
+                f"(only ~{residual_ratio*100:.0f}% of the standard-smoothed curve's "
+                "variance survives at the wide window). That's a sign the "
+                "apparent oscillation is largely window-sampling noise — the "
+                "20-episode average swinging with which mazes happened to "
+                "land in it — rather than the policy itself cycling up and "
+                f"down.{maze_hint}"
+            )
+        else:
+            notes.append(
+                f"The oscillation mostly survives a much wider smoothing "
+                f"window (~{residual_ratio*100:.0f}% of the standard-smoothed "
+                "curve's variance remains). That argues against pure window-"
+                "sampling noise — this looks like a real, slower-cycle "
+                "pattern in training itself (e.g. an LR/entropy interaction, "
+                "or periodic instability), not just averaging artifacts."
+            )
+
+    if maze_reward_corr is not None:
+        if maze_reward_corr < -0.4:
+            notes.append(
+                f"Reward correlates negatively with average maze size in the "
+                f"window (corr={maze_reward_corr:.2f}) — windows with bigger "
+                "mazes score lower, exactly as expected if maze-mix variance "
+                "is a real contributor to the swings. Consider reporting "
+                "reward/pellet % stratified by maze-size bucket instead of "
+                "pooled, since the pooled curve will keep oscillating even "
+                "once the policy stops improving."
+            )
+        elif abs(maze_reward_corr) < 0.15:
+            notes.append(
+                f"Reward doesn't correlate much with average maze size in the "
+                f"window (corr={maze_reward_corr:.2f}) — maze-mix doesn't look "
+                "like the driver of the oscillation here, so it's more likely "
+                "coming from training dynamics."
+            )
+        else:
+            notes.append(
+                f"Reward has a mild correlation with average maze size in the "
+                f"window (corr={maze_reward_corr:.2f}) — maze-mix is probably a "
+                "partial contributor to the swings, but not the whole story."
+            )
+
+    # NEW: Breakdown-specific diagnosis
+    if breakdown_stats is not None:
+        dom_pos, dom_pos_val = breakdown_stats["dominant_positive"]
+        dom_neg, dom_neg_val = breakdown_stats["dominant_negative"]
+        notes.append(
+            f"**Reward breakdown:** the largest positive driver is **{dom_pos}** "
+            f"(avg +{dom_pos_val:.1f}/ep). The largest penalty is **{dom_neg}** "
+            f"(avg {dom_neg_val:.1f}/ep)."
+        )
+
+        comp_corrs = breakdown_stats.get("comp_corrs", {})
+        if "Pellet" in comp_corrs and "BFS" in comp_corrs:
+            if comp_corrs["BFS"] > comp_corrs.get("Pellet", 0):
+                notes.append(
+                    f"BFS shaping (corr={comp_corrs['BFS']:.2f}) correlates with "
+                    f"total reward more strongly than raw pellet reward "
+                    f"(corr={comp_corrs['Pellet']:.2f}). The agent may be "
+                    "optimizing the distance heuristic instead of actual pellets — "
+                    "consider lowering `bfs_shaping_coef`."
+                )
+            else:
+                notes.append(
+                    f"Pellet reward (corr={comp_corrs['Pellet']:.2f}) dominates "
+                    f"over BFS shaping (corr={comp_corrs['BFS']:.2f}) — the "
+                    "shaping term is well-calibrated."
+                )
+        if "Death" in comp_corrs and comp_corrs["Death"] < -0.3:
+            notes.append(
+                f"Death penalty is strongly anti-correlated with total reward "
+                f"(corr={comp_corrs['Death']:.2f}). The agent is still dying "
+                "frequently on high-reward attempts — consider whether the "
+                "penalty magnitude (-30) is too small relative to the "
+                "completion bonus (200+)."
+            )
+        if "Osc" in comp_corrs and comp_corrs["Osc"] < -0.3:
+            notes.append(
+                f"Oscillation penalty is strongly anti-correlated with total reward "
+                f"(corr={comp_corrs['Osc']:.2f}). Back-and-forth movement is "
+                "still a significant problem — you may want to increase the "
+                "penalty magnitude or tighten the detection window."
             )
 
     return notes
@@ -563,14 +949,14 @@ Log file: `{log_file}`
 |-----------|-------|
 | PPO Updates | {start_upd} → {end_upd} ({total_updates} logged) |
 | Total Episodes | {total_episodes} |
-| Rollout Steps / Update | 512 |
+| Rollout Steps / Update | 1024 |
 | PPO Epochs | 4 |
 | Mini-batch Size | 64 |
-| Learning Rate | 3e-4 |
+| Learning Rate | 1e-4 |
 | Gamma (γ) | 0.99 |
 | GAE Lambda (λ) | 0.95 |
 | Clip ε | 0.2 |
-| Entropy Coef | 0.02 |
+| Entropy Coef | 0.05 |
 | Value Coef | 0.5 |
 | Max Grad Norm | 0.5 |
 
@@ -605,24 +991,18 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 
 ---
 
-## Reward System
+## Reward System (as implemented in `player_env.py`)
 
 | Event | Reward |
 |-------|--------|
 | Every step (base penalty) | **−0.2** |
-| Oscillating move (reversed within 6 steps) | **−0.3** *(active from report_002)* |
-| First visit to a new grid tile | **+0.5** |
+| Oscillating move (A→B→A) | **−0.5** |
 | Pellet eaten | **+5.0** |
-| Super-pellet eaten | **+15.0** |
+| Super-pellet eaten | **+10.0** |
 | Ghost eaten (in powered mode) | **+30.0** |
-| Level completed | **+100.0** |
-| Pac-Man died | **−20.0** |
-
-**Net examples:**
-- Step forward into a new pellet tile: `−0.2 + 0.5 + 5.0 = +5.3`
-- Step forward into a new empty tile: `−0.2 + 0.5 = +0.3`
-- Step forward into an already-visited tile: `−0.2`
-- Oscillating move (back-track): `−0.2 − 0.3 = −0.5` *(active from report_002)*
+| Level completed | **+200.0** + remaining_steps bonus |
+| Pac-Man died | **−30.0** |
+| BFS shaping (distance to nearest pellet) | **0.3 × Δpotential** |
 
 ---
 
@@ -644,6 +1024,10 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 
 Reward-vs-pellet correlation (smoothed): **{reward_pellet_corr:.2f}**
 {epoch_volatility_line}
+{maze_corr_line}
+Wide-window residual ratio: **{residual_ratio:.2f}**
+
+{breakdown_summary}
 
 Time spent in each trend regime (by update count):
 
@@ -676,6 +1060,9 @@ Time spent in each trend regime (by update count):
 | `04_reward_trend.png` | Local reward slope — where training is/isn't progressing |
 | `05_reward_vs_pellets.png` | Reward vs pellet completion, dual-axis |
 {epoch_plot_row}
+{maze_plot_row}
+| `08_smoothing_window_check.png` | Standard vs. wide smoothing — tests whether the oscillation is window noise |
+{breakdown_plot_rows}
 
 ![Overview](00_overview.png)
 
@@ -685,8 +1072,7 @@ Time spent in each trend regime (by update count):
 
 <!-- Add manual notes about this run here -->
 - Training data covers updates {start_upd}–{end_upd} ({total_episodes} episodes).
-- Log window size: last 20 completed episodes per update.
-- Oscillation penalty introduced in this run to combat node-to-node back-and-forth behavior.
+- Log window size: last 100 completed episodes per update (smoothed breakdown).
 """
 
 
@@ -696,6 +1082,7 @@ def write_readme(out: Path, num: int, title: str, log_file: str, stats: dict) ->
         for start, end, label, slope in stats["segments"]
     )
     diagnosis_bullets = "\n".join(f"- {n}" for n in stats["diagnosis"])
+
     epoch_volatility_line = (
         f"Episode-to-window reward volatility (std): **{stats['epoch_volatility']:.1f}**"
         if stats.get("epoch_volatility") is not None
@@ -707,6 +1094,52 @@ def write_readme(out: Path, num: int, title: str, log_file: str, stats: dict) ->
         if stats.get("has_epoch_rwd")
         else ""
     )
+    maze_plot_row = (
+        "| `07_reward_vs_maze_size.png` | Reward vs average maze size in the window |"
+        if stats.get("has_maze_data")
+        else ""
+    )
+    maze_corr_line = (
+        f"Reward-vs-maze-size correlation (smoothed): **{stats['maze_reward_corr']:.2f}**"
+        if stats.get("maze_reward_corr") is not None
+        else "*(Log has no `Avg Maze Area` field yet — add it to check "
+        "whether random maze-size variance is driving the oscillation.)*"
+    )
+
+    # Breakdown-specific README sections
+    if stats.get("has_breakdown"):
+        bd = stats["breakdown_stats"]
+        dom_pos, dom_pos_val = bd["dominant_positive"]
+        dom_neg, dom_neg_val = bd["dominant_negative"]
+        breakdown_summary = (
+            f"### Reward Breakdown Summary\n\n"
+            f"| Component | Avg per Episode |\n"
+            f"|-----------|----------------|\n"
+            f"| Largest positive | {dom_pos} (+{dom_pos_val:.1f}) |\n"
+            f"| Largest penalty | {dom_neg} ({dom_neg_val:.1f}) |\n\n"
+            f"Component correlations with total reward:\n\n"
+            f"| Component | Correlation |\n"
+            f"|-----------|-------------|\n"
+            + "\n".join(
+                f"| {k} | {v:.2f} |"
+                for k, v in sorted(
+                    bd["comp_corrs"].items(), key=lambda x: abs(x[1]), reverse=True
+                )
+            )
+            + "\n"
+        )
+        breakdown_plot_rows = (
+            "| `09_reward_breakdown.png` | Per-component reward contribution over time |\n"
+            "| `10_positive_composition.png` | Stacked positive rewards (pellet, super, ghost, complete, BFS) |\n"
+            "| `11_penalty_composition.png` | Stacked penalties (step, oscillation, death) |\n"
+            "| `12_component_importance.png` | Each component as % of total |reward| |\n"
+        )
+    else:
+        breakdown_summary = (
+            "*(No reward-breakdown fields detected in log. Add the breakdown "
+            "chunk to the training logger to unlock per-component diagnostics.)*\n"
+        )
+        breakdown_plot_rows = ""
 
     content = README_TEMPLATE.format(
         num=num,
@@ -717,6 +1150,10 @@ def write_readme(out: Path, num: int, title: str, log_file: str, stats: dict) ->
         diagnosis_bullets=diagnosis_bullets,
         epoch_volatility_line=epoch_volatility_line,
         epoch_plot_row=epoch_plot_row,
+        maze_plot_row=maze_plot_row,
+        maze_corr_line=maze_corr_line,
+        breakdown_summary=breakdown_summary,
+        breakdown_plot_rows=breakdown_plot_rows,
         improving_pct=stats["trend_pct"].get("improving", 0.0),
         plateau_pct=stats["trend_pct"].get("plateau", 0.0),
         declining_pct=stats["trend_pct"].get("declining", 0.0),
@@ -730,6 +1167,10 @@ def write_readme(out: Path, num: int, title: str, log_file: str, stats: dict) ->
                 "diagnosis",
                 "epoch_volatility",
                 "has_epoch_rwd",
+                "has_maze_data",
+                "maze_reward_corr",
+                "has_breakdown",
+                "breakdown_stats",
             )
         },
     )
@@ -768,8 +1209,8 @@ def main() -> None:
     parser.add_argument(
         "logfile",
         nargs="?",
-        default="RL_logs.txt",
-        help="Path to the training log file (default: RL-logs.txt)",
+        default="training_log.txt",
+        help="Path to the training log file (default: training_log.txt)",
     )
     parser.add_argument(
         "--title", default="PPO Stage-1", help="Short title for this report"
@@ -789,6 +1230,8 @@ def main() -> None:
     print(f"Found {len(data['updates'])} unique update entries.")
     if data["epoch_rwds"] is not None:
         print("  -> per-epoch reward field detected, extra diagnostic plot enabled.")
+    if data["bd_step"] is not None:
+        print("  -> reward-breakdown fields detected, component plots enabled.")
 
     num, out_dir = next_report_dir(reports_root)
     print(f"Creating report #{num:03d} → {out_dir}/")

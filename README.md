@@ -39,18 +39,43 @@ uv run python -m AI_arena.player.player_training \
     --log-interval 10
 ```
 
+### Train the model again
+
 Press `Ctrl+C` during supervised training to save the current model and its
-optimizer checkpoint safely. Continue later with:
+optimizer checkpoint safely. To continue training the existing model on the
+Pac-Man imitation dataset, use:
 
 ```bash
-uv run python -m AI_arena.player.player_training --resume --epochs 10
+uv run python -u -m AI_arena.player.player_training \
+    --dataset AI_arena/data/PACMAN_IMITATION_DATA.jsonl \
+    --resume \
+    --epochs 50 \
+    --batch-size 64 \
+    --patience 10
 ```
+
+`--epochs 50` means 50 additional epochs. For example, a checkpoint at epoch
+29 resumes at epoch 30 and can continue through epoch 79. Early stopping may
+finish sooner when validation accuracy does not improve for 10 consecutive
+epochs.
+
+To discard the previous training state and start from random weights, use:
+
+```bash
+uv run python -u -m AI_arena.player.player_training \
+    --dataset AI_arena/data/PACMAN_IMITATION_DATA.jsonl \
+    --fresh \
+    --epochs 50 \
+    --batch-size 64 \
+    --patience 10
+```
+
+Use `--resume` to improve the existing model. Be careful with `--fresh`: its
+new model and checkpoints replace the current supervised model files as
+training progresses.
 
 Training prints progress every 10 batches. Add `--log-interval 1` to print
 after every batch.
-
-Use `--fresh` (the default behavior) to ignore an existing checkpoint and
-start again from random weights.
 
 # Pac-Man Supervised Learning / Imitation Learning Plan
 
@@ -179,6 +204,63 @@ score =
     - unnecessary_reverse_or_oscillation
     - distance_to_next_safe_pellet
 ```
+
+### How `teacher_scores` are calculated
+
+Every collected sample stores four expert scores in the project action order:
+
+```text
+teacher_scores = [UP, DOWN, LEFT, RIGHT]
+```
+
+For example:
+
+```text
+teacher_scores = [12.5, -100000.0, 31.2, 18.7]
+```
+
+Here, `LEFT` has the highest score, so the stored training label is `2`. An
+illegal action keeps a score of negative infinity, and an action that leads to
+danger receives a very large negative score.
+
+The current expert in `AI_arena/player/expert.py` uses these contributions:
+
+```text
+normal pellet                         +18.0
+power pellet with dangerous ghosts    +35.0
+power pellet when already safe        +12.0
+each available exit                    +0.3
+safe distance from a dangerous ghost   +1.5 per step, capped at 6 steps
+reachable edible ghost                 +7.0 / (distance + 1)
+dead end while ghosts are dangerous   -25.0
+continue in the same direction         +0.2
+distance to nearest future pellet      -0.6 per step
+dangerous future position             -100000 - remaining_horizon * 100
+```
+
+The expert adds the immediate score for a candidate first action to the best
+future score found by its short-horizon search. It then chooses the legal
+action with the largest total score.
+
+`remaining_horizon` is the number of future search moves left when danger is
+detected. With `--horizon 7`, danger found at move 3 leaves four moves:
+
+```text
+remaining_horizon = 7 - 3 = 4
+danger score = -100000 - (4 * 100) = -100400
+```
+
+Danger found earlier therefore receives a stronger penalty:
+
+```text
+danger at move 1 -> -100600
+danger at move 3 -> -100400
+danger at move 6 -> -100100
+```
+
+The horizon search is used only by the expert to create training labels. The
+trained CNN does not run this search; it learns to predict the expert's chosen
+action directly from the current observation.
 
 Death must dominate all positive terms. First reject actions that cause an
 immediate collision or an unavoidable collision within the rollout horizon.

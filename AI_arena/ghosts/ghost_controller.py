@@ -7,12 +7,11 @@ from typing import Any, TypedDict
 
 import torch
 
-# from AI_arena.data.constants import CNN_HEIGHT, CNN_WIDTH
 from AI_arena.models.cnn_ghost import GhostCNN
-from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 
-DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models" / "ghost_ai.pt"
-QUANTIZED_MODEL_PATH = Path(__file__).parent.parent / "models" / "ghost_ai_quantized.pt"
+MODEL_DIR = Path(__file__).parent.parent / "AI_models"
+DEFAULT_MODEL_PATH = MODEL_DIR / "ghost_ai.pt"
+QUANTIZED_MODEL_PATH = MODEL_DIR / "ghost_ai_quantized.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 GHOST_NAMES = ("Blinky", "Pinky", "Inky", "Clyde")
 
@@ -43,6 +42,7 @@ class CNNGhostController:
                 str(quantized), map_location=self.device
             )
             self.model.eval()
+            print(f"Loaded quantized ghost model from {quantized}")
             return
 
         self.model = GhostCNN().to(self.device)
@@ -51,6 +51,9 @@ class CNNGhostController:
                 model_path, map_location=self.device, weights_only=True
             )
             self.model.load_state_dict(weights)
+            print(f"Loaded ghost model from {model_path}")
+        else:
+            raise FileNotFoundError(f"Ghost model not found: {model_path}")
         self.model.eval()
 
     def predict(

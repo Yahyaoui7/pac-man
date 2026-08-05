@@ -188,11 +188,10 @@ class PlayingState(State):
                         f"{d}:{p*100:.0f}%"
                         for d, p in diag.get("probabilities", {}).items()
                     )
-                    val = diag.get("estimated_value", 0.0)
                     print(
                         f"🤖 [PLAYER AI] Frame {self.ai_frame_counter:04d} "
                         f"Node ({em.player.grid_x:02d},{em.player.grid_y:02d}) "
-                        f"-> Choice: {action:<5s} | V(s): {val:+.2f} | Probs: [{probs_str}]"
+                        f"-> Choice: {action:<5s} | Probs: [{probs_str}]"
                     )
 
         self.movement.update_entity(em.player)
@@ -705,7 +704,6 @@ class PlayingState(State):
             if self.player_controller
             else {}
         )
-        val = diag.get("estimated_value", 0.0)
         probs = diag.get("probabilities", {})
 
         probs_text = (
@@ -717,7 +715,7 @@ class PlayingState(State):
             else "EVALUATING..."
         )
 
-        line1 = f"🤖 AI PLAYER | MOVE: {decision} | V(s): {val:+.2f}"
+        line1 = f"🤖 SUPERVISED AI | MOVE: {decision}"
         line2 = f"PROBS: {probs_text}"
 
         font1 = ui.get_scaled_font(
@@ -814,8 +812,8 @@ class PlayingState(State):
                         if self.game.lives > 1:
                             self.game.sound_manager.play_sound("player_death")
                         # TODO: don't reset the location while training
-                        # self.game.lives -= 1
+                        self.game.lives -= 1
                         self.player_invincible_until = after(1500)
-                        # player.reset_location()
+                        player.reset_location()
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0

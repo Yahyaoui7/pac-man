@@ -204,14 +204,11 @@ class PacmanPlayerEnv:
         while q:
             y, x = q.popleft()
             d = dist[y][x]
-            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                ny, nx = y + dy, x + dx
-                if (
-                    0 <= ny < h
-                    and 0 <= nx < w
-                    and dist[ny][nx] == -1
-                    and self.maze[ny][nx] != 15  # not a wall
-                ):
+            # Maze cells contain directional wall bits; checking only whether
+            # the neighboring cell equals 15 allows shaping to pass through
+            # walls. Use the same legal connectivity as the game instead.
+            for ny, nx in self.movement.get_neighbors(y, x):
+                if dist[ny][nx] == -1:
                     dist[ny][nx] = d + 1
                     q.append((ny, nx))
         return dist
@@ -536,8 +533,13 @@ class PacmanPlayerEnv:
             "death": 0.0,
             "bfs": 0.0,
         }
-        if events.get("oscillating", False):
-            breakdown["oscillation"] = -0.5
+        if events.get("oscillating", False) and not (
+            events["pellet_eaten"] or events["super_pellet_eaten"]
+        ):
+            # Reversing out of a pellet-bearing dead end is required for a
+            # complete maze clear. Penalize only empty A->B->A cycles, and keep
+            # the signal small enough that it does not forbid backtracking.
+            breakdown["oscillation"] = -0.1
         if events["pellet_eaten"]:
             breakdown["pellet"] = 3.0
         if events["super_pellet_eaten"]:

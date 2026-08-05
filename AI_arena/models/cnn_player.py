@@ -14,11 +14,15 @@ from AI_arena.models.cnn_backbone import PacmanCNNBackbone
 
 
 class PlayerActorCritic(nn.Module):
-    """Actor-Critic model taking spatial grid and state features to output action logits and state value."""
+    """Legacy actor-critic model retained for old RL checkpoints."""
 
     def __init__(self) -> None:
         super().__init__()
-        self.backbone = PacmanCNNBackbone(dropout_prob=0.1)
+        # PPO compares action log-probabilities collected during the rollout
+        # with probabilities produced during optimization. Dropout would add
+        # unrelated randomness to that ratio, so the RL policy must be
+        # deterministic for a fixed observation and set of weights.
+        self.backbone = PacmanCNNBackbone(dropout_prob=0.0)
         self.actor = nn.Linear(128, ACTION_COUNT)
         self.critic = nn.Linear(128, 1)
 
@@ -32,6 +36,23 @@ class PlayerActorCritic(nn.Module):
         logits = self.actor(latent)
         value = self.critic(latent)
         return logits, value
+
+
+class PlayerImitationCNN(nn.Module):
+    """Pac-Man action classifier trained from expert demonstrations."""
+
+    def __init__(self, extra_feature_count: int = 35) -> None:
+        super().__init__()
+        self.backbone = PacmanCNNBackbone(
+            dropout_prob=0.1,
+            extra_feature_count=extra_feature_count,
+        )
+        self.action_head = nn.Linear(128, ACTION_COUNT)
+
+    def forward(self, grid: Tensor, extra_features: Tensor) -> Tensor:
+        return self.action_head(
+            self.backbone.extract_features(grid, extra_features)
+        )
 
 
 def main() -> None:

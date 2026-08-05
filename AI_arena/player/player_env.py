@@ -110,12 +110,15 @@ class PacmanPlayerEnv:
         self.prev_prev_cell: tuple[int, int] | None = None
 
         self.use_bfs_shaping = True
-        self.bfs_shaping_coef = 0.3  # start small; this only nudges navigation,
+        self.bfs_shaping_coef = 3  # start small; this only nudges navigation,
         # it shouldn't compete with the +5/+10 eat rewards
         self.bfs_shaping_gamma = 0.99  # match your PPO gamma
 
         self._pellet_dist_grid: list[list[int]] | None = None
         self._cached_potential: float = 0.0
+
+        self.episode_event_counts: dict[str, int] = {}
+        self.episode_reward_breakdown: dict[str, float] = {}
 
     def reset(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Reset episode state and return (grid, features, valid_actions).
@@ -128,6 +131,24 @@ class PacmanPlayerEnv:
         self.last_action = None
         self.last_cell = None
         self.prev_prev_cell = None
+        self.episode_event_counts = {
+            "pellet": 0,
+            "super": 0,
+            "osc": 0,
+            "died": 0,
+            "completed": 0,
+            "truncated": 0,
+        }
+        self.episode_reward_breakdown = {
+            "step": 0.0,
+            "oscillation": 0.0,
+            "pellet": 0.0,
+            "super_pellet": 0.0,
+            "ghost": 0.0,
+            "complete": 0.0,
+            "death": 0.0,
+            "bfs": 0.0,
+        }
 
         # Sample a fresh random maze size for this episode.
         maze_w = self.rng.randint(MAZE_WIDTH_MIN, MAZE_WIDTH_MAX)
@@ -296,9 +317,22 @@ class PacmanPlayerEnv:
             bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
             self._cached_potential = potential_after
 
-        reward = self._calculate_reward(events, bfs_shaping)
+        reward, breakdown = self._calculate_reward(events, bfs_shaping)
+        for key, val in breakdown.items():
+            self.episode_reward_breakdown[key] += val
 
-        self.step_count += 1  # counts cell crossings, not pixel ticks
+        if events["pellet_eaten"]:
+            self.episode_event_counts["pellet"] += 1
+        if events["super_pellet_eaten"]:
+            self.episode_event_counts["super"] += 1
+        if events["oscillating"]:
+            self.episode_event_counts["osc"] += 1
+        if events["pacman_died"]:
+            self.episode_event_counts["died"] += 1
+        if events["level_completed"]:
+            self.episode_event_counts["completed"] += 1
+
+        self.step_count += 1
 
         terminated = bool(events["pacman_died"] or events["level_completed"])
         truncated = self.step_count >= self.max_steps
@@ -310,6 +344,8 @@ class PacmanPlayerEnv:
             if self.total_pellets > 0
             else 0.0
         )
+        if truncated:
+            self.episode_event_counts["truncated"] += 1
 
         info = {
             "step": self.step_count,
@@ -321,8 +357,15 @@ class PacmanPlayerEnv:
             "remaining_pellets": self.remaining_pellets,
             "completion_pct": completion_pct,
             "stage": self.stage,
+            "maze": (len(self.maze[0]), len(self.maze)),
         }
-
+        if done:
+            info["episode_event_counts"] = (
+                dict(self.episode_event_counts) if done else None
+            )
+            info["episode_reward_breakdown"] = (
+                dict(self.episode_reward_breakdown) if done else None
+            )
         return self._get_observation(), reward, done, info
 
     def _create_entities(self) -> None:
@@ -482,24 +525,33 @@ class PacmanPlayerEnv:
 
     def _calculate_reward(
         self, events: dict[str, bool], bfs_shaping: float = 0.0
-    ) -> float:
-        reward = -0.01
+    ) -> tuple[float, dict[str, float]]:
+        breakdown = {
+            "step": -0.2,
+            "oscillation": 0.0,
+            "pellet": 0.0,
+            "super_pellet": 0.0,
+            "ghost": 0.0,
+            "complete": 0.0,
+            "death": 0.0,
+            "bfs": 0.0,
+        }
         if events.get("oscillating", False):
-            reward -= 3
+            breakdown["oscillation"] = -0.5
         if events["pellet_eaten"]:
-            reward += 5.0
+            breakdown["pellet"] = 3.0
         if events["super_pellet_eaten"]:
-            reward += 10.0
+            breakdown["super_pellet"] = 5.0
         if events["ghost_eaten"]:
-            reward += 30.0
+            breakdown["ghost"] = 30.0
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            reward += 200.0 + float(remaining_steps)
+            breakdown["complete"] = 100 + float(remaining_steps)
         if events["pacman_died"]:
-            reward -= 30.0
+            breakdown["death"] = -30.0
+        breakdown["bfs"] = self.bfs_shaping_coef * bfs_shaping
 
-        reward += self.bfs_shaping_coef * bfs_shaping
-        return reward
+        return sum(breakdown.values()), breakdown
 
     def _get_observation(
         self,

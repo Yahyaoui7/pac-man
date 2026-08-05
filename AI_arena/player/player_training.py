@@ -181,14 +181,14 @@ def _format_breakdown_line(recent_episodes: deque[dict[str, Any]]) -> str:
 def train_player_ppo(
     stage: int = 1,
     num_updates: int = 100,
-    rollout_steps: int = 1024,
+    rollout_steps: int = 4096,
     ppo_epochs: int = 4,
     minibatch_size: int = 64,
-    learning_rate: float = 1e-4,
+    learning_rate: float = 3e-5,
     gamma: float = 0.99,
     gae_lambda: float = 0.95,
     clip_eps: float = 0.2,
-    entropy_coef: float = 0.05,
+    entropy_coef: float = 0.005,
     value_coef: float = 0.5,
     max_grad_norm: float = 0.5,
     model_dir: Path = DEFAULT_MODEL_DIR,
@@ -434,6 +434,14 @@ def train_player_ppo(
                 avg_h = sum(ep["maze"][1] for ep in save_window_episodes) / len(
                     save_window_episodes
                 )
+                completion_rate = sum(
+                    ep["episode_event_counts"].get("completed", 0) > 0
+                    for ep in save_window_episodes
+                ) / len(save_window_episodes)
+                truncation_rate = sum(
+                    ep["episode_event_counts"].get("truncated", 0) > 0
+                    for ep in save_window_episodes
+                ) / len(save_window_episodes)
             else:
                 window_max_pct = 0.0
                 max_pellets = 0
@@ -441,6 +449,8 @@ def train_player_ppo(
                 avg_area = 0.0
                 avg_w = 0.0
                 avg_h = 0.0
+                completion_rate = 0.0
+                truncation_rate = 0.0
 
             # Build the reward-breakdown chunk (averaged over the 100-ep window)
             breakdown_line = _format_breakdown_line(save_window_episodes)
@@ -456,7 +466,9 @@ def train_player_ppo(
                     f"{breakdown_line} | "
                     f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
                     f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
-                    f"| Avg Maze Area: {avg_area:.1f} ({avg_w:.1f}x{avg_h:.1f})"
+                    f" | Complete: {completion_rate:5.1%}"
+                    f" | Truncated: {truncation_rate:5.1%}"
+                    f" | Avg Maze Area: {avg_area:.1f} ({avg_w:.1f}x{avg_h:.1f})"
                 )
 
             if update % save_interval == 0 or update == num_updates:
@@ -512,7 +524,7 @@ def main() -> None:
         "--num-updates", type=int, default=100, help="Number of PPO update iterations"
     )
     parser.add_argument(
-        "--rollout-steps", type=int, default=1024, help="Steps per rollout"
+        "--rollout-steps", type=int, default=4096, help="Steps per rollout"
     )
     parser.add_argument(
         "--save-interval", type=int, default=2, help="Snapshot save interval"

@@ -532,14 +532,17 @@ class PacmanPlayerEnv:
             "bfs": 0.0,
         }
 
+        eaten_pellets = max((self.total_pellets - self.remaining_pellets), 1)
+        frac_cleared = eaten_pellets / self.total_pellets
+        if frac_cleared >= 1 / 8:
+            frac_cleared = frac_cleared * 4
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -0.5
+            breakdown["oscillation"] = -1
 
         if events["pellet_eaten"]:
-            eaten_pellets = max((self.total_pellets - self.remaining_pellets), 1)
-            breakdown["pellet"] = 0.1 * eaten_pellets
+            breakdown["pellet"] = 1.0 + 4.0 * frac_cleared
 
         if events["super_pellet_eaten"]:
             breakdown["super_pellet"] = 2.0

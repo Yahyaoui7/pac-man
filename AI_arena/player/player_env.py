@@ -1,4 +1,4 @@
-"""Headless Pac-Man environment for player reinforcement learning against BFS ghosts."""
+"""Headless Pac-Man environment used for expert collection and evaluation."""
 
 from __future__ import annotations
 
@@ -9,25 +9,16 @@ import pygame
 
 import torch
 
-from AI_arena.data.constants import (
-    ACTION_COUNT,
-    CNN_CHANNEL_COUNT,
-    CNN_HEIGHT,
-    CNN_WIDTH,
-    EXTRA_FEATURE_COUNT,
-    GHOST_COUNT,
-)
-
+from AI_arena.data.constants import ACTION_COUNT
 from AI_arena.data.formatter import ObservationFormatter
-
-DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
-
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.graphic_lib import PacmanMode as pm, SpriteLibrary
 from src.graphics.entitys.player import Player
-from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
+from src.logic.config import CELL_SIZE
 from src.logic.level_manager import LevelManager
 from src.logic.movement import MovementSystem
+
+DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
 GHOST_SPECS = [
     ("Blinky", (255, 0, 0)),
@@ -151,6 +142,7 @@ class PacmanPlayerEnv:
 
         # Create Pellets
         self._create_pellets()
+        assert self.player is not None
         if self.use_bfs_shaping:
             self._pellet_dist_grid = self._compute_pellet_distance_grid()
             self._cached_potential = self._potential_at(
@@ -172,6 +164,8 @@ class PacmanPlayerEnv:
         """
         from collections import deque
 
+        if self.maze is None or self.pellets is None:
+            raise RuntimeError("Environment has not been initialized.")
         h, w = len(self.maze), len(self.maze[0])
         dist = [[-1] * w for _ in range(h)]
         q: deque[tuple[int, int]] = deque()
@@ -203,6 +197,8 @@ class PacmanPlayerEnv:
             return 0.0
         d = self._pellet_dist_grid[y][x]
         if d < 0:  # unreachable from here — shouldn't happen on a connected
+            if self.maze is None:
+                raise RuntimeError("Environment has not been initialized.")
             sentinel = len(self.maze) + len(self.maze[0])  # maze, but be safe
             return -float(sentinel)
         return -float(d)
@@ -265,6 +261,7 @@ class PacmanPlayerEnv:
                     break
 
             current_cell = (self.player.grid_y, self.player.grid_x)
+            assert self.movement is not None
             if current_cell != start_cell and self.movement.is_centered(self.player):
                 cell_changed = True
                 break
@@ -474,8 +471,7 @@ class PacmanPlayerEnv:
                     ghost.in_prison = True
                     ghost.reset()
                 else:
-                    # TODO: make true latter
-                    events["pacman_died"] = False
+                    events["pacman_died"] = True
                     break
 
         return events
@@ -528,7 +524,7 @@ class PacmanPlayerEnv:
                 maze=self.maze,
                 pellets=self.pellets,
                 player_pos=(self.player.grid_x, self.player.grid_y),
-                player_direction=self.player.direction,
+                player_direction=self.player.direction or "NONE",
                 ghost_states=ghost_states,
                 movement=self.movement,
                 device=self.device,

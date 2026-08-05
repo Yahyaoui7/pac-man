@@ -14,7 +14,7 @@ from AI_arena.models.cnn_backbone import PacmanCNNBackbone
 
 
 class PlayerActorCritic(nn.Module):
-    """Actor-Critic model taking spatial grid and state features to output action logits and state value."""
+    """Legacy actor-critic model retained for old RL checkpoints."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -32,6 +32,23 @@ class PlayerActorCritic(nn.Module):
         logits = self.actor(latent)
         value = self.critic(latent)
         return logits, value
+
+
+class PlayerImitationCNN(nn.Module):
+    """Pac-Man action classifier trained from expert demonstrations."""
+
+    def __init__(self, extra_feature_count: int = 35) -> None:
+        super().__init__()
+        self.backbone = PacmanCNNBackbone(
+            dropout_prob=0.1,
+            extra_feature_count=extra_feature_count,
+        )
+        self.action_head = nn.Linear(128, ACTION_COUNT)
+
+    def forward(self, grid: Tensor, extra_features: Tensor) -> Tensor:
+        return self.action_head(
+            self.backbone.extract_features(grid, extra_features)
+        )
 
 
 def main() -> None:

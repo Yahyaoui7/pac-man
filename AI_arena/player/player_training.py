@@ -1,472 +1,341 @@
-"""High-performance PPO training pipeline for Pac-Man player model with continuous checkpoint resuming."""
+"""Supervised imitation training for the Pac-Man player."""
 
 from __future__ import annotations
 
 import argparse
-import sys
-import threading
-import time
+import copy
+import random
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.distributions import Categorical
+from torch import nn
+from torch.utils.data import DataLoader, Subset
 
-from AI_arena.models.cnn_player import PlayerActorCritic
-from AI_arena.player.player_env import PacmanPlayerEnv
+from AI_arena.models.cnn_player import PlayerImitationCNN
+from AI_arena.player.imitation_dataset import PlayerImitationDataset
+from AI_arena.player.observation import PLAYER_EXTRA_FEATURE_COUNT
+from AI_arena.player.player_collector import (
+    DEFAULT_DATASET_PATH,
+    collect_demonstrations,
+)
 
-DEFAULT_MODEL_DIR = Path(__file__).parent.parent / "models"
-
-
-class QuitListener:
-    """Background listener that watches stdin for a single 'q' keypress.
-
-    Works cross-platform:
-      - On Unix, puts the terminal into cbreak mode so a bare 'q' (no Enter)
-        is detected immediately.
-      - On Windows, polls msvcrt.kbhit()/getch().
-      - Falls back to line-buffered input (needs Enter) if stdin isn't a
-        real interactive terminal (e.g. piped/redirected input, some IDEs).
-
-    Usage:
-        listener = QuitListener()
-        listener.start()
-        ...
-        if listener.stop_requested:
-            break
-        ...
-        listener.stop()  # always call when done, restores terminal state
-    """
-
-    def __init__(self) -> None:
-        self._stop_requested = threading.Event()
-        self._shutdown = threading.Event()
-        self._thread: threading.Thread | None = None
-
-    @property
-    def stop_requested(self) -> bool:
-        return self._stop_requested.is_set()
-
-    def start(self) -> None:
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-        print(
-            "Press 'q' at any time to stop training gracefully and save a checkpoint."
-        )
-
-    def stop(self) -> None:
-        self._shutdown.set()
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)
-
-    def _run(self) -> None:
-        if not sys.stdin.isatty():
-            self._run_line_buffered()
-            return
-
-        if sys.platform.startswith("win"):
-            self._run_windows()
-        else:
-            self._run_unix()
-
-    def _run_line_buffered(self) -> None:
-        # Fallback for non-interactive stdin (piped input, some notebooks/IDEs).
-        # Requires pressing Enter after 'q'.
-        while not self._shutdown.is_set():
-            try:
-                line = sys.stdin.readline()
-            except Exception:
-                return
-            if not line:
-                return
-            if line.strip().lower() == "q":
-                self._stop_requested.set()
-                return
-
-    def _run_windows(self) -> None:
-        import msvcrt
-
-        while not self._shutdown.is_set():
-            if msvcrt.kbhit():
-                ch = msvcrt.getch()
-                try:
-                    if ch.decode(errors="ignore").lower() == "q":
-                        self._stop_requested.set()
-                        return
-                except Exception:
-                    pass
-            time.sleep(0.05)
-
-    def _run_unix(self) -> None:
-        import select
-        import termios
-        import tty
-
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setcbreak(fd)
-            while not self._shutdown.is_set():
-                ready, _, _ = select.select([sys.stdin], [], [], 0.1)
-                if ready:
-                    ch = sys.stdin.read(1)
-                    if ch.lower() == "q":
-                        self._stop_requested.set()
-                        return
-        except Exception:
-            # Terminal may not support cbreak mode (e.g. redirected/dumb tty).
-            # Fall back to line-buffered mode.
-            self._run_line_buffered()
-        finally:
-            try:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            except Exception:
-                pass
+DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models" / "player_sl.pt"
 
 
-def train_player_ppo(
-    stage: int = 1,
-    num_updates: int = 100,
-    rollout_steps: int = 1024,
-    ppo_epochs: int = 4,
-    minibatch_size: int = 64,
-    learning_rate: float = 1e-4,
-    gamma: float = 0.99,
-    gae_lambda: float = 0.95,
-    clip_eps: float = 0.2,
-    entropy_coef: float = 0.05,
-    value_coef: float = 0.5,
-    max_grad_norm: float = 0.5,
-    model_dir: Path = DEFAULT_MODEL_DIR,
-    save_interval: int = 10,
-    seed: int = 42,
-    resume: bool = True,
-    resume_path: Path | None = None,
+def _checkpoint_path(model_path: str | Path) -> Path:
+    destination = Path(model_path)
+    return destination.with_name(f"{destination.stem}_checkpoint.pt")
+
+
+def _best_model_path(model_path: str | Path) -> Path:
+    destination = Path(model_path)
+    return destination.with_name(f"{destination.stem}_best.pt")
+
+
+def _save_training_state(
+    path: Path,
+    model: PlayerImitationCNN,
+    optimizer: torch.optim.Optimizer,
+    epoch: int,
+    best_accuracy: float,
+    stale_epochs: int,
 ) -> None:
-    """Train Pac-Man player model using PPO with continuous checkpoint resuming."""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"============================================================")
-    print(f"Starting Stage {stage} PPO Training for Pac-Man")
-    print(
-        f"Device: {device} | Total Updates: {num_updates} | Rollout Steps: {rollout_steps}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "model_state": model.state_dict(),
+            "optimizer_state": optimizer.state_dict(),
+            "epoch": epoch,
+            "best_accuracy": best_accuracy,
+            "stale_epochs": stale_epochs,
+        },
+        path,
     )
-    print(f"============================================================")
 
-    model_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = model_dir / f"player_rl_stage{stage}.pt"
 
-    env = PacmanPlayerEnv(seed=seed, stage=stage, device="cpu")
-    policy = PlayerActorCritic().to(device)
-    optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate)
+def _episode_split(
+    dataset: PlayerImitationDataset,
+    validation_fraction: float,
+    seed: int,
+) -> tuple[list[int], list[int]]:
+    episodes = sorted(set(dataset.episode_ids))
+    if len(episodes) < 2:
+        raise ValueError("Dataset needs at least two complete episodes")
+    random.Random(seed).shuffle(episodes)
+    validation_count = max(1, round(len(episodes) * validation_fraction))
+    validation_episodes = set(episodes[:validation_count])
+    train_indices = [
+        i
+        for i, episode in enumerate(dataset.episode_ids)
+        if episode not in validation_episodes
+    ]
+    validation_indices = [
+        i
+        for i, episode in enumerate(dataset.episode_ids)
+        if episode in validation_episodes
+    ]
+    return train_indices, validation_indices
+
+
+def _evaluate(
+    model: nn.Module,
+    loader: DataLoader,
+    device: torch.device,
+) -> tuple[float, float]:
+    model.eval()
+    total_loss = 0.0
+    correct = 0
+    count = 0
+    with torch.inference_mode():
+        for grid, features, valid, labels in loader:
+            grid = grid.to(device)
+            features = features.to(device)
+            valid = valid.to(device)
+            labels = labels.to(device)
+            logits = model(grid, features).masked_fill(~valid, -1e9)
+            loss = nn.functional.cross_entropy(logits, labels)
+            total_loss += loss.item() * labels.numel()
+            correct += (logits.argmax(dim=1) == labels).sum().item()
+            count += labels.numel()
+    return total_loss / count, correct / count
+
+
+def train_player_supervised(
+    dataset_path: str | Path = DEFAULT_DATASET_PATH,
+    model_path: str | Path = DEFAULT_MODEL_PATH,
+    *,
+    epochs: int = 20,
+    batch_size: int = 64,
+    learning_rate: float = 1e-3,
+    validation_fraction: float = 0.15,
+    patience: int = 5,
+    seed: int = 42,
+    resume: bool = False,
+    log_interval: int = 10,
+) -> PlayerImitationCNN:
+    if epochs < 1:
+        raise ValueError("epochs must be at least 1")
+    if batch_size < 1:
+        raise ValueError("batch_size must be at least 1")
+    if learning_rate <= 0:
+        raise ValueError("learning_rate must be positive")
+    if not 0.0 < validation_fraction < 1.0:
+        raise ValueError("validation_fraction must be between 0 and 1")
+    if patience < 1:
+        raise ValueError("patience must be at least 1")
+    if log_interval < 1:
+        raise ValueError("log_interval must be at least 1")
+    torch.manual_seed(seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Loading and validating dataset: {dataset_path}", flush=True)
+    complete = PlayerImitationDataset(dataset_path)
+    print(
+        f"Loaded {len(complete)} samples from "
+        f"{len(set(complete.episode_ids))} episodes",
+        flush=True,
+    )
+    train_indices, validation_indices = _episode_split(
+        complete, validation_fraction, seed
+    )
+    # Reuse the validated dataset. Constructing two more dataset instances
+    # would parse the entire (potentially multi-gigabyte) JSONL file twice.
+    train_data = Subset(complete, train_indices)
+    validation_data = Subset(complete, validation_indices)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    validation_loader = DataLoader(validation_data, batch_size=batch_size)
+    model = PlayerImitationCNN(PLAYER_EXTRA_FEATURE_COUNT).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    best_weights = copy.deepcopy(model.state_dict())
+    best_accuracy = -1.0
+    stale_epochs = 0
+    completed_epoch = 0
+    checkpoint = _checkpoint_path(model_path)
+    best_destination = _best_model_path(model_path)
+    Path(model_path).parent.mkdir(parents=True, exist_ok=True)
 
     if resume:
-        target_load = resume_path or checkpoint_path
-        if target_load.exists():
-            weights = torch.load(target_load, map_location=device, weights_only=True)
-            policy.load_state_dict(weights)
-            print(f"SUCCESS: Resumed training from checkpoint: {target_load.name}")
+        if not checkpoint.is_file():
+            raise FileNotFoundError(
+                f"Cannot resume: training checkpoint not found: {checkpoint}"
+            )
+        saved = torch.load(checkpoint, map_location=device, weights_only=True)
+        model.load_state_dict(saved["model_state"])
+        optimizer.load_state_dict(saved["optimizer_state"])
+        completed_epoch = int(saved["epoch"])
+        best_accuracy = float(saved.get("best_accuracy", -1.0))
+        previous_stale_epochs = int(saved.get("stale_epochs", 0))
+        # A resume command starts a new training session. Carrying an exhausted
+        # early-stopping counter into it can stop the requested run after one
+        # epoch, even when the user explicitly requested more training.
+        stale_epochs = 0
+        if best_destination.is_file():
+            best_weights = torch.load(
+                best_destination,
+                map_location=device,
+                weights_only=True,
+            )
         else:
-            print("No existing checkpoint found. Starting with fresh initial weights.")
-    else:
-        print("Starting training with fresh initial weights (--fresh specified).")
+            best_weights = copy.deepcopy(model.state_dict())
+        print(
+            f"Resumed supervised training from epoch {completed_epoch} "
+            f"(reset early-stopping counter from {previous_stale_epochs})"
+        )
 
-    quit_listener = QuitListener()
-    quit_listener.start()
-
-    start_time = time.time()
-    obs = env.reset()
-
-    from collections import deque
-
-    recent_episodes: deque[dict[str, float]] = deque(
-        maxlen=100
-    )  # 100-ep window smooths random-maze variance
-    current_ep_reward = 0.0
-    current_ep_steps = 0
-    total_completed_episodes = 0
-    last_update_completed = 0
-
-    # Best-checkpoint tracking — saves the peak policy, not just the last one.
-    best_checkpoint_path = model_dir / f"player_rl_stage{stage}_best.pt"
-    best_avg_pct: float = 0.0
-    best_avg_pellets: float = 0.0
-
+    print(
+        f"Supervised Pac-Man training on {device}: "
+        f"{len(train_data)} train / {len(validation_data)} validation",
+        flush=True,
+    )
+    first_epoch = completed_epoch + 1
+    final_epoch = completed_epoch + epochs
+    print(
+        "Press Ctrl+C to stop safely and save the current training state.",
+        flush=True,
+    )
     try:
-        for update in range(1, num_updates + 1):
-            update_start_time = time.time()
-            rollout_grids = []
-            rollout_features = []
-            rollout_valid_actions = []
-            rollout_actions = []
-            rollout_log_probs = []
-            rollout_rewards = []
-            rollout_dones = []
-            rollout_values = []
-
-            completed_episodes_in_update = 0
-            save_window_episodes: list[dict[str, float]] = []
-            # Fast Rollout Collection Phase (CPU -> GPU)
-
-            for _ in range(rollout_steps):
-                grid, features, valid_actions = obs
-
-                with torch.no_grad():
-                    logits, value = policy(grid.to(device), features.to(device))
-                    masked_logits = logits.masked_fill(~valid_actions.to(device), -1e9)
-                    dist = Categorical(logits=masked_logits)
-                    action = dist.sample()
-                    log_prob = dist.log_prob(action)
-
-                next_obs, reward, done, info = env.step(action.item())
-                current_ep_reward += reward
-                current_ep_steps += 1
-
-                rollout_grids.append(grid)
-                rollout_features.append(features)
-                rollout_valid_actions.append(valid_actions)
-                rollout_actions.append(action.cpu())
-                rollout_log_probs.append(log_prob.cpu())
-                rollout_rewards.append(torch.tensor([reward], dtype=torch.float32))
-                rollout_dones.append(torch.tensor([done], dtype=torch.float32))
-                rollout_values.append(value.squeeze(-1).cpu())
-
-                if done:
-                    obs = env.reset()
-                    ep_record = {
-                        "reward": current_ep_reward,
-                        "pellets": float(info["pellets_eaten"]),
-                        "pct": float(info["completion_pct"]),
-                        "steps": float(current_ep_steps),
-                    }
-                    current_ep_reward = 0.0
-                    current_ep_steps = 0
-                    completed_episodes_in_update += 1
-                    total_completed_episodes += 1
-                    recent_episodes.append(ep_record)
-                    save_window_episodes.append(ep_record)
-                else:
-                    obs = next_obs
-
-            # Bulk Transfer Rollout Data to GPU & GAE Calculation
-            with torch.no_grad():
-                last_grid, last_features, _ = obs
-                _, next_value = policy(last_grid.to(device), last_features.to(device))
-                next_value = next_value.squeeze(-1)
-
-            b_grids = torch.cat(rollout_grids, dim=0).to(device)
-            b_features = torch.cat(rollout_features, dim=0).to(device)
-            b_valid_actions = torch.cat(rollout_valid_actions, dim=0).to(device)
-            b_actions = torch.cat(rollout_actions, dim=0).to(device)
-            b_log_probs = torch.cat(rollout_log_probs, dim=0).to(device)
-            b_rewards = torch.cat(rollout_rewards, dim=0).to(device)
-            b_dones = torch.cat(rollout_dones, dim=0).to(device)
-            b_values = torch.cat(rollout_values, dim=0).to(device)
-
-            advantages = torch.zeros_like(b_rewards, device=device)
-            last_gae_lam = 0.0
-            for t in reversed(range(rollout_steps)):
-                if t == rollout_steps - 1:
-                    next_non_terminal = 1.0 - b_dones[t]
-                    next_val = next_value
-                else:
-                    next_non_terminal = 1.0 - b_dones[t]
-                    next_val = b_values[t + 1]
-
-                delta = (
-                    b_rewards[t] + gamma * next_val * next_non_terminal - b_values[t]
-                )
-                advantages[t] = last_gae_lam = (
-                    delta + gamma * gae_lambda * next_non_terminal * last_gae_lam
-                )
-
-            returns = advantages + b_values
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-            # PPO GPU Optimization Epochs
-            total_policy_loss = 0.0
-            total_value_loss = 0.0
-            total_entropy_loss = 0.0
-            dataset_size = rollout_steps
-
-            for _ in range(ppo_epochs):
-                permutation = torch.randperm(dataset_size, device=device)
-                for start_idx in range(0, dataset_size, minibatch_size):
-                    mb_idx = permutation[start_idx : start_idx + minibatch_size]
-
-                    mb_grid = b_grids[mb_idx]
-                    mb_features = b_features[mb_idx]
-                    mb_valid_actions = b_valid_actions[mb_idx]
-                    mb_actions = b_actions[mb_idx]
-                    mb_old_log_probs = b_log_probs[mb_idx]
-                    mb_adv = advantages[mb_idx]
-                    mb_returns = returns[mb_idx]
-
-                    logits, values = policy(mb_grid, mb_features)
-                    masked_logits = logits.masked_fill(~mb_valid_actions, -1e9)
-                    dist = Categorical(logits=masked_logits)
-
-                    new_log_probs = dist.log_prob(mb_actions)
-                    entropy = dist.entropy().mean()
-
-                    log_ratio = new_log_probs - mb_old_log_probs
-                    ratio = torch.exp(log_ratio)
-
-                    surr1 = ratio * mb_adv
-                    surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * mb_adv
-                    policy_loss = -torch.min(surr1, surr2).mean()
-
-                    value_loss = F.mse_loss(values.squeeze(-1), mb_returns)
-
-                    loss = (
-                        policy_loss + value_coef * value_loss - entropy_coef * entropy
+        for epoch in range(first_epoch, final_epoch + 1):
+            model.train()
+            loss_sum = 0.0
+            correct = 0
+            count = 0
+            batch_total = len(train_loader)
+            for batch_index, (grid, features, valid, labels) in enumerate(
+                train_loader,
+                start=1,
+            ):
+                grid = grid.to(device)
+                features = features.to(device)
+                valid = valid.to(device)
+                labels = labels.to(device)
+                logits = model(grid, features).masked_fill(~valid, -1e9)
+                loss = nn.functional.cross_entropy(logits, labels)
+                optimizer.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
+                loss_sum += loss.item() * labels.numel()
+                correct += (logits.argmax(dim=1) == labels).sum().item()
+                count += labels.numel()
+                if (
+                    batch_index % log_interval == 0
+                    or batch_index == batch_total
+                ):
+                    print(
+                        f"Epoch {epoch:03d} | batch "
+                        f"{batch_index:04d}/{batch_total:04d} | "
+                        f"loss={loss_sum/count:.5f} | "
+                        f"acc={correct/count:.2%}",
+                        flush=True,
                     )
-
-                    optimizer.zero_grad()
-                    loss.backward()
-                    nn.utils.clip_grad_norm_(policy.parameters(), max_grad_norm)
-                    optimizer.step()
-
-                    total_policy_loss += policy_loss.item()
-                    total_value_loss += value_loss.item()
-                    total_entropy_loss += entropy.item()
-
-            update_elapsed = time.time() - update_start_time
-            total_elapsed = time.time() - start_time
-            last_update_completed = update
-
-            if recent_episodes:
-                avg_reward = sum(ep["reward"] for ep in recent_episodes) / len(
-                    recent_episodes
-                )
-                avg_pellets = sum(ep["pellets"] for ep in recent_episodes) / len(
-                    recent_episodes
-                )
-
-                avg_pct = sum(ep["pct"] for ep in recent_episodes) / len(
-                    recent_episodes
-                )
+            val_loss, val_accuracy = _evaluate(
+                model, validation_loader, device
+            )
+            completed_epoch = epoch
+            print(
+                f"Epoch {epoch:03d}: train loss={loss_sum/count:.5f} "
+                f"acc={correct/count:.2%} | val loss={val_loss:.5f} "
+                f"acc={val_accuracy:.2%}"
+            )
+            if val_accuracy > best_accuracy:
+                best_accuracy = val_accuracy
+                best_weights = copy.deepcopy(model.state_dict())
+                torch.save(best_weights, best_destination)
+                stale_epochs = 0
             else:
-                avg_reward = current_ep_reward
-                avg_pellets = float(info.get("pellets_eaten", 0))
-                avg_pct = float(info.get("completion_pct", 0.0))
-
-            avg_policy_loss = total_policy_loss / (ppo_epochs * dataset_size)
-            avg_value_loss = total_value_loss / (ppo_epochs * dataset_size)
-
-            # Save best checkpoint whenever avg_pct improves
-            is_best = bool(recent_episodes and avg_pct > best_avg_pct)
-            if is_best:
-                best_avg_pct = avg_pct
-                best_avg_pellets = avg_pellets
-                torch.save(policy.state_dict(), best_checkpoint_path)
-
-            if save_window_episodes:
-                window_max_pct = max(ep["pct"] for ep in save_window_episodes)
-                max_pellets = int(max(ep["pellets"] for ep in save_window_episodes))
-                epoch_avg_reward = sum(
-                    ep["reward"] for ep in save_window_episodes
-                ) / len(save_window_episodes)
-                # window_episode_count = len(save_window_episodes)
-            else:
-                window_max_pct = 0.0
-                max_pellets = 0
-                # window_episode_count = 0
-
-            if update % 1 == 0 or update == 1 or update == num_updates:
-
-                print(
-                    f"Upd {update:03d}/{num_updates:03d} | "
-                    f"Tot Ep: {total_completed_episodes:03d} | "
-                    f"Averge Epoch Rwd: {epoch_avg_reward:6.1f} | "
-                    f"Max Epoch Pellets: {max_pellets:3d} ({window_max_pct:4.1f}%) | "
-                    f"Avg Pellets: {avg_pellets:5.1f} ({avg_pct:4.1f}%) | "
-                    f"Avg Rwd: {avg_reward:4.1f} | "
-                    f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
-                    f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
-                )
-
-            if update % save_interval == 0 or update == num_updates:
-                torch.save(policy.state_dict(), checkpoint_path)
-                save_window_episodes = []
-
-            if quit_listener.stop_requested:
-                print(f"\n'q' pressed — stopping after update {update}/{num_updates}.")
-                torch.save(policy.state_dict(), checkpoint_path)
-                print(f"Checkpoint saved to: {checkpoint_path}")
-                print(
-                    f"Best checkpoint (avg {best_avg_pct:.1f}%): {best_checkpoint_path}"
-                )
+                stale_epochs += 1
+            _save_training_state(
+                checkpoint,
+                model,
+                optimizer,
+                completed_epoch,
+                best_accuracy,
+                stale_epochs,
+            )
+            # Keep the live-game checkpoint usable after every epoch.
+            torch.save(model.state_dict(), Path(model_path))
+            if stale_epochs >= patience:
+                print(f"Early stopping after {epoch} epochs")
                 break
     except KeyboardInterrupt:
-        # Also handle Ctrl+C gracefully with a final save.
-        print(
-            f"\nKeyboardInterrupt — saving checkpoint at update {last_update_completed}."
+        destination = Path(model_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), destination)
+        _save_training_state(
+            checkpoint,
+            model,
+            optimizer,
+            completed_epoch,
+            best_accuracy,
+            stale_epochs,
         )
-        torch.save(policy.state_dict(), checkpoint_path)
-        print(f"Checkpoint saved to: {checkpoint_path}")
         print(
-            f"Best checkpoint (avg {best_avg_pct:.1f}% | {best_avg_pellets:.0f} pellets): {best_checkpoint_path}"
+            "\nTraining stopped safely. Current model saved to "
+            f"{destination}; "
+            f"resume state saved to {checkpoint}."
         )
-    finally:
-        quit_listener.stop()
+        return model
 
-    print(f"============================================================")
+    model.load_state_dict(best_weights)
+    destination = Path(model_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), destination)
     print(
-        f"Stage {stage} Training Stopped/Completed after {last_update_completed} update(s), "
-        f"{time.time() - start_time:.1f}s!"
+        f"Saved supervised player to {destination} "
+        f"(validation accuracy {best_accuracy:.2%})"
     )
-    print(f"Checkpoint Path: {checkpoint_path}")
-    print(f"Best Checkpoint: {best_checkpoint_path} (peak avg_pct={best_avg_pct:.1f}%)")
-    print(f"============================================================")
+    return model
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="PPO Stage 1 Trainer for Pac-Man Player Model"
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET_PATH)
+    parser.add_argument("--output", type=Path, default=DEFAULT_MODEL_PATH)
+    parser.add_argument("--collect-samples", type=int, default=0)
+    parser.add_argument("--stage", type=int, default=2)
+    parser.add_argument("--horizon", type=int, default=7)
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--validation-fraction", type=float, default=0.15)
+    parser.add_argument("--patience", type=int, default=5)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
-        "--stage",
+        "--log-interval",
         type=int,
-        default=1,
-        help="Curriculum stage (1=Pellets, 2=Static Ghosts, 3=BFS Ghosts)",
+        default=10,
+        help="Print progress every N training batches",
     )
-    parser.add_argument(
-        "--num-updates", type=int, default=100, help="Number of PPO update iterations"
+    start_group = parser.add_mutually_exclusive_group()
+    start_group.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue from player_sl_checkpoint.pt",
     )
-    parser.add_argument(
-        "--rollout-steps", type=int, default=1024, help="Steps per rollout"
-    )
-    parser.add_argument(
-        "--save-interval", type=int, default=2, help="Snapshot save interval"
-    )
-    parser.add_argument(
-        "--model-dir",
-        type=str,
-        default=str(DEFAULT_MODEL_DIR),
-        help="Model checkpoint directory",
-    )
-    parser.add_argument(
+    start_group.add_argument(
         "--fresh",
         action="store_true",
-        help="Start training from fresh initial weights instead of resuming checkpoint",
-    )
-    parser.add_argument(
-        "--resume-path",
-        type=str,
-        default="",
-        help="Custom checkpoint path to resume from",
+        help="Start from new random weights (the default)",
     )
     args = parser.parse_args()
-
-    train_player_ppo(
-        stage=args.stage,
-        num_updates=args.num_updates,
-        rollout_steps=args.rollout_steps,
-        save_interval=args.save_interval,
-        model_dir=Path(args.model_dir),
-        resume=not args.fresh,
-        resume_path=Path(args.resume_path) if args.resume_path else None,
+    if args.collect_samples:
+        collect_demonstrations(
+            args.collect_samples,
+            args.dataset,
+            stage=args.stage,
+            seed=args.seed,
+            horizon=args.horizon,
+        )
+    train_player_supervised(
+        args.dataset,
+        args.output,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        validation_fraction=args.validation_fraction,
+        patience=args.patience,
+        seed=args.seed,
+        resume=args.resume,
+        log_interval=args.log_interval,
     )
 
 

@@ -15,10 +15,9 @@ from AI_arena.ghosts.ghost_env import PacmanGhostEnv
 from AI_arena.ghosts.ghost_training import train as train_ghost_cnn
 from AI_arena.models.cnn_backbone import PacmanCNNBackbone
 from AI_arena.models.cnn_ghost import GhostCNN
-from AI_arena.models.cnn_player import PlayerActorCritic
+from AI_arena.models.cnn_player import PlayerActorCritic, PlayerImitationCNN
 from AI_arena.player.player_controller import CNNPlayerController
 from AI_arena.player.player_env import PacmanPlayerEnv
-from AI_arena.player.player_training import train_player_ppo
 
 __all__ = [
     "CNN_CHANNEL_COUNT",
@@ -33,9 +32,9 @@ __all__ = [
     "PacmanCNNBackbone",
     "GhostCNN",
     "PlayerActorCritic",
+    "PlayerImitationCNN",
     "PacmanPlayerEnv",
     "CNNPlayerController",
-    "train_player_ppo",
     "PacmanGhostEnv",
     "CNNGhostController",
     "train_ghost_cnn",

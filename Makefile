@@ -1,4 +1,4 @@
-.PHONY: install run debug collect train clean lint lint-strict
+.PHONY: install run debug collect train collect-player train-player clean lint lint-strict
 
 
 run:
@@ -15,6 +15,12 @@ collect:
 
 train:
 	uv run python -m AI_arena.ghosts.ghost_training --epochs 30 --patience 5
+
+collect-player:
+	uv run python -m AI_arena.player.player_collector --samples 10000 --stage 2
+
+train-player:
+	uv run python -m AI_arena.player.player_training --epochs 20 --batch-size 64
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

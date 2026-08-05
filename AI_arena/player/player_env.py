@@ -42,19 +42,17 @@ GHOST_SPECS = [
 # CNN_WIDTH  = 25  (columns / x-axis)
 # CNN_HEIGHT = 50  (rows / y-axis, but LevelManager caps height at 23 anyway)
 MAZE_WIDTH_MIN = 5
-# MAZE_WIDTH_MAX = CNN_WIDTH  # 25 — do not exceed CNN_WIDTH or formatter will fail
 MAZE_WIDTH_MAX = 10
 
 MAZE_HEIGHT_MIN = 5
 MAZE_HEIGHT_MAX = 10
-# MAZE_HEIGHT_MAX = min(CNN_HEIGHT, 23)  # 23 — game engine hard cap
 
 # Physics safety cap: max ticks to advance before giving up on centering
 MAX_PHYSICS_TICKS = 300
 
 # Multiplier for episode step limits based on maze size (w * h)
 # e.g. 2.5 * (10 * 10) = 250 max steps per episode.
-MAZE_STEP_MULTIPLIER: float = 5
+MAZE_STEP_MULTIPLIER: float = 7
 
 
 class PacmanPlayerEnv:
@@ -251,7 +249,7 @@ class PacmanPlayerEnv:
 
         assert self.player is not None
         self.player.next_direction = DIRECTIONS[action]
-
+        self.last_action = action
         events = {
             "pellet_eaten": False,
             "super_pellet_eaten": False,
@@ -522,7 +520,7 @@ class PacmanPlayerEnv:
         self, events: dict[str, bool], bfs_shaping: float = 0.0
     ) -> tuple[float, dict[str, float]]:
         breakdown = {
-            "step": -0.01,
+            "step": -0.2,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
@@ -534,12 +532,17 @@ class PacmanPlayerEnv:
 
         eaten_pellets = max((self.total_pellets - self.remaining_pellets), 1)
         frac_cleared = eaten_pellets / self.total_pellets
-        if frac_cleared >= 1 / 8:
+        if frac_cleared >= 7 / 10:
+            frac_cleared = frac_cleared * 1.5
+        elif frac_cleared >= 8 / 10:
+            frac_cleared = frac_cleared * 2
+        elif frac_cleared >= 9 / 10:
             frac_cleared = frac_cleared * 4
+
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -1
+            breakdown["oscillation"] = -0.1
 
         if events["pellet_eaten"]:
             breakdown["pellet"] = 1.0 + 4.0 * frac_cleared
@@ -595,4 +598,18 @@ class PacmanPlayerEnv:
             )
         )
 
+        # ─── Anti-oscillation hard mask ───
+        # Forbid the reverse of the last action if at least one other move is legal.
+        if self.last_action is not None:
+            rev = self._reverse_action(self.last_action)
+            if valid_player_actions[0, rev]:
+                if valid_player_actions.sum().item() > 1:
+                    valid_player_actions = valid_player_actions.clone()
+                    valid_player_actions[0, rev] = False
+        # ──────────────────────────────────
+
         return grid, extra_features, valid_player_actions
+
+    def _reverse_action(self, action: int) -> int:
+        """Return the reverse direction index."""
+        return {0: 1, 1: 0, 2: 3, 3: 2}[action]

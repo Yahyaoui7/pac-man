@@ -3,19 +3,23 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import torch
 
-from AI_arena.models.cnn_player import PlayerImitationCNN
-from AI_arena.player.observation import (
-    PLAYER_EXTRA_FEATURE_COUNT,
-    format_player_observation,
+from AI_arena.data.constants import (
+    ACTION_COUNT,
+    CNN_CHANNEL_COUNT,
+    CNN_HEIGHT,
+    CNN_WIDTH,
 )
+from AI_arena.models.cnn_player import PlayerActorCritic
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
+from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 
-DEFAULT_PLAYER_PATH = Path(__file__).parent.parent / "models" / "player_sl.pt"
+from AI_arena.data.formatter import ObservationFormatter
+
+DEFAULT_STAGE1_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage1.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
 
@@ -24,17 +28,22 @@ class CNNPlayerController:
 
     def __init__(self, model_path: str | Path | None = None) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = PlayerImitationCNN(PLAYER_EXTRA_FEATURE_COUNT).to(self.device)
-        path = DEFAULT_PLAYER_PATH if model_path is None else Path(model_path)
+        self.model = PlayerActorCritic().to(self.device)
+
+        if model_path is None:
+            if DEFAULT_STAGE1_PATH.exists():
+                path = DEFAULT_STAGE1_PATH
+
+        else:
+            path = Path(model_path)
 
         if path.exists():
             weights = torch.load(path, map_location=self.device, weights_only=True)
             self.model.load_state_dict(weights)
-            print(f"Loaded supervised player checkpoint from {path}")
+            print(f"Loaded player RL checkpoint from {path}")
         else:
             print(
-                f"Warning: supervised player checkpoint {path} not found. "
-                "Using untrained weights."
+                f"Warning: Player RL checkpoint {path} not found. Using untrained weights."
             )
 
         self.model.eval()
@@ -49,13 +58,13 @@ class CNNPlayerController:
         movement_system: Any,
         sample: bool = True,
     ) -> str:
-        """Construct state tensors and select a sampled or greedy action."""
+        """Construct state tensors and select action (sampling from distribution or greedy)."""
         grid, extra_features, valid_actions = self._build_observation(
             maze, pellets, player, ghosts, movement_system
         )
 
         with torch.no_grad():
-            logits = self.model(grid, extra_features)
+            logits, value = self.model(grid, extra_features)
             masked_logits = logits.masked_fill(~valid_actions, -1e9)
             probs = torch.softmax(masked_logits, dim=-1)[0]
             if sample:
@@ -66,6 +75,7 @@ class CNNPlayerController:
         chosen_action = DIRECTIONS[action_index]
         self.last_diagnostics = {
             "chosen_action": chosen_action,
+            "estimated_value": round(float(value.item()), 4),
             "probabilities": {
                 d: round(float(probs[i].item()), 4) for i, d in enumerate(DIRECTIONS)
             },
@@ -88,13 +98,25 @@ class CNNPlayerController:
         ghosts: list[Ghost],
         movement_system: Any,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        grid, extra_features, valid_player_actions = format_player_observation(
-            maze=maze,
-            pellets=pellets,
-            player=player,
-            ghosts=ghosts,
-            movement=movement_system,
-            initial_pellet_count=None,
-            device=self.device,
+        ghost_states = [
+            {
+                "grid_x": ghost.grid_x,
+                "grid_y": ghost.grid_y,
+                "is_edible": ghost.is_edible,
+                "direction": ghost.direction,
+            }
+            for ghost in ghosts
+        ]
+
+        grid, extra_features, valid_player_actions, _ = (
+            ObservationFormatter.format_observation(
+                maze=maze,
+                pellets=pellets,
+                player_pos=(player.grid_x, player.grid_y),
+                player_direction=player.direction,
+                ghost_states=ghost_states,
+                movement=movement_system,
+                device=self.device,
+            )
         )
         return grid, extra_features, valid_player_actions

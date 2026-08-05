@@ -182,7 +182,7 @@ def train_player_ppo(
     stage: int = 1,
     num_updates: int = 100,
     rollout_steps: int = 4096,
-    ppo_epochs: int = 4,
+    ppo_epochs: int = 2,
     minibatch_size: int = 64,
     learning_rate: float = 3e-5,
     gamma: float = 0.99,
@@ -524,7 +524,7 @@ def main() -> None:
         "--num-updates", type=int, default=100, help="Number of PPO update iterations"
     )
     parser.add_argument(
-        "--rollout-steps", type=int, default=4096, help="Steps per rollout"
+        "--rollout-steps", type=int, default=1024, help="Steps per rollout"
     )
     parser.add_argument(
         "--save-interval", type=int, default=2, help="Snapshot save interval"

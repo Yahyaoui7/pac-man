@@ -110,8 +110,6 @@ class PacmanPlayerEnv:
         self.prev_prev_cell: tuple[int, int] | None = None
 
         self.use_bfs_shaping = True
-        self.bfs_shaping_coef = 3  # start small; this only nudges navigation,
-        # it shouldn't compete with the +5/+10 eat rewards
         self.bfs_shaping_gamma = 0.99  # match your PPO gamma
 
         self._pellet_dist_grid: list[list[int]] | None = None
@@ -524,7 +522,7 @@ class PacmanPlayerEnv:
         self, events: dict[str, bool], bfs_shaping: float = 0.0
     ) -> tuple[float, dict[str, float]]:
         breakdown = {
-            "step": -0.2,
+            "step": -0.01,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
@@ -533,25 +531,30 @@ class PacmanPlayerEnv:
             "death": 0.0,
             "bfs": 0.0,
         }
+
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            # Reversing out of a pellet-bearing dead end is required for a
-            # complete maze clear. Penalize only empty A->B->A cycles, and keep
-            # the signal small enough that it does not forbid backtracking.
-            breakdown["oscillation"] = -0.1
+            breakdown["oscillation"] = -0.5
+
         if events["pellet_eaten"]:
-            breakdown["pellet"] = 3.0
+            eaten_pellets = max((self.total_pellets - self.remaining_pellets), 1)
+            breakdown["pellet"] = 0.1 * eaten_pellets
+
         if events["super_pellet_eaten"]:
-            breakdown["super_pellet"] = 5.0
+            breakdown["super_pellet"] = 2.0
+
         if events["ghost_eaten"]:
-            breakdown["ghost"] = 30.0
+            breakdown["ghost"] = 10.0
+
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            breakdown["complete"] = 100 + float(remaining_steps)
+            breakdown["complete"] = 500.0 + float(remaining_steps)
+
         if events["pacman_died"]:
-            breakdown["death"] = -30.0
-        breakdown["bfs"] = self.bfs_shaping_coef * bfs_shaping
+            breakdown["death"] = -50.0
+
+        breakdown["bfs"] = 2 * bfs_shaping
 
         return sum(breakdown.values()), breakdown
 

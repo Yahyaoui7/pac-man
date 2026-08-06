@@ -106,8 +106,9 @@ class PacmanPlayerEnv:
         # Anti-oscillation tracking (last two cell positions)
         self.last_cell: tuple[int, int] | None = None
         self.prev_prev_cell: tuple[int, int] | None = None
-        self.mask_reverse_prob = 0.5  # 50% of episodes use the hard mask
-        self.use_reverse_mask = False  # set per-episode in reset()
+        # Reverse mask is always active — 50% randomness taught the model that
+        # reversals are sometimes valid, reinforcing the oscillating attractor.
+        self.use_reverse_mask = True
 
         self.use_bfs_shaping = True
         self.bfs_shaping_gamma = 0.99  # match your PPO gamma
@@ -129,6 +130,7 @@ class PacmanPlayerEnv:
         self.last_action = None
         self.last_cell = None
         self.prev_prev_cell = None
+        self._osc_count = 0  # Tracks oscillations in the current episode
         self.episode_event_counts = {
             "pellet": 0,
             "super": 0,
@@ -181,7 +183,6 @@ class PacmanPlayerEnv:
             self.visited_tiles.add(start_cell)
             self.last_cell = start_cell
 
-        self.use_reverse_mask = self.rng.random() < self.mask_reverse_prob
         return self._get_observation()
 
     def _compute_pellet_distance_grid(self) -> list[list[int]]:
@@ -299,6 +300,7 @@ class PacmanPlayerEnv:
         if cell_changed and self.prev_prev_cell is not None:
             if current_pos == self.prev_prev_cell:
                 events["oscillating"] = True
+                self._osc_count += 1
 
         # Update oscillation history
         if cell_changed:
@@ -533,19 +535,27 @@ class PacmanPlayerEnv:
             "bfs": 0.0,
         }
 
+        # Fix: cascade the thresholds from high to low so only one fires.
+        # Previously all three elif branches were dead — the first if >= 0.7
+        # caught everything above 70%, so 80% and 90% tiers never applied.
         eaten_pellets = max((self.total_pellets - self.remaining_pellets), 1)
         frac_cleared = eaten_pellets / self.total_pellets
-        if frac_cleared >= 7 / 10:
-            frac_cleared = frac_cleared * 1.5
-        elif frac_cleared >= 8 / 10:
-            frac_cleared = frac_cleared * 2
-        elif frac_cleared >= 9 / 10:
+        if frac_cleared >= 0.9:
             frac_cleared = frac_cleared * 4
+        elif frac_cleared >= 0.8:
+            frac_cleared = frac_cleared * 2
+        elif frac_cleared >= 0.7:
+            frac_cleared = frac_cleared * 1.5
 
+        # Progressive oscillation penalty: each additional bounce in the same
+        # episode costs more. The first one is -0.5; by the 10th it's -5.0.
+        # This breaks the value function's equilibrium — a uniform flat penalty
+        # gets absorbed into the baseline; an escalating one does not.
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -0.5
+            osc_penalty = -0.5 * min(self._osc_count, 10)
+            breakdown["oscillation"] = osc_penalty
 
         if events["pellet_eaten"]:
             breakdown["pellet"] = 1.0 + 4.0 * frac_cleared

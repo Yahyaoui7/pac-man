@@ -106,6 +106,8 @@ class PacmanPlayerEnv:
         # Anti-oscillation tracking (last two cell positions)
         self.last_cell: tuple[int, int] | None = None
         self.prev_prev_cell: tuple[int, int] | None = None
+        self.mask_reverse_prob = 0.5  # 50% of episodes use the hard mask
+        self.use_reverse_mask = False  # set per-episode in reset()
 
         self.use_bfs_shaping = True
         self.bfs_shaping_gamma = 0.99  # match your PPO gamma
@@ -179,6 +181,7 @@ class PacmanPlayerEnv:
             self.visited_tiles.add(start_cell)
             self.last_cell = start_cell
 
+        self.use_reverse_mask = self.rng.random() < self.mask_reverse_prob
         return self._get_observation()
 
     def _compute_pellet_distance_grid(self) -> list[list[int]]:
@@ -542,7 +545,7 @@ class PacmanPlayerEnv:
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -0.1
+            breakdown["oscillation"] = -0.5
 
         if events["pellet_eaten"]:
             breakdown["pellet"] = 1.0 + 4.0 * frac_cleared
@@ -600,7 +603,7 @@ class PacmanPlayerEnv:
 
         # ─── Anti-oscillation hard mask ───
         # Forbid the reverse of the last action if at least one other move is legal.
-        if self.last_action is not None:
+        if self.last_action is not None and self.use_reverse_mask:
             rev = self._reverse_action(self.last_action)
             if valid_player_actions[0, rev]:
                 if valid_player_actions.sum().item() > 1:

@@ -19,6 +19,7 @@ from AI_arena.data.constants import (
 )
 
 from AI_arena.data.formatter import ObservationFormatter
+from AI_arena.player.observation import format_player_observation
 
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
@@ -38,15 +39,15 @@ GHOST_SPECS = [
 
 
 MAZE_WIDTH_MIN = 5
-MAZE_WIDTH_MAX = 43
+MAZE_WIDTH_MAX = 15
 
 MAZE_HEIGHT_MIN = 5
-MAZE_HEIGHT_MAX = 23
+MAZE_HEIGHT_MAX = 15
 
 MAX_PHYSICS_TICKS = 300
 
 
-MAZE_STEP_MULTIPLIER: float = 7
+MAZE_STEP_MULTIPLIER: float = 9
 
 
 GHOST_RESPAWN_TICKS: int = 15
@@ -103,9 +104,9 @@ class PacmanPlayerEnv:
         # Anti-oscillation tracking (last two cell positions)
         self.last_cell: tuple[int, int] | None = None
         self.prev_prev_cell: tuple[int, int] | None = None
-        # Reverse mask is always active — 50% randomness taught the model that
-        # reversals are sometimes valid, reinforcing the oscillating attractor.
-        self.use_reverse_mask = True
+        # Reverse mask disabled by default: action history in state observation
+        # lets policy learn natural momentum without hard masking deadlocks.
+        self.use_reverse_mask = False
 
         self.use_bfs_shaping = False
         self.bfs_shaping_gamma = 0.99  # match your PPO gamma
@@ -337,14 +338,7 @@ class PacmanPlayerEnv:
 
         self.step_count += 1
 
-        # If Pac-Man died: respawn at maze center instead of ending episode
-        if events["pacman_died"] and self.stage > 1:
-            self._respawn_player()
-
-        terminated = bool(
-            (events["pacman_died"] and self.stage == 1)  # stage 1 never dies but guard
-            or events["level_completed"]
-        )
+        terminated = bool(events["pacman_died"] or events["level_completed"])
         truncated = self.step_count >= self.max_steps
         done = terminated or truncated
 
@@ -536,8 +530,6 @@ class PacmanPlayerEnv:
 
         if self.remaining_pellets <= 0:
             events["level_completed"] = True
-        if self.step_count >= self.max_steps:
-            events["pacman_died"] = True
         if self.stage == 1:
             return events
 
@@ -604,21 +596,21 @@ class PacmanPlayerEnv:
         # Cascade thresholds high→low so each tier fires correctly.
         eaten_pellets = max((self.total_pellets - self.remaining_pellets), 1)
         frac_cleared = eaten_pellets / self.total_pellets
-        if frac_cleared >= 0.95:
+        if frac_cleared >= 0.9:
             frac_cleared = frac_cleared * 4
-        elif frac_cleared >= 0.9:
+        elif frac_cleared >= 0.75:
             frac_cleared = frac_cleared * 2
-        elif frac_cleared >= 0.85:
+        elif frac_cleared >= 0.6:
             frac_cleared = frac_cleared * 1.5
 
         # Progressive oscillation penalty
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -2.0
+            breakdown["oscillation"] = -0.5
 
         if events["pellet_eaten"]:
-            breakdown["pellet"] = 1.0
+            breakdown["pellet"] = 1.0 + 3.0 * frac_cleared
 
         if events["super_pellet_eaten"]:
             breakdown["super_pellet"] = 2.0
@@ -628,7 +620,7 @@ class PacmanPlayerEnv:
 
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            breakdown["complete"] = float(remaining_steps * 2)
+            breakdown["complete"] = (self.max_steps / 6 ) + float(remaining_steps)
 
         if events["pacman_died"]:
             breakdown["death"] = -50.0
@@ -666,26 +658,14 @@ class PacmanPlayerEnv:
         ):
             raise RuntimeError("Environment has not been initialized.")
 
-        ghost_states = [
-            {
-                "grid_x": ghost.grid_x,
-                "grid_y": ghost.grid_y,
-                "is_edible": ghost.is_edible,
-                "direction": ghost.direction,
-            }
-            for ghost in self.ghosts
-        ]
-
-        grid, extra_features, valid_player_actions, _ = (
-            ObservationFormatter.format_observation(
-                maze=self.maze,
-                pellets=self.pellets,
-                player_pos=(self.player.grid_x, self.player.grid_y),
-                player_direction=self.player.direction,
-                ghost_states=ghost_states,
-                movement=self.movement,
-                device=self.device,
-            )
+        grid, extra_features, valid_player_actions = format_player_observation(
+            maze=self.maze,
+            pellets=self.pellets,
+            player=self.player,
+            ghosts=self.ghosts,
+            movement=self.movement,
+            initial_pellet_count=self.total_pellets,
+            device=self.device,
         )
 
         # ─── Anti-oscillation hard mask ───

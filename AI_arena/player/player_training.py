@@ -16,166 +16,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from AI_arena.models.cnn_player import PlayerActorCritic
+from AI_arena.models.cnn_player import PlayerActorCritic, load_sl_weights_into_ppo
 from AI_arena.player.player_env import PacmanPlayerEnv
 
 DEFAULT_MODEL_DIR = Path(__file__).parent.parent / "models"
 
-BD_LABELS = {
-    "step": "Step",
-    "oscillation": "Osc",
-    "pellet": "Pellet",
-    "super_pellet": "Super",
-    "ghost": "Ghost",
-    "complete": "Complete",
-    "death": "Death",
-    "bfs": "BFS",
-}
-
-
-class TrainingLogger:
-    """Appends every log line to a file and optionally mirrors to stdout."""
-
-    def __init__(self, log_path: Path, quiet: bool = False) -> None:
-        self.quiet = quiet
-        self.log_path = log_path
-        self._file = open(log_path, "a", encoding="utf-8", buffering=1)
-        self._file.write(
-            f"\n{'='*70}\n"
-            f"Training session started at {datetime.now().isoformat()}\n"
-            f"{'='*70}\n"
-        )
-        self._file.flush()
-
-    def log(self, message: str) -> None:
-        if not self.quiet:
-            print(message)
-        self._file.write(message + "\n")
-        self._file.flush()
-
-    def close(self) -> None:
-        if not self._file.closed:
-            self._file.close()
-
-
-class QuitListener:
-    """Background listener that watches stdin for a single 'q' keypress.
-
-    Works cross-platform:
-      - On Unix, puts the terminal into cbreak mode so a bare 'q' (no Enter)
-        is detected immediately.
-      - On Windows, polls msvcrt.kbhit()/getch().
-      - Falls back to line-buffered input (needs Enter) if stdin isn't a
-        real interactive terminal (e.g. piped/redirected input, some IDEs).
-
-    Usage:
-        listener = QuitListener()
-        listener.start()
-        ...
-        if listener.stop_requested:
-            break
-        ...
-        listener.stop()  # always call when done, restores terminal state
-    """
-
-    def __init__(self) -> None:
-        self._stop_requested = threading.Event()
-        self._shutdown = threading.Event()
-        self._thread: threading.Thread | None = None
-
-    @property
-    def stop_requested(self) -> bool:
-        return self._stop_requested.is_set()
-
-    def start(self) -> None:
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-        print(
-            "Press 'q' at any time to stop training gracefully and save a checkpoint."
-        )
-
-    def stop(self) -> None:
-        self._shutdown.set()
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)
-
-    def _run(self) -> None:
-        if not sys.stdin.isatty():
-            self._run_line_buffered()
-            return
-
-        if sys.platform.startswith("win"):
-            self._run_windows()
-        else:
-            self._run_unix()
-
-    def _run_line_buffered(self) -> None:
-        # Fallback for non-interactive stdin (piped input, some notebooks/IDEs).
-        # Requires pressing Enter after 'q'.
-        while not self._shutdown.is_set():
-            try:
-                line = sys.stdin.readline()
-            except Exception:
-                return
-            if not line:
-                return
-            if line.strip().lower() == "q":
-                self._stop_requested.set()
-                return
-
-    def _run_windows(self) -> None:
-        import msvcrt
-
-        while not self._shutdown.is_set():
-            if msvcrt.kbhit():
-                ch = msvcrt.getch()
-                try:
-                    if ch.decode(errors="ignore").lower() == "q":
-                        self._stop_requested.set()
-                        return
-                except Exception:
-                    pass
-            time.sleep(0.05)
-
-    def _run_unix(self) -> None:
-        import select
-        import termios
-        import tty
-
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setcbreak(fd)
-            while not self._shutdown.is_set():
-                ready, _, _ = select.select([sys.stdin], [], [], 0.1)
-                if ready:
-                    ch = sys.stdin.read(1)
-                    if ch.lower() == "q":
-                        self._stop_requested.set()
-                        return
-        except Exception:
-            # Terminal may not support cbreak mode (e.g. redirected/dumb tty).
-            # Fall back to line-buffered mode.
-            self._run_line_buffered()
-        finally:
-            try:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            except Exception:
-                pass
-
-
-def _format_breakdown_line(recent_episodes: deque[dict[str, Any]]) -> str:
-    """Return a compact ' | Key: +X.X' string averaged over the last window."""
-    if not recent_episodes:
-        return " | ".join(f"{label}: +0.0" for label in BD_LABELS.values())
-
-    parts = []
-    for key, label in BD_LABELS.items():
-        avg = sum(
-            ep["episode_reward_breakdown"].get(key, 0.0) for ep in recent_episodes
-        ) / len(recent_episodes)
-        parts.append(f"{label}: {avg:+.1f}")
-    return " | ".join(parts)
+from AI_arena.player.utils import (
+    BD_LABELS,
+    QuitListener,
+    TrainingLogger,
+    format_breakdown_line,
+)
 
 
 def train_player_ppo(
@@ -197,16 +48,22 @@ def train_player_ppo(
     resume: bool = True,
     resume_path: Path | None = None,
     log_file: Path = Path("training_log.txt"),
+    sl_warmstart: bool = True,
     quiet: bool = False,
 ) -> None:
     """Train Pac-Man player model using PPO with continuous checkpoint resuming."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        torch.set_float32_matmul_precision("high")
+        torch.backends.cudnn.benchmark = True
+
+    scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda"))
     logger = TrainingLogger(log_file, quiet)
 
     logger.log(f"============================================================")
     logger.log(f"Starting Stage {stage} PPO Training for Pac-Man")
     logger.log(
-        f"Device: {device} | Total Updates: {num_updates} | Rollout Steps: {rollout_steps}"
+        f"Device: {device} | AMP: {device.type == 'cuda'} | Total Updates: {num_updates} | Rollout Steps: {rollout_steps}"
     )
     logger.log(f"============================================================")
 
@@ -217,7 +74,10 @@ def train_player_ppo(
     policy = PlayerActorCritic().to(device)
     optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate)
 
-    if resume:
+    loaded_checkpoint = False
+    sl_best_path = model_dir / "player_sl_best.pt"
+    loaded_checkpoint = False
+    if resume and not sl_warmstart:
         target_load = resume_path or checkpoint_path
         if not target_load.exists() and stage > 1:
             stage1_best = model_dir / f"player_rl_stage{stage-1}_best.pt"
@@ -230,13 +90,28 @@ def train_player_ppo(
         if target_load.exists():
             weights = torch.load(target_load, map_location=device, weights_only=True)
             policy.load_state_dict(weights)
+            loaded_checkpoint = True
             logger.log(f"SUCCESS: Resumed training from checkpoint: {target_load.name}")
+
+    ref_policy: PlayerActorCritic | None = None
+    if not loaded_checkpoint:
+        if sl_warmstart and sl_best_path.exists():
+            load_sl_weights_into_ppo(policy, str(sl_best_path), device=device)
+            logger.log(f"SUCCESS: Warm-started PPO policy with pre-trained SL weights ({sl_best_path.name})")
+
+            # Freeze CNN backbone to preserve expert spatial representation
+            for p in policy.backbone.parameters():
+                p.requires_grad = False
+            logger.log("INFO: Frozen CNN backbone parameters to prevent spatial policy degradation.")
+
+            # Create frozen reference policy for KL anchoring
+            ref_policy = PlayerActorCritic().to(device)
+            load_sl_weights_into_ppo(ref_policy, str(sl_best_path), device=device)
+            ref_policy.eval()
+            for p in ref_policy.parameters():
+                p.requires_grad = False
         else:
-            logger.log(
-                "No existing checkpoint found. Starting with fresh initial weights."
-            )
-    else:
-        logger.log("Starting training with fresh initial weights (--fresh specified).")
+            logger.log("Starting training with fresh random initial weights.")
 
     quit_listener = QuitListener()
     quit_listener.start()
@@ -250,7 +125,11 @@ def train_player_ppo(
     total_completed_episodes = 0
     last_update_completed = 0
 
-    # Best-checkpoint tracking — saves the peak policy, not just the last one.
+    if sl_warmstart and sl_best_path.exists() and not loaded_checkpoint:
+        learning_rate = 5e-5
+        optimizer = torch.optim.Adam([p for p in policy.parameters() if p.requires_grad], lr=learning_rate)
+        logger.log(f"INFO: Adjusted learning rate to {learning_rate} for PPO head fine-tuning.")
+
     best_checkpoint_path = model_dir / f"player_rl_stage{stage}_best.pt"
     best_avg_pct: float = 0.0
     best_avg_pellets: float = 0.0
@@ -269,14 +148,13 @@ def train_player_ppo(
 
             completed_episodes_in_update = 0
             save_window_episodes: list[dict[str, float]] = []
-            # Fast Rollout Collection Phase (CPU -> GPU)
 
             for _ in range(rollout_steps):
                 grid, features, valid_actions = obs
 
                 with torch.no_grad():
                     logits, value = policy(grid.to(device), features.to(device))
-                    masked_logits = logits.masked_fill(~valid_actions.to(device), -1e9)
+                    masked_logits = logits.masked_fill(~valid_actions.to(device), -1e4)
                     dist = Categorical(logits=masked_logits)
                     action = dist.sample()
                     log_prob = dist.log_prob(action)
@@ -296,11 +174,15 @@ def train_player_ppo(
 
                 if done:
                     obs = env.reset()
+                    ep_steps = max(1.0, float(current_ep_steps))
+                    osc_cnt = float(info["episode_event_counts"].get("osc", 0))
                     ep_record = {
                         "reward": current_ep_reward,
                         "pellets": float(info["pellets_eaten"]),
                         "pct": float(info["completion_pct"]),
-                        "steps": float(current_ep_steps),
+                        "steps": ep_steps,
+                        "osc_count": osc_cnt,
+                        "osc_pct": (osc_cnt / ep_steps) * 100.0,
                         "maze": info["maze"],
                         "episode_event_counts": info["episode_event_counts"],
                         "episode_reward_breakdown": info["episode_reward_breakdown"],
@@ -320,14 +202,14 @@ def train_player_ppo(
                 _, next_value = policy(last_grid.to(device), last_features.to(device))
                 next_value = next_value.squeeze(-1)
 
-            b_grids = torch.cat(rollout_grids, dim=0).to(device)
-            b_features = torch.cat(rollout_features, dim=0).to(device)
-            b_valid_actions = torch.cat(rollout_valid_actions, dim=0).to(device)
-            b_actions = torch.cat(rollout_actions, dim=0).to(device)
-            b_log_probs = torch.cat(rollout_log_probs, dim=0).to(device)
-            b_rewards = torch.cat(rollout_rewards, dim=0).to(device)
-            b_dones = torch.cat(rollout_dones, dim=0).to(device)
-            b_values = torch.cat(rollout_values, dim=0).to(device)
+            b_grids = torch.cat(rollout_grids, dim=0).to(device, non_blocking=True)
+            b_features = torch.cat(rollout_features, dim=0).to(device, non_blocking=True)
+            b_valid_actions = torch.cat(rollout_valid_actions, dim=0).to(device, non_blocking=True)
+            b_actions = torch.cat(rollout_actions, dim=0).to(device, non_blocking=True)
+            b_log_probs = torch.cat(rollout_log_probs, dim=0).to(device, non_blocking=True)
+            b_rewards = torch.cat(rollout_rewards, dim=0).to(device, non_blocking=True)
+            b_dones = torch.cat(rollout_dones, dim=0).to(device, non_blocking=True)
+            b_values = torch.cat(rollout_values, dim=0).to(device, non_blocking=True)
 
             advantages = torch.zeros_like(b_rewards, device=device)
             last_gae_lam = 0.0
@@ -355,6 +237,9 @@ def train_player_ppo(
             total_entropy_loss = 0.0
             dataset_size = rollout_steps
 
+            kl_coef = 0.20 if ref_policy is not None else 0.0
+            eff_entropy_coef = 0.001 if ref_policy is not None else entropy_coef
+
             for _ in range(ppo_epochs):
                 permutation = torch.randperm(dataset_size, device=device)
                 for start_idx in range(0, dataset_size, minibatch_size):
@@ -368,30 +253,43 @@ def train_player_ppo(
                     mb_adv = advantages[mb_idx]
                     mb_returns = returns[mb_idx]
 
-                    logits, values = policy(mb_grid, mb_features)
-                    masked_logits = logits.masked_fill(~mb_valid_actions, -1e9)
-                    dist = Categorical(logits=masked_logits)
-
-                    new_log_probs = dist.log_prob(mb_actions)
-                    entropy = dist.entropy().mean()
-
-                    log_ratio = new_log_probs - mb_old_log_probs
-                    ratio = torch.exp(log_ratio)
-
-                    surr1 = ratio * mb_adv
-                    surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * mb_adv
-                    policy_loss = -torch.min(surr1, surr2).mean()
-
-                    value_loss = F.mse_loss(values.squeeze(-1), mb_returns)
-
-                    loss = (
-                        policy_loss + value_coef * value_loss - entropy_coef * entropy
-                    )
-
                     optimizer.zero_grad()
-                    loss.backward()
+                    with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
+                        logits, values = policy(mb_grid, mb_features)
+                        masked_logits = logits.masked_fill(~mb_valid_actions, -1e4)
+                        dist = Categorical(logits=masked_logits)
+
+                        new_log_probs = dist.log_prob(mb_actions)
+                        entropy = dist.entropy().mean()
+
+                        log_ratio = new_log_probs - mb_old_log_probs
+                        ratio = torch.exp(log_ratio)
+
+                        surr1 = ratio * mb_adv
+                        surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * mb_adv
+                        policy_loss = -torch.min(surr1, surr2).mean()
+
+                        value_loss = F.mse_loss(values.squeeze(-1), mb_returns)
+
+                        kl_loss = torch.tensor(0.0, device=device)
+                        if ref_policy is not None:
+                            with torch.no_grad():
+                                ref_logits, _ = ref_policy(mb_grid, mb_features)
+                                ref_masked_logits = ref_logits.masked_fill(~mb_valid_actions, -1e4)
+                                ref_probs = F.softmax(ref_masked_logits, dim=-1)
+                                ref_log_probs = F.log_softmax(ref_masked_logits, dim=-1)
+                            log_probs_dist = F.log_softmax(masked_logits, dim=-1)
+                            kl_loss = (ref_probs * (ref_log_probs - log_probs_dist)).sum(dim=-1).mean()
+
+                        loss = (
+                            policy_loss + value_coef * value_loss - eff_entropy_coef * entropy + kl_coef * kl_loss
+                        )
+
+                    scaler.scale(loss).backward()
+                    scaler.unscale_(optimizer)
                     nn.utils.clip_grad_norm_(policy.parameters(), max_grad_norm)
-                    optimizer.step()
+                    scaler.step(optimizer)
+                    scaler.update()
 
                     total_policy_loss += policy_loss.item()
                     total_value_loss += value_loss.item()
@@ -450,6 +348,9 @@ def train_player_ppo(
                     ep["episode_event_counts"].get("truncated", 0) > 0
                     for ep in save_window_episodes
                 ) / len(save_window_episodes)
+                avg_osc_pct = sum(
+                    ep.get("osc_pct", 0.0) for ep in save_window_episodes
+                ) / len(save_window_episodes)
             else:
                 window_max_pct = 0.0
                 max_pellets = 0
@@ -459,9 +360,10 @@ def train_player_ppo(
                 avg_h = 0.0
                 completion_rate = 0.0
                 truncation_rate = 0.0
+                avg_osc_pct = 0.0
 
             # Build the reward-breakdown chunk (averaged over the 100-ep window)
-            breakdown_line = _format_breakdown_line(save_window_episodes)
+            breakdown_line = format_breakdown_line(save_window_episodes)
 
             if update % 1 == 0 or update == 1 or update == num_updates:
                 logger.log(
@@ -470,6 +372,7 @@ def train_player_ppo(
                     f"Averge Epoch Rwd: {epoch_avg_reward:6.1f} | "
                     f"Max Epoch Pellets: {max_pellets:3d} ({window_max_pct:4.1f}%) | "
                     f"Avg Pellets: {avg_pellets:5.1f} ({avg_pct:4.1f}%) | "
+                    f"Osc%: {avg_osc_pct:4.1f}% | "
                     f"Avg Rwd: {avg_reward:4.1f} | "
                     f"{breakdown_line} | "
                     f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
@@ -532,7 +435,7 @@ def main() -> None:
         "--num-updates", type=int, default=100, help="Number of PPO update iterations"
     )
     parser.add_argument(
-        "--rollout-steps", type=int, default=1024, help="Steps per rollout"
+        "--rollout-steps", type=int, default=2048, help="Steps per rollout"
     )
     parser.add_argument(
         "--save-interval", type=int, default=2, help="Snapshot save interval"
@@ -561,6 +464,11 @@ def main() -> None:
         help="Path to training log file (append mode)",
     )
     parser.add_argument(
+        "--no-sl-warmstart",
+        action="store_true",
+        help="Disable warm-starting PPO policy from Supervised Learning weights",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress stdout output (log to file only)",
@@ -576,6 +484,7 @@ def main() -> None:
         resume=not args.fresh,
         resume_path=Path(args.resume_path) if args.resume_path else None,
         log_file=Path(args.log_file),
+        sl_warmstart=not args.no_sl_warmstart,
         quiet=args.quiet,
     )
 

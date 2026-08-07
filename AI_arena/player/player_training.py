@@ -219,6 +219,14 @@ def train_player_ppo(
 
     if resume:
         target_load = resume_path or checkpoint_path
+        if not target_load.exists() and stage > 1:
+            stage1_best = model_dir / f"player_rl_stage{stage-1}_best.pt"
+            stage1_last = model_dir / f"player_rl_stage{stage-1}.pt"
+            if stage1_best.exists():
+                target_load = stage1_best
+            elif stage1_last.exists():
+                target_load = stage1_last
+
         if target_load.exists():
             weights = torch.load(target_load, map_location=device, weights_only=True)
             policy.load_state_dict(weights)

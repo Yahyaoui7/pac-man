@@ -72,12 +72,17 @@ class ObservationFormatter:
         # Build Extra Features (37 floats)
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]
         player_powered = float(any(gst.get("is_edible", False) for gst in ghost_states))
-        ghost_edible_flags = [float(gst.get("is_edible", False)) for gst in ghost_states]
+        ghost_edible_flags = [
+            float(gst.get("is_edible", False)) for gst in ghost_states
+        ]
 
         features = [
             *player_dir_vec,
             player_powered,
             *ghost_edible_flags,
+            float(width) / 50.0,
+            float(height) / 25.0,
+            float(width * height - 1) / 1000.0,
         ]
 
         bfs_dist = (

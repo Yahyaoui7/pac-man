@@ -31,6 +31,7 @@ class ObservationFormatter:
         ghost_states: list[dict[str, Any]],
         movement: Any,
         device: torch.device | str = "cpu",
+        last_action: int | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Construct unified tensors efficiently."""
         device = torch.device(device)
@@ -69,8 +70,12 @@ class ObservationFormatter:
             gx = max(0, min(CNN_WIDTH - 1, gx))
             grid[0, 7 + idx, gy, gx] = 1.0
 
-        # Build Extra Features (37 floats)
+        # Build Extra Features (44 floats)
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]
+        last_action_vec = [
+            float(last_action == a_idx) if last_action is not None else 0.0
+            for a_idx in range(ACTION_COUNT)
+        ]
         player_powered = float(any(gst.get("is_edible", False) for gst in ghost_states))
         ghost_edible_flags = [
             float(gst.get("is_edible", False)) for gst in ghost_states
@@ -78,6 +83,7 @@ class ObservationFormatter:
 
         features = [
             *player_dir_vec,
+            *last_action_vec,
             player_powered,
             *ghost_edible_flags,
             float(width) / 50.0,

@@ -17,7 +17,7 @@ from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 
-from AI_arena.data.formatter import ObservationFormatter
+from AI_arena.player.observation import format_player_observation
 
 DEFAULT_STAGE1_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage1.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
@@ -33,7 +33,8 @@ class CNNPlayerController:
         if model_path is None:
             if DEFAULT_STAGE1_PATH.exists():
                 path = DEFAULT_STAGE1_PATH
-
+            else:
+                path = Path(__file__).parent.parent / "models" / "player_sl_best.pt"
         else:
             path = Path(model_path)
 
@@ -48,6 +49,11 @@ class CNNPlayerController:
 
         self.model.eval()
         self.last_diagnostics: dict[str, Any] = {}
+        self.last_action_idx: int | None = None
+
+    def reset_state(self) -> None:
+        """Reset internal state history (e.g. between games)."""
+        self.last_action_idx = None
 
     def get_action(
         self,
@@ -72,6 +78,7 @@ class CNNPlayerController:
             else:
                 action_index = int(torch.argmax(masked_logits, dim=-1).item())
 
+        self.last_action_idx = action_index
         chosen_action = DIRECTIONS[action_index]
         self.last_diagnostics = {
             "chosen_action": chosen_action,
@@ -98,25 +105,11 @@ class CNNPlayerController:
         ghosts: list[Ghost],
         movement_system: Any,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        ghost_states = [
-            {
-                "grid_x": ghost.grid_x,
-                "grid_y": ghost.grid_y,
-                "is_edible": ghost.is_edible,
-                "direction": ghost.direction,
-            }
-            for ghost in ghosts
-        ]
-
-        grid, extra_features, valid_player_actions, _ = (
-            ObservationFormatter.format_observation(
-                maze=maze,
-                pellets=pellets,
-                player_pos=(player.grid_x, player.grid_y),
-                player_direction=player.direction,
-                ghost_states=ghost_states,
-                movement=movement_system,
-                device=self.device,
-            )
+        return format_player_observation(
+            maze=maze,
+            pellets=pellets,
+            player=player,
+            ghosts=ghosts,
+            movement=movement_system,
+            device=self.device,
         )
-        return grid, extra_features, valid_player_actions

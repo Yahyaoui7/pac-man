@@ -34,14 +34,14 @@ class PlayerActorCritic(nn.Module):
         """Return (action_logits [batch, 4], state_value [batch, 1])."""
         latent = self.backbone.extract_features(grid, extra_features)
         logits = self.actor(latent)
-        value = self.critic(latent)
+        value = self.critic(latent.detach())
         return logits, value
 
 
 class PlayerImitationCNN(nn.Module):
     """Pac-Man action classifier trained from expert demonstrations."""
 
-    def __init__(self, extra_feature_count: int = 35) -> None:
+    def __init__(self, extra_feature_count: int = EXTRA_FEATURE_COUNT) -> None:
         super().__init__()
         self.backbone = PacmanCNNBackbone(
             dropout_prob=0.1,
@@ -53,6 +53,33 @@ class PlayerImitationCNN(nn.Module):
         return self.action_head(
             self.backbone.extract_features(grid, extra_features)
         )
+
+
+def load_sl_weights_into_ppo(
+    ppo_model: PlayerActorCritic,
+    sl_checkpoint_path: str,
+    device: str | torch.device = "cpu",
+) -> PlayerActorCritic:
+    """Initialize a PlayerActorCritic PPO model with pre-trained SL weights."""
+    sl_dict = torch.load(sl_checkpoint_path, map_location=device)
+    if isinstance(sl_dict, dict) and "model_state" in sl_dict:
+        sl_dict = sl_dict["model_state"]
+
+    ppo_dict = ppo_model.state_dict()
+    mapped_dict = {}
+
+    for k, v in sl_dict.items():
+        if k.startswith("action_head"):
+            new_k = k.replace("action_head", "actor")
+            if new_k in ppo_dict and ppo_dict[new_k].shape == v.shape:
+                mapped_dict[new_k] = v
+        elif k in ppo_dict and ppo_dict[k].shape == v.shape:
+            mapped_dict[k] = v
+
+    ppo_dict.update(mapped_dict)
+    ppo_model.load_state_dict(ppo_dict)
+    print(f"Successfully loaded SL pre-trained weights from {sl_checkpoint_path} into PPO actor network!")
+    return ppo_model
 
 
 def main() -> None:

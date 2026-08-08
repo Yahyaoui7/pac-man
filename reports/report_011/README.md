@@ -1,6 +1,6 @@
-# Training Report 016 — PPO Stage-1
+# Training Report 011 — PPO Stage-1
 
-Generated: 2026-08-07 22:21  
+Generated: 2026-08-08 02:17  
 Log file: `training_log.txt`
 
 ---
@@ -9,8 +9,8 @@ Log file: `training_log.txt`
 
 | Parameter | Value |
 |-----------|-------|
-| PPO Updates | 1 → 1689 (1689 logged) |
-| Total Episodes | 180818 |
+| PPO Updates | 1 → 109 (109 logged) |
+| Total Episodes | 1356 |
 | Rollout Steps / Update | 1024 |
 | PPO Epochs | 4 |
 | Mini-batch Size | 64 |
@@ -72,41 +72,41 @@ Binary mask over `[UP, DOWN, LEFT, RIGHT]` — invalid moves are masked to −�
 
 | Metric | Value | At Update |
 |--------|-------|-----------|
-| Best raw avg reward | -3.4 | 764 |
-| Best smoothed avg reward | -24.2 | 1277 |
-| Best avg pellet % | 17.9% | 444 |
-| Best max pellet % | 100.0% | 322 |
-| Final avg reward | -35.4 | 1689 |
-| Final avg pellet % | 12.8% | 1689 |
-| Final max pellet % | 60.0% | 1689 |
+| Best raw avg reward | 72.6 | 47 |
+| Best smoothed avg reward | 58.8 | 50 |
+| Best avg pellet % | 21.2% | 93 |
+| Best max pellet % | 88.6% | 96 |
+| Final avg reward | 44.9 | 109 |
+| Final avg pellet % | 18.4% | 109 |
+| Final max pellet % | 40.4% | 109 |
 
 ---
 
 ## Reward Trend Diagnostics
 
-Reward-vs-pellet correlation (smoothed): **0.88**
-Episode-to-window reward volatility (std): **1.7**
-Reward-vs-maze-size correlation (smoothed): **-0.06**
-Wide-window residual ratio: **0.82**
+Reward-vs-pellet correlation (smoothed): **-0.20**
+Episode-to-window reward volatility (std): **29.3**
+Reward-vs-maze-size correlation (smoothed): **0.73**
+Wide-window residual ratio: **0.79**
 
 ### Reward Breakdown Summary
 
 | Component | Avg per Episode |
 |-----------|----------------|
-| Largest positive | Ghost (+18.1) |
+| Largest positive | Pellet (+125.2) |
 | Largest penalty | Death (-50.0) |
 
 Component correlations with total reward:
 
 | Component | Correlation |
 |-----------|-------------|
-| Ghost | 0.98 |
-| Pellet | 0.87 |
-| Super | 0.82 |
-| Step | -0.61 |
-| Osc | 0.52 |
-| Death | 0.12 |
-| Complete | 0.11 |
+| Super | 0.86 |
+| Pellet | 0.71 |
+| Ghost | 0.59 |
+| Step | -0.33 |
+| Osc | 0.10 |
+| Complete | nan |
+| Death | 0.00 |
 | BFS | nan |
 
 
@@ -114,64 +114,26 @@ Time spent in each trend regime (by update count):
 
 | Regime | % of run |
 |--------|----------|
-| Improving | 34% |
-| Plateau | 33% |
-| Declining | 23% |
+| Improving | 37% |
+| Plateau | 21% |
+| Declining | 0% |
 
 ### Segments
 
 | Updates | Regime | Avg slope (Δreward/upd) |
 |---------|--------|---------------------------|
-| 1–47 | declining | -0.0530 |
-| 54–78 | improving | +0.0163 |
-| 90–160 | improving | +0.0203 |
-| 161–193 | plateau | -0.0026 |
-| 194–237 | improving | +0.0235 |
-| 238–255 | plateau | +0.0014 |
-| 256–274 | declining | -0.0175 |
-| 284–335 | improving | +0.0425 |
-| 345–383 | declining | -0.0341 |
-| 390–437 | improving | +0.0494 |
-| 444–501 | declining | -0.0483 |
-| 502–519 | plateau | +0.0016 |
-| 520–542 | improving | +0.0152 |
-| 543–625 | plateau | -0.0007 |
-| 626–681 | improving | +0.0231 |
-| 682–700 | plateau | -0.0007 |
-| 724–758 | improving | +0.0221 |
-| 759–784 | plateau | -0.0003 |
-| 785–820 | declining | -0.0287 |
-| 821–837 | plateau | +0.0019 |
-| 838–892 | improving | +0.0255 |
-| 893–935 | plateau | +0.0030 |
-| 948–978 | declining | -0.0167 |
-| 979–996 | plateau | +0.0005 |
-| 997–1020 | improving | +0.0173 |
-| 1021–1057 | plateau | +0.0012 |
-| 1064–1099 | plateau | -0.0043 |
-| 1100–1133 | declining | -0.0231 |
-| 1134–1162 | plateau | -0.0077 |
-| 1169–1188 | plateau | -0.0062 |
-| 1189–1212 | declining | -0.0164 |
-| 1219–1271 | improving | +0.0476 |
-| 1281–1314 | declining | -0.0310 |
-| 1323–1352 | improving | +0.0243 |
-| 1365–1403 | declining | -0.0289 |
-| 1412–1439 | improving | +0.0170 |
-| 1440–1480 | plateau | +0.0007 |
-| 1486–1554 | plateau | -0.0024 |
-| 1565–1609 | plateau | -0.0006 |
-| 1610–1643 | improving | +0.0229 |
-| 1657–1689 | declining | -0.0637 |
+| 1–40 | improving | +0.8038 |
+| 70–92 | plateau | +0.0072 |
 
 ### What this run suggests
 
-- Reward is still trending up for a meaningful share of the run (~34% improving). Worth letting this configuration keep training before changing anything.
-- Reward and pellet completion move together closely (corr=0.88). Reward increases are coming from actually eating more pellets — the shaping is aligned with the real objective.
-- The oscillation mostly survives a much wider smoothing window (~82% of the standard-smoothed curve's variance remains). That argues against pure window-sampling noise — this looks like a real, slower-cycle pattern in training itself (e.g. an LR/entropy interaction, or periodic instability), not just averaging artifacts.
-- Reward doesn't correlate much with average maze size in the window (corr=-0.06) — maze-mix doesn't look like the driver of the oscillation here, so it's more likely coming from training dynamics.
-- **Reward breakdown:** the largest positive driver is **Ghost** (avg +18.1/ep). The largest penalty is **Death** (avg -50.0/ep).
-- Pellet reward (corr=0.87) dominates over BFS shaping (corr=nan) — the shaping term is well-calibrated.
+- Reward is still trending up for a meaningful share of the run (~37% improving). Worth letting this configuration keep training before changing anything.
+- Reward and pellet completion are weakly correlated (corr=-0.20). Reward is moving for reasons other than pellet progress — check how much of it comes from the BFS shaping, oscillation penalty, or per-step cost; the agent may be optimizing those instead.
+- Per-episode reward is noisy relative to the smoothed trend (episode-to-window std ≈ 29.3). Individual episodes still swing a lot — consider whether the maze size/seed randomization is creating too much variance per update, or whether more PPO epochs/rollout steps would help it settle.
+- The oscillation mostly survives a much wider smoothing window (~79% of the standard-smoothed curve's variance remains). That argues against pure window-sampling noise — this looks like a real, slower-cycle pattern in training itself (e.g. an LR/entropy interaction, or periodic instability), not just averaging artifacts.
+- Reward has a mild correlation with average maze size in the window (corr=0.73) — maze-mix is probably a partial contributor to the swings, but not the whole story.
+- **Reward breakdown:** the largest positive driver is **Pellet** (avg +125.2/ep). The largest penalty is **Death** (avg -50.0/ep).
+- Pellet reward (corr=0.71) dominates over BFS shaping (corr=nan) — the shaping term is well-calibrated.
 
 ---
 
@@ -201,5 +163,5 @@ Time spent in each trend regime (by update count):
 ## Notes / Observations
 
 <!-- Add manual notes about this run here -->
-- Training data covers updates 1–1689 (180818 episodes).
+- Training data covers updates 1–109 (1356 episodes).
 - Log window size: last 100 completed episodes per update (smoothed breakdown).

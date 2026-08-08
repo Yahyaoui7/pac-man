@@ -815,8 +815,8 @@ class PlayingState(State):
                     if expired(self.player_invincible_until):
                         if self.game.lives > 1:
                             self.game.sound_manager.play_sound("player_death")
-                        # self.game.lives -= 1
+                        self.game.lives -= 1
                         self.player_invincible_until = after(1500)
-                        # player.reset_location()
+                        player.reset_location()
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0

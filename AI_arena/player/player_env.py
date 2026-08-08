@@ -39,10 +39,10 @@ GHOST_SPECS = [
 
 
 MAZE_WIDTH_MIN = 5
-MAZE_WIDTH_MAX = 15
+MAZE_WIDTH_MAX = 43
 
 MAZE_HEIGHT_MIN = 5
-MAZE_HEIGHT_MAX = 15
+MAZE_HEIGHT_MAX = 23
 
 MAX_PHYSICS_TICKS = 300
 
@@ -119,6 +119,8 @@ class PacmanPlayerEnv:
 
         self.episode_event_counts: dict[str, int] = {}
         self.episode_reward_breakdown: dict[str, float] = {}
+        self.ghost_confusion_prob = 0.75
+        self.death_count = 0
 
     def reset(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Reset episode state and return (grid, features, valid_actions).
@@ -338,7 +340,10 @@ class PacmanPlayerEnv:
 
         self.step_count += 1
 
-        terminated = bool(events["pacman_died"] or events["level_completed"])
+        terminated = bool(
+            self.episode_event_counts["died"] > 3 or events["level_completed"]
+        )
+        # terminated = bool(self.step_count > 128 or events["level_completed"])
         truncated = self.step_count >= self.max_steps
         done = terminated or truncated
 
@@ -417,6 +422,7 @@ class PacmanPlayerEnv:
         for (y, x), (name, color) in zip(ghost_cells, GHOST_SPECS):
             ghost = Ghost(y, x, color, name)
             ghost.reset()
+            ghost._tick_accumulator = 0.0
             self.ghosts.append(ghost)
 
     def _create_pellets(self) -> None:
@@ -461,7 +467,6 @@ class PacmanPlayerEnv:
         self.remaining_pellets = total
 
     def _update_entities(self) -> None:
-        """Advance player and ghosts by one simulation tick."""
         if self.movement is None or self.player is None or self.maze is None:
             return
 
@@ -481,22 +486,59 @@ class PacmanPlayerEnv:
             return
 
         # Stage 2+: ghosts hunt via BFS, run away when edible.
-        # Eaten ghosts wait GHOST_RESPAWN_TICKS at their corner before
-        # re-entering the hunt (simulates returning to base).
         for idx, ghost in enumerate(self.ghosts):
+
             if ghost.in_prison:
-                # Countdown the respawn delay; release when it hits zero
                 if self._ghost_respawn_ticks[idx] > 0:
                     self._ghost_respawn_ticks[idx] -= 1
                 else:
-                    # Ghost is now free to hunt again
                     ghost.in_prison = False
                     ghost.is_edible = False
                     ghost.runaway_target = None
             elif ghost.is_edible:
-                self.movement.update_runaway_ghost(ghost, self.player)
+                # Frightened ghosts stay slow (optional: add confusion here too)
+                ghost._tick_accumulator += 0.5
+                if ghost._tick_accumulator >= 1.0:
+                    ghost._tick_accumulator -= 1.0
+                    self.movement.update_runaway_ghost(ghost, self.player)
             else:
-                self.movement.update_bfs_ghost(ghost, self.player)
+                # ── NEW: confused ghost movement ──
+                ghost._tick_accumulator += 0.75  # your existing speed factor
+                if ghost._tick_accumulator >= 1.0:
+                    ghost._tick_accumulator -= 1.0
+
+                    if self.rng.random() < self.ghost_confusion_prob:
+                        # Pick a random valid direction instead of BFS optimal
+                        valid_dirs = [
+                            d
+                            for d in DIRECTIONS
+                            if self.movement.can_move(ghost.grid_y, ghost.grid_x, d)
+                        ]
+                        if len(valid_dirs) > 1:
+                            # Avoid immediate reversal if possible (looks less dumb)
+                            current_idx = (
+                                DIRECTIONS.index(ghost.direction)
+                                if ghost.direction in DIRECTIONS
+                                else -1
+                            )
+                            rev_dir = (
+                                DIRECTIONS[self._reverse_action(current_idx)]
+                                if current_idx >= 0
+                                else None
+                            )
+                            candidates = [d for d in valid_dirs if d != rev_dir]
+                            chosen = self.rng.choice(
+                                candidates if candidates else valid_dirs
+                            )
+                        elif valid_dirs:
+                            chosen = valid_dirs[0]
+                        else:
+                            chosen = ghost.direction
+
+                        ghost.next_direction = chosen
+                        self.movement.update_entity(ghost)
+                    else:
+                        self.movement.update_bfs_ghost(ghost, self.player)
 
     def _check_events(self) -> dict[str, bool]:
         """Detect pellet consumption, ghost collisions, and win/loss states."""
@@ -545,12 +587,13 @@ class PacmanPlayerEnv:
                     events["ghost_eaten"] = True
                     ghost.is_edible = False
                     ghost.in_prison = True
-                    # Reset ghost to its corner spawn and start respawn delay
                     ghost.reset()
+                    ghost._tick_accumulator = 0.0
                     self._ghost_respawn_ticks[idx] = GHOST_RESPAWN_TICKS
                 else:
                     # Real death: Pac-Man respawns at center, episode continues
                     events["pacman_died"] = True
+                    self.player.reset_location()
                     break
 
         return events
@@ -582,7 +625,7 @@ class PacmanPlayerEnv:
         self, events: dict[str, bool], bfs_shaping: float = 0.0
     ) -> tuple[float, dict[str, float]]:
         breakdown = {
-            "step": -0.2,
+            "step": -0.1,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
@@ -607,10 +650,10 @@ class PacmanPlayerEnv:
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -0.5
+            breakdown["oscillation"] = -0.3
 
         if events["pellet_eaten"]:
-            breakdown["pellet"] = 1.0 + 3.0 * frac_cleared
+            breakdown["pellet"] = 2.0 + 3.0 * frac_cleared
 
         if events["super_pellet_eaten"]:
             breakdown["super_pellet"] = 2.0
@@ -620,7 +663,7 @@ class PacmanPlayerEnv:
 
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            breakdown["complete"] = (self.max_steps / 6 ) + float(remaining_steps)
+            breakdown["complete"] = (self.max_steps / 6) + float(remaining_steps)
 
         if events["pacman_died"]:
             breakdown["death"] = -50.0

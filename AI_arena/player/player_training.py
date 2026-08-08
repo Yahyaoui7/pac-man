@@ -97,12 +97,16 @@ def train_player_ppo(
     if not loaded_checkpoint:
         if sl_warmstart and sl_best_path.exists():
             load_sl_weights_into_ppo(policy, str(sl_best_path), device=device)
-            logger.log(f"SUCCESS: Warm-started PPO policy with pre-trained SL weights ({sl_best_path.name})")
+            logger.log(
+                f"SUCCESS: Warm-started PPO policy with pre-trained SL weights ({sl_best_path.name})"
+            )
 
             # Freeze CNN backbone to preserve expert spatial representation
             for p in policy.backbone.parameters():
                 p.requires_grad = False
-            logger.log("INFO: Frozen CNN backbone parameters to prevent spatial policy degradation.")
+            logger.log(
+                "INFO: Frozen CNN backbone parameters to prevent spatial policy degradation."
+            )
 
             # Create frozen reference policy for KL anchoring
             ref_policy = PlayerActorCritic().to(device)
@@ -127,8 +131,12 @@ def train_player_ppo(
 
     if sl_warmstart and sl_best_path.exists() and not loaded_checkpoint:
         learning_rate = 5e-5
-        optimizer = torch.optim.Adam([p for p in policy.parameters() if p.requires_grad], lr=learning_rate)
-        logger.log(f"INFO: Adjusted learning rate to {learning_rate} for PPO head fine-tuning.")
+        optimizer = torch.optim.Adam(
+            [p for p in policy.parameters() if p.requires_grad], lr=learning_rate
+        )
+        logger.log(
+            f"INFO: Adjusted learning rate to {learning_rate} for PPO head fine-tuning."
+        )
 
     best_checkpoint_path = model_dir / f"player_rl_stage{stage}_best.pt"
     best_avg_pct: float = 0.0
@@ -203,10 +211,16 @@ def train_player_ppo(
                 next_value = next_value.squeeze(-1)
 
             b_grids = torch.cat(rollout_grids, dim=0).to(device, non_blocking=True)
-            b_features = torch.cat(rollout_features, dim=0).to(device, non_blocking=True)
-            b_valid_actions = torch.cat(rollout_valid_actions, dim=0).to(device, non_blocking=True)
+            b_features = torch.cat(rollout_features, dim=0).to(
+                device, non_blocking=True
+            )
+            b_valid_actions = torch.cat(rollout_valid_actions, dim=0).to(
+                device, non_blocking=True
+            )
             b_actions = torch.cat(rollout_actions, dim=0).to(device, non_blocking=True)
-            b_log_probs = torch.cat(rollout_log_probs, dim=0).to(device, non_blocking=True)
+            b_log_probs = torch.cat(rollout_log_probs, dim=0).to(
+                device, non_blocking=True
+            )
             b_rewards = torch.cat(rollout_rewards, dim=0).to(device, non_blocking=True)
             b_dones = torch.cat(rollout_dones, dim=0).to(device, non_blocking=True)
             b_values = torch.cat(rollout_values, dim=0).to(device, non_blocking=True)
@@ -266,7 +280,9 @@ def train_player_ppo(
                         ratio = torch.exp(log_ratio)
 
                         surr1 = ratio * mb_adv
-                        surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * mb_adv
+                        surr2 = (
+                            torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * mb_adv
+                        )
                         policy_loss = -torch.min(surr1, surr2).mean()
 
                         value_loss = F.mse_loss(values.squeeze(-1), mb_returns)
@@ -275,14 +291,23 @@ def train_player_ppo(
                         if ref_policy is not None:
                             with torch.no_grad():
                                 ref_logits, _ = ref_policy(mb_grid, mb_features)
-                                ref_masked_logits = ref_logits.masked_fill(~mb_valid_actions, -1e4)
+                                ref_masked_logits = ref_logits.masked_fill(
+                                    ~mb_valid_actions, -1e4
+                                )
                                 ref_probs = F.softmax(ref_masked_logits, dim=-1)
                                 ref_log_probs = F.log_softmax(ref_masked_logits, dim=-1)
                             log_probs_dist = F.log_softmax(masked_logits, dim=-1)
-                            kl_loss = (ref_probs * (ref_log_probs - log_probs_dist)).sum(dim=-1).mean()
+                            kl_loss = (
+                                (ref_probs * (ref_log_probs - log_probs_dist))
+                                .sum(dim=-1)
+                                .mean()
+                            )
 
                         loss = (
-                            policy_loss + value_coef * value_loss - eff_entropy_coef * entropy + kl_coef * kl_loss
+                            policy_loss
+                            + value_coef * value_loss
+                            - eff_entropy_coef * entropy
+                            + kl_coef * kl_loss
                         )
 
                     scaler.scale(loss).backward()
@@ -381,7 +406,14 @@ def train_player_ppo(
                     f" | Truncated: {truncation_rate:5.1%}"
                     f" | Avg Maze Area: {avg_area:.1f} ({avg_w:.1f}x{avg_h:.1f})"
                 )
-
+            death_rate = (
+                sum(
+                    ep["episode_event_counts"].get("died", 0) > 0
+                    for ep in save_window_episodes
+                )
+                / max(1, len(save_window_episodes))
+                * 100
+            )
             if update % save_interval == 0 or update == num_updates:
                 torch.save(policy.state_dict(), checkpoint_path)
                 save_window_episodes = []
@@ -393,7 +425,7 @@ def train_player_ppo(
                 torch.save(policy.state_dict(), checkpoint_path)
                 logger.log(f"Checkpoint saved to: {checkpoint_path}")
                 logger.log(
-                    f"Best checkpoint (avg {best_avg_pct:.1f}%): {best_checkpoint_path}"
+                    f"Best checkpoint (avg {best_avg_pct:.1f}%): {best_checkpoint_path}| Death rate : {death_rate}%"
                 )
                 break
     except KeyboardInterrupt:
@@ -404,7 +436,7 @@ def train_player_ppo(
         torch.save(policy.state_dict(), checkpoint_path)
         logger.log(f"Checkpoint saved to: {checkpoint_path}")
         logger.log(
-            f"Best checkpoint (avg {best_avg_pct:.1f}% | {best_avg_pellets:.0f} pellets): {best_checkpoint_path}"
+            f"Best checkpoint (avg {best_avg_pct:.1f}% | Death rate : {death_rate}% | {best_avg_pellets:.0f} pellets): {best_checkpoint_path}"
         )
     finally:
         logger.log(f"============================================================")

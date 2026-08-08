@@ -39,15 +39,22 @@ GHOST_SPECS = [
 
 
 MAZE_WIDTH_MIN = 5
+<<<<<<< HEAD
 MAZE_WIDTH_MAX = 15
 
 MAZE_HEIGHT_MIN = 5
 MAZE_HEIGHT_MAX = 15
+=======
+MAZE_WIDTH_MAX = 12
+
+MAZE_HEIGHT_MIN = 5
+MAZE_HEIGHT_MAX = 12
+>>>>>>> 4408f43d891981ac9b43fd68ddef0947e9637656
 
 MAX_PHYSICS_TICKS = 300
 
 
-MAZE_STEP_MULTIPLIER: float = 9
+MAZE_STEP_MULTIPLIER: float = 7
 
 
 GHOST_RESPAWN_TICKS: int = 15
@@ -620,7 +627,8 @@ class PacmanPlayerEnv:
 
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            breakdown["complete"] = (self.max_steps / 6 ) + float(remaining_steps)
+
+            breakdown["complete"] = 500 + float(remaining_steps)
 
         if events["pacman_died"]:
             breakdown["death"] = -50.0

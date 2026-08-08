@@ -34,7 +34,7 @@ class PlayerActorCritic(nn.Module):
         """Return (action_logits [batch, 4], state_value [batch, 1])."""
         latent = self.backbone.extract_features(grid, extra_features)
         logits = self.actor(latent)
-        value = self.critic(latent.detach())
+        value = self.critic(latent)
         return logits, value
 
 
@@ -50,9 +50,7 @@ class PlayerImitationCNN(nn.Module):
         self.action_head = nn.Linear(128, ACTION_COUNT)
 
     def forward(self, grid: Tensor, extra_features: Tensor) -> Tensor:
-        return self.action_head(
-            self.backbone.extract_features(grid, extra_features)
-        )
+        return self.action_head(self.backbone.extract_features(grid, extra_features))
 
 
 def load_sl_weights_into_ppo(
@@ -78,7 +76,9 @@ def load_sl_weights_into_ppo(
 
     ppo_dict.update(mapped_dict)
     ppo_model.load_state_dict(ppo_dict)
-    print(f"Successfully loaded SL pre-trained weights from {sl_checkpoint_path} into PPO actor network!")
+    print(
+        f"Successfully loaded SL pre-trained weights from {sl_checkpoint_path} into PPO actor network!"
+    )
     return ppo_model
 
 

@@ -70,7 +70,7 @@ class ObservationFormatter:
             gx = max(0, min(CNN_WIDTH - 1, gx))
             grid[0, 7 + idx, gy, gx] = 1.0
 
-        # Build Extra Features (44 floats)
+        # Build Extra Features (45 floats)
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]
         last_action_vec = [
             float(last_action == a_idx) if last_action is not None else 0.0
@@ -82,13 +82,13 @@ class ObservationFormatter:
         ]
 
         features = [
-            *player_dir_vec,
-            *last_action_vec,
-            player_powered,
-            *ghost_edible_flags,
-            float(width) / 50.0,
-            float(height) / 25.0,
-            float(width * height - 1) / 1000.0,
+            *player_dir_vec,  # 4
+            *last_action_vec,  # 4
+            player_powered,  # 1
+            *ghost_edible_flags,  # 4
+            float(width) / 50.0,  # 1
+            float(height) / 25.0,  # 1
+            float(width * height - 1) / 1000.0,  # 1
         ]
 
         bfs_dist = (
@@ -112,6 +112,21 @@ class ObservationFormatter:
         for gst in ghost_states:
             g_dir = gst.get("direction", "NONE")
             features.extend([float(g_dir == d) for d in DIRECTIONS])
+
+        # Power-pellet distance — APPEND TO LIST BEFORE creating tensor
+        power_pellet_positions = [
+            (gy, gx)
+            for gy in range(height)
+            for gx in range(width)
+            if pellets[gy][gx] == 2
+        ]
+        if power_pellet_positions:
+            nearest_pp_dist = min(
+                bfs_dist[gy * width + gx] for gy, gx in power_pellet_positions
+            )
+        else:
+            nearest_pp_dist = -1
+        features.append((nearest_pp_dist + 1) / max_dim)
 
         extra_features = torch.tensor(
             [features],

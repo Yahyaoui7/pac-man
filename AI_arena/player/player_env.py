@@ -11,11 +11,6 @@ import torch
 
 from AI_arena.data.constants import (
     ACTION_COUNT,
-    CNN_CHANNEL_COUNT,
-    CNN_HEIGHT,
-    CNN_WIDTH,
-    EXTRA_FEATURE_COUNT,
-    GHOST_COUNT,
 )
 
 from AI_arena.data.formatter import ObservationFormatter
@@ -625,7 +620,7 @@ class PacmanPlayerEnv:
         self, events: dict[str, bool], bfs_shaping: float = 0.0
     ) -> tuple[float, dict[str, float]]:
         breakdown = {
-            "step": -0.1,
+            "step": -0.3,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
@@ -663,7 +658,7 @@ class PacmanPlayerEnv:
 
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            breakdown["complete"] = 500 + float(remaining_steps)
+            breakdown["complete"] = 150.0 + float(remaining_steps)
 
         if events["pacman_died"]:
             breakdown["death"] = -50.0

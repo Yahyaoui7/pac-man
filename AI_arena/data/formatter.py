@@ -45,30 +45,34 @@ class ObservationFormatter:
             device=device,
         )
 
-        # Convert maze to tensor for fast wall extraction
         maze_tensor = torch.tensor(maze, dtype=torch.int32, device=device)
-        grid[0, 0, :height, :width] = (maze_tensor & NORTH).bool().float()
-        grid[0, 1, :height, :width] = (maze_tensor & SOUTH).bool().float()
-        grid[0, 2, :height, :width] = (maze_tensor & WEST).bool().float()
-        grid[0, 3, :height, :width] = (maze_tensor & EAST).bool().float()
-        grid[0, 11, :height, :width] = (maze_tensor != 15).float()
-
-        # Pellets
         pellets_tensor = torch.tensor(pellets, dtype=torch.int32, device=device)
-        grid[0, 4, :height, :width] = (pellets_tensor == 1).float()
-        grid[0, 5, :height, :width] = (pellets_tensor == 2).float()
 
+        # Channel 0: Walkable (1 = can walk, 0 = wall)
+        grid[0, 0, :height, :width] = (maze_tensor != 15).float()
+
+        # Channel 1: Normal pellets
+        grid[0, 1, :height, :width] = (pellets_tensor == 1).float()
+
+        # Channel 2: Power pellets
+        grid[0, 2, :height, :width] = (pellets_tensor == 2).float()
+
+        # Channel 3: Player position
         px, py = player_pos
         py = max(0, min(CNN_HEIGHT - 1, py))
         px = max(0, min(CNN_WIDTH - 1, px))
-        grid[0, 6, py, px] = 1.0
+        grid[0, 3, py, px] = 1.0
 
+        # Channels 4 & 5: Ghost counts (non-edible vs edible)
         for idx in range(min(GHOST_COUNT, len(ghost_states))):
             gst = ghost_states[idx]
             gx, gy = gst["grid_x"], gst["grid_y"]
             gy = max(0, min(CNN_HEIGHT - 1, gy))
             gx = max(0, min(CNN_WIDTH - 1, gx))
-            grid[0, 7 + idx, gy, gx] = 1.0
+            if gst.get("is_edible", False):
+                grid[0, 5, gy, gx] += 1.0
+            else:
+                grid[0, 4, gy, gx] += 1.0
 
         # Build Extra Features (45 floats)
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]
@@ -82,13 +86,13 @@ class ObservationFormatter:
         ]
 
         features = [
-            *player_dir_vec,  # 4
-            *last_action_vec,  # 4
-            player_powered,  # 1
-            *ghost_edible_flags,  # 4
-            float(width) / 50.0,  # 1
-            float(height) / 25.0,  # 1
-            float(width * height - 1) / 1000.0,  # 1
+            *player_dir_vec,
+            *last_action_vec,
+            player_powered,
+            *ghost_edible_flags,
+            float(width) / 50.0,
+            float(height) / 25.0,
+            float(width * height - 1) / 1000.0,
         ]
 
         bfs_dist = (
@@ -113,7 +117,7 @@ class ObservationFormatter:
             g_dir = gst.get("direction", "NONE")
             features.extend([float(g_dir == d) for d in DIRECTIONS])
 
-        # Power-pellet distance — APPEND TO LIST BEFORE creating tensor
+        # Power-pellet distance — append BEFORE tensor creation
         power_pellet_positions = [
             (gy, gx)
             for gy in range(height)
@@ -134,7 +138,6 @@ class ObservationFormatter:
             device=device,
         )
 
-        # Valid Player Actions (1, 4)
         valid_player_actions = torch.zeros(
             (1, ACTION_COUNT),
             dtype=torch.bool,
@@ -144,7 +147,6 @@ class ObservationFormatter:
             for a_idx, d in enumerate(DIRECTIONS):
                 valid_player_actions[0, a_idx] = movement.can_move(py, px, d)
 
-        # Valid Ghost Actions (4, 4)
         valid_ghost_actions = torch.zeros(
             (GHOST_COUNT, ACTION_COUNT),
             dtype=torch.bool,

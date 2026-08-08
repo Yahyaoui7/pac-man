@@ -1,4 +1,4 @@
-"""Deep multi-scale CNN backbone for Pac-Man with SE attention."""
+"""CNN-GRU backbone for Pac-Man with temporal memory."""
 
 from __future__ import annotations
 
@@ -8,38 +8,12 @@ from torch import Tensor, nn
 from AI_arena.data.constants import CNN_CHANNEL_COUNT, EXTRA_FEATURE_COUNT
 
 
-class SEBlock(nn.Module):
-    """Squeeze-and-Excitation: channel-wise attention."""
-
-    def __init__(self, channels: int, reduction: int = 16) -> None:
-        super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channels, channels // reduction),
-            nn.ReLU(),
-            nn.Linear(channels // reduction, channels),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, x: Tensor) -> Tensor:
-        b, c, _, _ = x.size()
-        y = self.avg_pool(x).view(b, c)
-        y = self.fc(y).view(b, c, 1, 1)
-        return x * y
-
-
 class ResBlock(nn.Module):
-    """Residual block with dilation."""
-
     def __init__(self, channels: int, dilation: int = 1) -> None:
         super().__init__()
         pad = dilation
-        self.conv1 = nn.Conv2d(
-            channels, channels, kernel_size=3, padding=pad, dilation=dilation
-        )
-        self.conv2 = nn.Conv2d(
-            channels, channels, kernel_size=3, padding=pad, dilation=dilation
-        )
+        self.conv1 = nn.Conv2d(channels, channels, 3, padding=pad, dilation=dilation)
+        self.conv2 = nn.Conv2d(channels, channels, 3, padding=pad, dilation=dilation)
         self.relu = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -49,7 +23,7 @@ class ResBlock(nn.Module):
 
 
 class PacmanCNNBackbone(nn.Module):
-    """Multi-scale spatial encoder with SE attention and deep trunk."""
+    """Spatial CNN encoder + GRU temporal memory."""
 
     def __init__(
         self,
@@ -58,73 +32,69 @@ class PacmanCNNBackbone(nn.Module):
     ) -> None:
         super().__init__()
 
-        self.stem = nn.Sequential(
-            nn.Conv2d(CNN_CHANNEL_COUNT, 64, kernel_size=3, padding=1),
+        # ── CNN: per-frame spatial encoder (identical to your current one) ──
+        self.cnn = nn.Sequential(
+            nn.Conv2d(CNN_CHANNEL_COUNT, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-        )
-
-        self.local_group = nn.Sequential(
+            ResBlock(32, dilation=1),
+            ResBlock(32, dilation=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=4, dilation=4),
+            nn.ReLU(),
+            ResBlock(64, dilation=4),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
             ResBlock(64, dilation=1),
-            SEBlock(64),
-            ResBlock(64, dilation=1),
-            SEBlock(64),
-            ResBlock(64, dilation=2),
-            SEBlock(64),
-        )
-
-        self.meso_group = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, padding=4, dilation=4),
-            nn.ReLU(),
-            ResBlock(128, dilation=4),
-            SEBlock(128),
-            ResBlock(128, dilation=4),
-            SEBlock(128),
-        )
-
-        self.macro_group = nn.Sequential(
-            nn.Conv2d(128, 128, kernel_size=3, padding=8, dilation=8),
-            nn.ReLU(),
-            ResBlock(128, dilation=8),
-            SEBlock(128),
-        )
-
-        self.down = nn.Sequential(
-            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            ResBlock(128, dilation=1),
-        )
-
-        self.bottleneck = nn.Sequential(
-            nn.Conv2d(128, 64, kernel_size=1),
+            nn.Conv2d(64, 32, kernel_size=1),
             nn.ReLU(),
         )
 
-        flat_dim = 64 * 25 * 13
-        total_dim = flat_dim + extra_feature_count
+        flat_dim = 32 * 25 * 13  # 10,400
+        total_dim = flat_dim + extra_feature_count  # 10,445
 
-        self.trunk = nn.Sequential(
-            nn.Linear(total_dim, 1024),
+        # ── Projection to GRU input size ──
+        self.proj = nn.Sequential(
+            nn.Linear(total_dim, 128),
+            nn.ReLU(),
+        )
+
+        # ── GRU: the memory cell ──
+        # input_size = 128 (from proj)
+        # hidden_size = 128 (memory capacity)
+        # batch_first = True because we feed (batch, seq=1, features)
+        self.gru = nn.GRU(128, 128, batch_first=True)
+
+        # ── Output head ──
+        self.out = nn.Sequential(
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Dropout(dropout_prob),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Dropout(dropout_prob),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Dropout(dropout_prob),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
         )
 
-    def extract_features(self, grid: Tensor, extra_features: Tensor) -> Tensor:
-        x = self.stem(grid)
-        x = self.local_group(x)
-        x = self.meso_group(x)
-        x = self.macro_group(x)
-        x = self.down(x)
-        x = self.bottleneck(x)
-        spatial = torch.flatten(x, start_dim=1)
-        combined = torch.cat((spatial, extra_features), dim=1)
-        return self.trunk(combined)
+    def forward(
+        self,
+        grid: Tensor,
+        extra_features: Tensor,
+        hidden: Tensor | None = None,
+    ) -> tuple[Tensor, Tensor]:
+        """
+        Args:
+            grid: (batch, 6, 50, 25)
+            extra_features: (batch, 45)
+            hidden: (1, batch, 128) or None
+
+        Returns:
+            latent: (batch, 128)
+            hidden: (1, batch, 128) — pass this back in next step
+        """
+        # Spatial encoding
+        x = self.cnn(grid)
+        x = torch.flatten(x, start_dim=1)
+        x = torch.cat((x, extra_features), dim=1)
+        x = self.proj(x)  # (batch, 128)
+
+        # GRU expects (batch, seq_len=1, features)
+        x = x.unsqueeze(1)  # (batch, 1, 128)
+        out, hidden = self.gru(x, hidden)
+        out = out.squeeze(1)  # (batch, 128)
+
+        return self.out(out), hidden

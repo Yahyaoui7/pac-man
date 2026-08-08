@@ -26,11 +26,14 @@ from AI_arena.player.utils import (
 
 STAGE = 1
 NUM_UPDATES = 1000
-ROLLOUT_STEPS = 2048
+ROLLOUT_STEPS = 5000
+SEQ_LEN = 16  # Temporal sequence chunk length for GRU BPTT
+NUM_SEQUENCES = ROLLOUT_STEPS // SEQ_LEN  # 128 sequence chunks per rollout
+MINIBATCH_SEQS = 4  # 4 sequences per minibatch (64 total frames)
 PPO_EPOCHS = 2
 MINIBATCH_SIZE = 64
 
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 3e-4
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.1
@@ -173,13 +176,21 @@ def train() -> None:
             rollout_rewards: list[torch.Tensor] = []
             rollout_dones: list[torch.Tensor] = []
             rollout_values: list[torch.Tensor] = []
-            rollout_hiddens: list[torch.Tensor] = []
+            rollout_seq_hiddens: list[torch.Tensor] = []
 
             save_window_episodes: list[dict[str, float]] = []
             policy_hidden: torch.Tensor | None = None
 
-            for _ in range(ROLLOUT_STEPS):
+            for step in range(ROLLOUT_STEPS):
                 grid, features, valid_actions = obs
+
+                # Record hidden state at start of each sequence chunk
+                if step % SEQ_LEN == 0:
+                    rollout_seq_hiddens.append(
+                        policy_hidden.view(128).cpu()
+                        if policy_hidden is not None
+                        else torch.zeros(128)
+                    )
 
                 with torch.no_grad():
                     logits, value, policy_hidden = policy(
@@ -204,13 +215,6 @@ def train() -> None:
                 rollout_rewards.append(torch.tensor([reward], dtype=torch.float32))
                 rollout_dones.append(torch.tensor([done], dtype=torch.float32))
                 rollout_values.append(value.squeeze(-1).cpu())
-
-                # Store hidden state as (1, 128) — squeeze the layer dim only
-                rollout_hiddens.append(
-                    policy_hidden.squeeze(0).cpu()
-                    if policy_hidden is not None
-                    else torch.zeros(1, 128)
-                )
 
                 if done:
                     obs = env.reset()
@@ -245,48 +249,55 @@ def train() -> None:
                 )
                 next_value = next_value.squeeze(-1)
 
-            # ── Stack rollout tensors ──
-            b_grids = torch.cat(rollout_grids, dim=0).to(device)
-            b_features = torch.cat(rollout_features, dim=0).to(device)
-            b_valid_actions = torch.cat(rollout_valid_actions, dim=0).to(device)
-            b_actions = torch.cat(rollout_actions, dim=0).to(device)
-            b_log_probs = torch.cat(rollout_log_probs, dim=0).to(device)
-            b_rewards = torch.cat(rollout_rewards, dim=0).to(device)
-            b_dones = torch.cat(rollout_dones, dim=0).to(device)
-            b_values = torch.cat(rollout_values, dim=0).to(device)
-            b_hiddens = torch.cat(rollout_hiddens, dim=0).to(device)
-            # b_hiddens shape: (ROLLOUT_STEPS, 128)
+            # ── Truncate tensors to match full sequence chunks ──
+            num_seq_steps = NUM_SEQUENCES * SEQ_LEN
+            b_grids = torch.cat(rollout_grids, dim=0)[:num_seq_steps].to(device)
+            b_features = torch.cat(rollout_features, dim=0)[:num_seq_steps].to(device)
+            b_valid_actions = torch.cat(rollout_valid_actions, dim=0)[:num_seq_steps].to(device)
+            b_actions = torch.cat(rollout_actions, dim=0)[:num_seq_steps].to(device)
+            b_log_probs = torch.cat(rollout_log_probs, dim=0)[:num_seq_steps].to(device)
+            b_rewards = torch.cat(rollout_rewards, dim=0)[:num_seq_steps].to(device)
+            b_dones = torch.cat(rollout_dones, dim=0)[:num_seq_steps].to(device)
+            b_values = torch.cat(rollout_values, dim=0)[:num_seq_steps].to(device)
+            b_seq_hiddens = torch.stack(rollout_seq_hiddens, dim=0)[:NUM_SEQUENCES].to(device)  # (NUM_SEQUENCES, 128)
 
             # ── GAE ──
             advantages, returns = compute_gae(
                 b_rewards, b_values, b_dones, next_value, GAMMA, GAE_LAMBDA
             )
 
-            # ── PPO update epochs ──
+            # ── Reshape into Sequence Chunks for BPTT ──
+            b_grids_seq = b_grids.view(NUM_SEQUENCES, SEQ_LEN, *b_grids.shape[1:])
+            b_features_seq = b_features.view(NUM_SEQUENCES, SEQ_LEN, *b_features.shape[1:])
+            b_valid_actions_seq = b_valid_actions.view(NUM_SEQUENCES, SEQ_LEN, *b_valid_actions.shape[1:])
+            b_actions_seq = b_actions.view(NUM_SEQUENCES, SEQ_LEN)
+            b_log_probs_seq = b_log_probs.view(NUM_SEQUENCES, SEQ_LEN)
+            advantages_seq = advantages.view(NUM_SEQUENCES, SEQ_LEN)
+            returns_seq = returns.view(NUM_SEQUENCES, SEQ_LEN)
+
+            # ── PPO update epochs (BPTT across sequence chunks) ──
             total_policy_loss = 0.0
             total_value_loss = 0.0
             total_entropy_loss = 0.0
-            dataset_size = ROLLOUT_STEPS
+            num_minibatches = 0
 
             kl_coef = 0.20 if ref_policy is not None else 0.0
             eff_entropy_coef = 0.001 if ref_policy is not None else ENTROPY_COEF
 
             for _ in range(PPO_EPOCHS):
-                perm = torch.randperm(dataset_size, device=device)
-                for start in range(0, dataset_size, MINIBATCH_SIZE):
-                    mb_idx = perm[start : start + MINIBATCH_SIZE]
+                seq_perm = torch.randperm(NUM_SEQUENCES, device=device)
+                for start in range(0, NUM_SEQUENCES, MINIBATCH_SEQS):
+                    mb_seq_idx = seq_perm[start : start + MINIBATCH_SEQS]
 
-                    mb_grid = b_grids[mb_idx]
-                    mb_features = b_features[mb_idx]
-                    mb_valid = b_valid_actions[mb_idx]
-                    mb_actions = b_actions[mb_idx]
-                    mb_old_log_probs = b_log_probs[mb_idx]
-                    mb_adv = advantages[mb_idx]
-                    mb_returns = returns[mb_idx]
+                    mb_grid = b_grids_seq[mb_seq_idx]
+                    mb_features = b_features_seq[mb_seq_idx]
+                    mb_valid = b_valid_actions_seq[mb_seq_idx]
+                    mb_actions = b_actions_seq[mb_seq_idx]
+                    mb_old_log_probs = b_log_probs_seq[mb_seq_idx]
+                    mb_adv = advantages_seq[mb_seq_idx]
+                    mb_returns = returns_seq[mb_seq_idx]
 
-                    # GRU hidden states for this minibatch
-                    mb_hidden = b_hiddens[mb_idx]  # (B, 128)
-                    mb_hidden = mb_hidden.unsqueeze(0)  # (1, B, 128)
+                    mb_hidden = b_seq_hiddens[mb_seq_idx].unsqueeze(0)  # (1, MINIBATCH_SEQS, 128)
 
                     optimizer.zero_grad()
                     with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
@@ -308,7 +319,7 @@ def train() -> None:
                         kl_loss = torch.tensor(0.0, device=device)
                         if ref_policy is not None:
                             with torch.no_grad():
-                                ref_logits, _ = ref_policy(
+                                ref_logits, _, _ = ref_policy(
                                     mb_grid, mb_features, mb_hidden
                                 )
                                 ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
@@ -335,6 +346,7 @@ def train() -> None:
                     total_policy_loss += policy_loss.item()
                     total_value_loss += value_loss.item()
                     total_entropy_loss += entropy.item()
+                    num_minibatches += 1
 
             # ── Logging ──
             update_elapsed = time.time() - update_start
@@ -356,8 +368,8 @@ def train() -> None:
                 avg_pellets = 0.0
                 avg_pct = 0.0
 
-            avg_policy_loss = total_policy_loss / (PPO_EPOCHS * dataset_size)
-            avg_value_loss = total_value_loss / (PPO_EPOCHS * dataset_size)
+            avg_policy_loss = total_policy_loss / max(1, num_minibatches)
+            avg_value_loss = total_value_loss / max(1, num_minibatches)
 
             is_best = bool(recent_episodes and avg_pct > best_avg_pct)
             if is_best:

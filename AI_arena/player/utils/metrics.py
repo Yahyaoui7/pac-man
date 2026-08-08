@@ -6,6 +6,7 @@ from typing import Any, Sequence
 
 BD_LABELS = {
     "step": "Step",
+    "new_tile": "NewTile",
     "oscillation": "Osc",
     "pellet": "Pellet",
     "super_pellet": "Super",
@@ -33,9 +34,10 @@ def format_breakdown_line(recent_episodes: Sequence[dict[str, Any]]) -> str:
 def compute_positive_stats(recent_episodes: Sequence[dict[str, Any]]) -> dict[str, float]:
     """Compute average positive reward contributions."""
     if not recent_episodes:
-        return {"pellet": 0.0, "super_pellet": 0.0, "ghost": 0.0, "complete": 0.0}
+        return {"new_tile": 0.0, "pellet": 0.0, "super_pellet": 0.0, "ghost": 0.0, "complete": 0.0}
     n = len(recent_episodes)
     return {
+        "new_tile": sum(ep["episode_reward_breakdown"].get("new_tile", 0.0) for ep in recent_episodes) / n,
         "pellet": sum(ep["episode_reward_breakdown"].get("pellet", 0.0) for ep in recent_episodes) / n,
         "super_pellet": sum(ep["episode_reward_breakdown"].get("super_pellet", 0.0) for ep in recent_episodes) / n,
         "ghost": sum(ep["episode_reward_breakdown"].get("ghost", 0.0) for ep in recent_episodes) / n,

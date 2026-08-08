@@ -78,21 +78,35 @@ class PacmanCNNBackbone(nn.Module):
     ) -> tuple[Tensor, Tensor]:
         """
         Args:
-            grid: (batch, 6, 50, 25)
-            extra_features: (batch, 45)
+            grid: (batch, 6, 50, 25) or (batch, seq_len, 6, 50, 25)
+            extra_features: (batch, 45) or (batch, seq_len, 45)
             hidden: (1, batch, 128) or None
 
         Returns:
-            latent: (batch, 128)
-            hidden: (1, batch, 128) — pass this back in next step
+            latent: (batch, 128) or (batch, seq_len, 128)
+            hidden: (1, batch, 128)
         """
-        # Spatial encoding
+        if grid.ndim == 5:
+            # Sequence chunk mode: (batch, seq_len, channels, height, width)
+            b, l, c, h, w = grid.shape
+            grid_flat = grid.reshape(b * l, c, h, w)
+            extra_flat = extra_features.reshape(b * l, -1)
+
+            x = self.cnn(grid_flat)
+            x = torch.flatten(x, start_dim=1)
+            x = torch.cat((x, extra_flat), dim=1)
+            x = self.proj(x)  # (b * l, 128)
+
+            x = x.view(b, l, 128)  # (batch, seq_len, 128)
+            out, hidden = self.gru(x, hidden)  # out: (batch, seq_len, 128)
+            return self.out(out), hidden
+
+        # Single step mode: (batch, channels, height, width)
         x = self.cnn(grid)
         x = torch.flatten(x, start_dim=1)
         x = torch.cat((x, extra_features), dim=1)
         x = self.proj(x)  # (batch, 128)
 
-        # GRU expects (batch, seq_len=1, features)
         x = x.unsqueeze(1)  # (batch, 1, 128)
         out, hidden = self.gru(x, hidden)
         out = out.squeeze(1)  # (batch, 128)

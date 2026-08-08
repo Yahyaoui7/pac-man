@@ -34,10 +34,10 @@ GHOST_SPECS = [
 
 
 MAZE_WIDTH_MIN = 5
-MAZE_WIDTH_MAX = 12
+MAZE_WIDTH_MAX = 43
 
 MAZE_HEIGHT_MIN = 5
-MAZE_HEIGHT_MAX = 12
+MAZE_HEIGHT_MAX = 23
 
 MAX_PHYSICS_TICKS = 300
 
@@ -141,6 +141,7 @@ class PacmanPlayerEnv:
         }
         self.episode_reward_breakdown = {
             "step": 0.0,
+            "new_tile": 0.0,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
@@ -621,6 +622,7 @@ class PacmanPlayerEnv:
     ) -> tuple[float, dict[str, float]]:
         breakdown = {
             "step": -0.3,
+            "new_tile": 0.0,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
@@ -641,11 +643,14 @@ class PacmanPlayerEnv:
         elif frac_cleared >= 0.6:
             frac_cleared = frac_cleared * 1.5
 
+        if events.get("new_tile_visited", False):
+            breakdown["new_tile"] = 0.5
+
         # Progressive oscillation penalty
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -0.5
+            breakdown["oscillation"] = -2.0
 
         if events["pellet_eaten"]:
             breakdown["pellet"] = 1.0 + 3.0 * frac_cleared

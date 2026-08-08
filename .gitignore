@@ -5,3 +5,9 @@ __pycache__/
 .venv/
 .mypy_cache/
 AI_arena/data/PACMAN_IMITATION_DATA.jsonl
+
+# AI model checkpoints / weights
+*.pt
+*.pth
+*.onnx
+*.safetensors

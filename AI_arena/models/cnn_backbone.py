@@ -24,16 +24,15 @@ class PacmanCNNBackbone(nn.Module):
         self.cnn = nn.Sequential(
             nn.Conv2d(CNN_CHANNEL_COUNT, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2),
+
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2),
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
+            nn.AdaptiveMaxPool2d((25, 12)),  # full-res convs, compress only at end
         )
 
-        # 50x25 observation reduced by two 2x2 pools -> 12x6 grid
-        flattened_spatial_dim = 128 * 12 * 6
+        flattened_spatial_dim = 128 * 25 * 12  # 38400
         total_input_dim = flattened_spatial_dim + extra_feature_count
 
         self.trunk = nn.Sequential(
@@ -45,7 +44,7 @@ class PacmanCNNBackbone(nn.Module):
         )
 
     def extract_features(self, grid: Tensor, extra_features: Tensor) -> Tensor:
-        """Combine the spatial grid and state features into a latent vector."""
+
         spatial_features = torch.flatten(self.cnn(grid), start_dim=1)
         combined = torch.cat((spatial_features, extra_features), dim=1)
         return self.trunk(combined)

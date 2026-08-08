@@ -81,6 +81,8 @@ class PlayingState(State):
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             print(f"Player RL model unavailable: {exc}")
             self.player_controller = None
+        self.ai_last_decision_cell = None
+        self.ai_frame_counter = 0
 
         self.msg_text = f"LEVEL {curr_idx + 1}"
         self.msg_timer = 2.0

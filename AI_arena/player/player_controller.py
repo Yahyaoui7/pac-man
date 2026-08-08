@@ -3,19 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import torch
 
-from AI_arena.data.constants import (
-    ACTION_COUNT,
-    CNN_CHANNEL_COUNT,
-    CNN_HEIGHT,
-    CNN_WIDTH,
-)
 from AI_arena.models.cnn_player import PlayerActorCritic
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
-from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 
 from AI_arena.player.observation import format_player_observation
 
@@ -50,10 +44,12 @@ class CNNPlayerController:
         self.model.eval()
         self.last_diagnostics: dict[str, Any] = {}
         self.last_action_idx: int | None = None
+        self._hidden: torch.Tensor | None = None  # ← GRU memory persists across steps
 
     def reset_state(self) -> None:
         """Reset internal state history (e.g. between games)."""
         self.last_action_idx = None
+        self._hidden = None  # ← wipe GRU memory on new game
 
     def get_action(
         self,
@@ -70,7 +66,8 @@ class CNNPlayerController:
         )
 
         with torch.no_grad():
-            logits, value = self.model(grid, extra_features)
+            # Pass hidden state into model, receive updated hidden state back
+            logits, value, self._hidden = self.model(grid, extra_features, self._hidden)
             masked_logits = logits.masked_fill(~valid_actions, -1e9)
             probs = torch.softmax(masked_logits, dim=-1)[0]
             if sample:

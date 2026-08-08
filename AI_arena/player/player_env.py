@@ -39,15 +39,15 @@ GHOST_SPECS = [
 
 
 MAZE_WIDTH_MIN = 5
-MAZE_WIDTH_MAX = 43
+MAZE_WIDTH_MAX = 12
 
 MAZE_HEIGHT_MIN = 5
-MAZE_HEIGHT_MAX = 23
+MAZE_HEIGHT_MAX = 12
 
 MAX_PHYSICS_TICKS = 300
 
 
-MAZE_STEP_MULTIPLIER: float = 9
+MAZE_STEP_MULTIPLIER: float = 7
 
 
 GHOST_RESPAWN_TICKS: int = 15
@@ -650,10 +650,10 @@ class PacmanPlayerEnv:
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -0.3
+            breakdown["oscillation"] = -0.5
 
         if events["pellet_eaten"]:
-            breakdown["pellet"] = 2.0 + 3.0 * frac_cleared
+            breakdown["pellet"] = 1.0 + 3.0 * frac_cleared
 
         if events["super_pellet_eaten"]:
             breakdown["super_pellet"] = 2.0
@@ -663,7 +663,7 @@ class PacmanPlayerEnv:
 
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            breakdown["complete"] = (self.max_steps / 6) + float(remaining_steps)
+            breakdown["complete"] = 500 + float(remaining_steps)
 
         if events["pacman_died"]:
             breakdown["death"] = -50.0

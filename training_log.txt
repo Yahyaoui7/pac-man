@@ -1,14 +1,1 @@
-
-======================================================================
-Training session started at 2026-08-08T12:48:31.376198
-======================================================================
-============================================================
-Starting Stage 2 PPO Training for Pac-Man
-Device: cpu | AMP: False | Total Updates: 2000 | Rollout Steps: 2048
-============================================================
-Starting training with fresh random initial weights.
-============================================================
-Stage 2 Training Stopped/Completed after 1 update(s), 43.3s!
-Checkpoint Path: /home/mmenniou/Documents/pac-man/AI_arena/models/player_rl_stage2.pt
-Best Checkpoint: /home/mmenniou/Documents/pac-man/AI_arena/models/player_rl_stage2_best.pt (peak avg_pct=22.7%)
-============================================================
+Upd 001/1000 | Tot Ep: 006 | Averge Epoch Rwd:   81.1 | Max Epoch Pellets:  47 (100.0%) | Avg Pellets:  35.5 (81.7%) | Osc%: 43.8% | Avg Rwd: 81.1 | Step: -31.8 | Osc: -68.2 | Pellet: +93.6 | Super: +3.3 | Ghost: +0.0 | Complete: +84.2 | Death: +0.0 | BFS: +0.0 | Loss (P/V): 0.0000/17.7640 | Time: 163.7s (163.66s/upd) | Complete: 16.7% | Truncated: 83.3% | Avg Maze Area: 45.5 (7.0x6.7)

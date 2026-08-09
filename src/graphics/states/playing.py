@@ -822,3 +822,5 @@ class PlayingState(State):
                         player.reset_location()
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0
+                        for ghost in ghosts:
+                            ghost.reset()

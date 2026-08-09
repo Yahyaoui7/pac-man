@@ -24,7 +24,7 @@ from AI_arena.player.utils import (
 # CONFIGURATION — edit these by hand
 # ═══════════════════════════════════════════════════════════════════════════════
 
-STAGE = 1
+STAGE = 2
 NUM_UPDATES = 1000
 ROLLOUT_STEPS = 5000
 SEQ_LEN = 16  # Temporal sequence chunk length for GRU BPTT
@@ -253,13 +253,17 @@ def train() -> None:
             num_seq_steps = NUM_SEQUENCES * SEQ_LEN
             b_grids = torch.cat(rollout_grids, dim=0)[:num_seq_steps].to(device)
             b_features = torch.cat(rollout_features, dim=0)[:num_seq_steps].to(device)
-            b_valid_actions = torch.cat(rollout_valid_actions, dim=0)[:num_seq_steps].to(device)
+            b_valid_actions = torch.cat(rollout_valid_actions, dim=0)[
+                :num_seq_steps
+            ].to(device)
             b_actions = torch.cat(rollout_actions, dim=0)[:num_seq_steps].to(device)
             b_log_probs = torch.cat(rollout_log_probs, dim=0)[:num_seq_steps].to(device)
             b_rewards = torch.cat(rollout_rewards, dim=0)[:num_seq_steps].to(device)
             b_dones = torch.cat(rollout_dones, dim=0)[:num_seq_steps].to(device)
             b_values = torch.cat(rollout_values, dim=0)[:num_seq_steps].to(device)
-            b_seq_hiddens = torch.stack(rollout_seq_hiddens, dim=0)[:NUM_SEQUENCES].to(device)  # (NUM_SEQUENCES, 128)
+            b_seq_hiddens = torch.stack(rollout_seq_hiddens, dim=0)[:NUM_SEQUENCES].to(
+                device
+            )  # (NUM_SEQUENCES, 128)
 
             # ── GAE ──
             advantages, returns = compute_gae(
@@ -268,8 +272,12 @@ def train() -> None:
 
             # ── Reshape into Sequence Chunks for BPTT ──
             b_grids_seq = b_grids.view(NUM_SEQUENCES, SEQ_LEN, *b_grids.shape[1:])
-            b_features_seq = b_features.view(NUM_SEQUENCES, SEQ_LEN, *b_features.shape[1:])
-            b_valid_actions_seq = b_valid_actions.view(NUM_SEQUENCES, SEQ_LEN, *b_valid_actions.shape[1:])
+            b_features_seq = b_features.view(
+                NUM_SEQUENCES, SEQ_LEN, *b_features.shape[1:]
+            )
+            b_valid_actions_seq = b_valid_actions.view(
+                NUM_SEQUENCES, SEQ_LEN, *b_valid_actions.shape[1:]
+            )
             b_actions_seq = b_actions.view(NUM_SEQUENCES, SEQ_LEN)
             b_log_probs_seq = b_log_probs.view(NUM_SEQUENCES, SEQ_LEN)
             advantages_seq = advantages.view(NUM_SEQUENCES, SEQ_LEN)
@@ -297,7 +305,7 @@ def train() -> None:
                     mb_adv = advantages_seq[mb_seq_idx]
                     mb_returns = returns_seq[mb_seq_idx]
 
-                    mb_hidden = b_seq_hiddens[mb_seq_idx].unsqueeze(0)  # (1, MINIBATCH_SEQS, 128)
+                    mb_hidden = b_seq_hiddens[mb_seq_idx].unsqueeze(0).detach()
 
                     optimizer.zero_grad()
                     with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
@@ -314,7 +322,12 @@ def train() -> None:
                             torch.clamp(ratio, 1.0 - CLIP_EPS, 1.0 + CLIP_EPS) * mb_adv
                         )
                         policy_loss = -torch.min(surr1, surr2).mean()
-                        value_loss = F.mse_loss(values.squeeze(-1), mb_returns)
+                        mb_returns_norm = (mb_returns - mb_returns.mean()) / (
+                            mb_returns.std() + 1e-8
+                        )
+                        value_loss = F.mse_loss(
+                            values.reshape(-1), mb_returns_norm.reshape(-1)
+                        )
 
                         kl_loss = torch.tensor(0.0, device=device)
                         if ref_policy is not None:

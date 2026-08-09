@@ -21,7 +21,7 @@ DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.graphic_lib import PacmanMode as pm, SpriteLibrary
 from src.graphics.entitys.player import Player
-from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
+from src.logic.config import CELL_SIZE
 from src.logic.level_manager import LevelManager
 from src.logic.movement import MovementSystem
 
@@ -33,19 +33,36 @@ GHOST_SPECS = [
 ]
 
 
-MAZE_WIDTH_MIN = 5
+MAZE_WIDTH_MIN = 10
 MAZE_WIDTH_MAX = 43
 
-MAZE_HEIGHT_MIN = 5
+MAZE_HEIGHT_MIN = 10
 MAZE_HEIGHT_MAX = 23
 
 MAX_PHYSICS_TICKS = 300
+GHOST_RESPAWN_TICKS: int = 25
 
+MAZE_STEP_MULTIPLIER: float = 9
 
-MAZE_STEP_MULTIPLIER: float = 7
-
-
-GHOST_RESPAWN_TICKS: int = 15
+STEP_REWARD = -0.2  # slightly less punishing for Stage 2 maneuvering
+DEATH_REWARD = -10.0  # was -50. 4 deaths = -60, painful but learnable
+OSCILLATION_REWARD = -2.0  # was -0.001. Keep it meaningful.
+COMPLETION_REWARD = 500.0
+PELLET_REWARD = 1.0
+EAT_GHOST_REWARD = 40.0
+SUPER_PELLET_REWARD = 2.0
+LIVES = 100
+MILESTONE_REWARDS = {
+    0.10: 5.0,
+    0.20: 5.0,
+    0.30: 5.0,
+    0.40: 5.0,
+    0.50: 10.0,
+    0.60: 10.0,
+    0.70: 10.0,
+    0.80: 15.0,
+    0.90: 20.0,
+}
 
 
 class PacmanPlayerEnv:
@@ -114,8 +131,9 @@ class PacmanPlayerEnv:
 
         self.episode_event_counts: dict[str, int] = {}
         self.episode_reward_breakdown: dict[str, float] = {}
-        self.ghost_confusion_prob = 0.75
+        self.ghost_confusion_prob = 0.90
         self.death_count = 0
+        self.milestones_hit: set[float] = set()
 
     def reset(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Reset episode state and return (grid, features, valid_actions).
@@ -130,6 +148,7 @@ class PacmanPlayerEnv:
         self.prev_prev_cell = None
         self._osc_count = 0  # Tracks oscillations in the current episode
         self._ghost_respawn_ticks = [0] * 4
+        self.milestones_hit = set()
         self.episode_event_counts = {
             "pellet": 0,
             "super": 0,
@@ -141,13 +160,13 @@ class PacmanPlayerEnv:
         }
         self.episode_reward_breakdown = {
             "step": 0.0,
-            "new_tile": 0.0,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
             "ghost": 0.0,
             "complete": 0.0,
             "death": 0.0,
+            "milestone": 0.0,  # ← ADD
             "bfs": 0.0,
             "ghost_proximity": 0.0,
         }
@@ -262,7 +281,6 @@ class PacmanPlayerEnv:
             "ghost_eaten": False,
             "pacman_died": False,
             "level_completed": False,
-            "new_tile_visited": False,
             "oscillating": False,
         }
 
@@ -292,11 +310,6 @@ class PacmanPlayerEnv:
         # If the player didn't cross to a new cell (wall hit / no valid move),
         # we still count it as a step so training doesn't freeze.
         current_pos = (self.player.grid_y, self.player.grid_x)
-
-        # Track visited tiles
-        if current_pos not in self.visited_tiles:
-            events["new_tile_visited"] = True
-            self.visited_tiles.add(current_pos)
 
         # Anti-oscillation: penalise A→B→A bouncing
         if cell_changed and self.prev_prev_cell is not None:
@@ -337,7 +350,7 @@ class PacmanPlayerEnv:
         self.step_count += 1
 
         terminated = bool(
-            self.episode_event_counts["died"] > 3 or events["level_completed"]
+            self.episode_event_counts["died"] > LIVES or events["level_completed"]
         )
         # terminated = bool(self.step_count > 128 or events["level_completed"])
         truncated = self.step_count >= self.max_steps
@@ -621,65 +634,76 @@ class PacmanPlayerEnv:
         self, events: dict[str, bool], bfs_shaping: float = 0.0
     ) -> tuple[float, dict[str, float]]:
         breakdown = {
-            "step": -0.3,
-            "new_tile": 0.0,
+            "step": STEP_REWARD,
             "oscillation": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
             "ghost": 0.0,
             "complete": 0.0,
             "death": 0.0,
+            "milestone": 0.0,
             "bfs": 0.0,
             "ghost_proximity": 0.0,
         }
 
-        # Cascade thresholds high→low so each tier fires correctly.
-        eaten_pellets = max((self.total_pellets - self.remaining_pellets), 1)
-        frac_cleared = eaten_pellets / self.total_pellets
+        eaten_pellets = self.total_pellets - self.remaining_pellets
+        frac_cleared = (
+            eaten_pellets / self.total_pellets if self.total_pellets > 0 else 0.0
+        )
+
+        # ── Milestone rewards (one-time per episode) ──
+        for threshold, reward in MILESTONE_REWARDS.items():
+            if frac_cleared >= threshold and threshold not in self.milestones_hit:
+                self.milestones_hit.add(threshold)
+                breakdown["milestone"] += reward
+
+        # Progressive pellet reward (keep your existing frac_cleared multiplier)
+        pellet_bonus = 1.0
         if frac_cleared >= 0.9:
-            frac_cleared = frac_cleared * 4
+            pellet_bonus = 4.0
         elif frac_cleared >= 0.75:
-            frac_cleared = frac_cleared * 2
+            pellet_bonus = 2.0
         elif frac_cleared >= 0.6:
-            frac_cleared = frac_cleared * 1.5
+            pellet_bonus = 1.5
 
-        if events.get("new_tile_visited", False):
-            breakdown["new_tile"] = 0.5
-
-        # Progressive oscillation penalty
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            breakdown["oscillation"] = -2.0
+            breakdown["oscillation"] = OSCILLATION_REWARD
 
         if events["pellet_eaten"]:
-            breakdown["pellet"] = 1.0 + 3.0 * frac_cleared
+            breakdown["pellet"] = PELLET_REWARD + 3.0 * frac_cleared * pellet_bonus
 
         if events["super_pellet_eaten"]:
-            breakdown["super_pellet"] = 2.0
+            breakdown["super_pellet"] = SUPER_PELLET_REWARD
 
         if events.get("ghost_eaten", False):
-            breakdown["ghost"] = 90.0
+            breakdown["ghost"] = EAT_GHOST_REWARD
 
         if events["level_completed"]:
             remaining_steps = max(0, self.max_steps - self.step_count)
-            breakdown["complete"] = 150.0 + float(remaining_steps)
+            breakdown["complete"] = COMPLETION_REWARD + float(remaining_steps)
 
         if events["pacman_died"]:
-            breakdown["death"] = -50.0
+            breakdown["death"] = DEATH_REWARD
 
+        # ── Ghost proximity (strengthened for Stage 2) ──
         if self.stage > 1 and self.movement is not None and self.player is not None:
-            py2, px2 = self.player.grid_y, self.player.grid_x
-            bfs_from_player = self.movement.bfs_distances((py2, px2))
-            w2 = len(self.maze[0]) if self.maze else 1
+            py, px = self.player.grid_y, self.player.grid_x
+            bfs = self.movement.bfs_distances((py, px))
+            w = len(self.maze[0]) if self.maze else 1
             for ghost in self.ghosts:
                 if ghost.in_prison or ghost.is_edible:
                     continue
-                cell_idx = ghost.grid_y * w2 + ghost.grid_x
-                if 0 <= cell_idx < len(bfs_from_player):
-                    d = bfs_from_player[cell_idx]
-                    if 0 <= d <= 3:
-                        breakdown["ghost_proximity"] -= (4 - d) * 0.5
+                idx = ghost.grid_y * w + ghost.grid_x
+                if 0 <= idx < len(bfs):
+                    d = bfs[idx]
+                    if d == 1:
+                        breakdown["ghost_proximity"] -= 3.0  # adjacent: very bad
+                    elif d == 2:
+                        breakdown["ghost_proximity"] -= 1.5  # close: bad
+                    elif d == 3:
+                        breakdown["ghost_proximity"] -= 0.5  # nearby: caution
 
         breakdown["bfs"] = 2 * bfs_shaping
         self.episode_reward_breakdown["ghost_proximity"] = (

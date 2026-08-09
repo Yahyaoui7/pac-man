@@ -113,11 +113,9 @@ class PacmanPlayerEnv:
         self.last_action: int | None = None
         self.device = torch.device(device)
 
-        # Anti-oscillation tracking (last two cell positions)
         self.last_cell: tuple[int, int] | None = None
         self.prev_prev_cell: tuple[int, int] | None = None
-        # Reverse mask disabled by default: action history in state observation
-        # lets policy learn natural momentum without hard masking deadlocks.
+
         self.use_reverse_mask = False
 
         self.use_bfs_shaping = False
@@ -146,7 +144,7 @@ class PacmanPlayerEnv:
         self.last_action = None
         self.last_cell = None
         self.prev_prev_cell = None
-        self._osc_count = 0  # Tracks oscillations in the current episode
+        self._osc_count = 0
         self._ghost_respawn_ticks = [0] * 4
         self.milestones_hit = set()
         self.episode_event_counts = {
@@ -603,6 +601,8 @@ class PacmanPlayerEnv:
                     # Real death: Pac-Man respawns at center, episode continues
                     events["pacman_died"] = True
                     self.player.reset_location()
+                    for ghost in self.ghosts:
+                        ghost.reset()
                     break
 
         return events

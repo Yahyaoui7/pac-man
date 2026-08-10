@@ -37,6 +37,9 @@ class RewardCalculator:
         ghosts: list,
         movement,
         maze: list[list[int]] | None,
+        threat_dist: float = float("inf"),
+        min_ghost_dist_after: int = -1,
+        min_ghost_dist_before: int = -1,
     ) -> tuple[float, dict[str, float]]:
         """Return (total_reward, breakdown_dict)."""
         breakdown = {
@@ -50,6 +53,10 @@ class RewardCalculator:
             "milestone": 0.0,
             "bfs": 0.0,
             "ghost_proximity": 0.0,
+            "abandon_pellet": 0.0,
+            "region_dirty": 0.0,
+            "region_cleared": 0.0,
+            "circular_loop": 0.0,
         }
 
         eaten = total_pellets - remaining_pellets
@@ -70,30 +77,32 @@ class RewardCalculator:
         elif frac >= 0.6:
             pellet_bonus = 1.5
 
-        # ── Context-aware oscillation penalty ──
+        # ── Context-aware oscillation penalty (2-cell A->B->A) ──
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            threat_dist = float("inf")
-            if (
-                self.stage > 1
-                and movement is not None
-                and player is not None
-                and maze is not None
-            ):
-                py, px = player.grid_y, player.grid_x
-                bfs = movement.bfs_distances((py, px))
-                w = len(maze[0]) if maze else 1
-                for ghost in ghosts:
-                    if ghost.in_prison or ghost.is_edible:
-                        continue
-                    idx = ghost.grid_y * w + ghost.grid_x
-                    if 0 <= idx < len(bfs) and bfs[idx] >= 0:
-                        threat_dist = min(threat_dist, bfs[idx])
-
-            if threat_dist > 5 and player.powered_timer <= 0:
+            if threat_dist > 5 and (player is None or player.powered_timer <= 0):
                 breakdown["oscillation"] = OSCILLATION_REWARD
 
+        # ── Zero-Pellet Circular Loop Penalty (2x2 / 3-cell squares) ──
+        if events.get("circular_loop", False):
+            if threat_dist > 4 and (player is None or player.powered_timer <= 0):
+                breakdown["circular_loop"] = -4.0
+
+        # ── Close-Pellet Abandonment Penalty ──
+        if events.get("abandoned_close_pellet", False):
+            if threat_dist > 3 and (player is None or player.powered_timer <= 0):
+                breakdown["abandon_pellet"] = -3.0
+
+        # ── Region-Leaving Penalty & Cleared Bonus ──
+        if events.get("left_dirty_region", False):
+            if threat_dist > 4 and (player is None or player.powered_timer <= 0):
+                breakdown["region_dirty"] = -5.0
+
+        if events.get("cleared_region", False):
+            breakdown["region_cleared"] = +5.0
+
+        # ── Pellet & Event Rewards ──
         if events["pellet_eaten"]:
             breakdown["pellet"] = PELLET_REWARD + 3.0 * frac * pellet_bonus
 
@@ -110,25 +119,19 @@ class RewardCalculator:
         if events["pacman_died"]:
             breakdown["death"] = DEATH_REWARD
 
-        # ── Ghost proximity: avoid hunters, chase edible ──
+        # ── Ghost proximity & Suicidal Avoidance ──
         if (
             self.stage > 1
             and movement is not None
             and player is not None
             and maze is not None
         ):
-            py, px = player.grid_y, player.grid_x
-            bfs = movement.bfs_distances((py, px))
-            w = len(maze[0]) if maze else 1
             powered = player.powered_timer > 0
 
             for ghost in ghosts:
                 if ghost.in_prison:
                     continue
-                idx = ghost.grid_y * w + ghost.grid_x
-                if not (0 <= idx < len(bfs)):
-                    continue
-                d = bfs[idx]
+                d = min_ghost_dist_after
                 if d < 0:
                     continue
 
@@ -141,13 +144,17 @@ class RewardCalculator:
                     elif d == 3:
                         breakdown["ghost_proximity"] += 2.0
                 elif not ghost.is_edible:
-                    # AVOID MODE
+                    # AVOID MODE: Severe penalties when dangerously close
                     if d == 1:
-                        breakdown["ghost_proximity"] -= 3.0
+                        breakdown["ghost_proximity"] -= 12.0
                     elif d == 2:
-                        breakdown["ghost_proximity"] -= 1.5
+                        breakdown["ghost_proximity"] -= 4.0
                     elif d == 3:
-                        breakdown["ghost_proximity"] -= 0.5
+                        breakdown["ghost_proximity"] -= 1.5
+
+                    # Suicidal move check: stepping closer to a non-edible ghost when d <= 2
+                    if min_ghost_dist_before > 0 and d < min_ghost_dist_before and d <= 2:
+                        breakdown["ghost_proximity"] -= 15.0
 
         breakdown["bfs"] = 2 * bfs_shaping
         return sum(breakdown.values()), breakdown

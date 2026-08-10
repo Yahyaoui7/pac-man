@@ -1,7 +1,4 @@
-"""Headless Pac-Man environment for player reinforcement learning against BFS ghosts."""
-
-from __future__ import annotations
-
+from collections import deque
 import os
 import random
 from typing import Any
@@ -48,7 +45,7 @@ class PacmanPlayerEnv:
         max_steps: int | None = None,
         stage: int = 1,
         device: str | torch.device = "cpu",
-        use_bfs_shaping: bool = True,  # ← RESTORED: default True
+        use_bfs_shaping: bool = True,
     ) -> None:
         if not pygame.get_init():
             os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -81,8 +78,13 @@ class PacmanPlayerEnv:
         self.last_cell: tuple[int, int] | None = None
         self.prev_prev_cell: tuple[int, int] | None = None
 
+        self.cell_history: deque[tuple[int, int]] = deque(maxlen=6)
+        self.pellet_history: deque[bool] = deque(maxlen=6)
+        self.region_pellets: dict[tuple[int, int], int] = {}
+        self.last_region: tuple[int, int] | None = None
+
         self.use_reverse_mask = False
-        self.use_bfs_shaping = use_bfs_shaping  # ← RESTORED
+        self.use_bfs_shaping = use_bfs_shaping
         self.bfs_shaping_gamma = 0.99
 
         self._pellet_dist_grid: list[list[int]] | None = None
@@ -110,6 +112,10 @@ class PacmanPlayerEnv:
         self.last_action = None
         self.last_cell = None
         self.prev_prev_cell = None
+        self.cell_history.clear()
+        self.pellet_history.clear()
+        self.region_pellets = {}
+        self.last_region = None
         self._osc_count = 0
         self._ghost_respawn_ticks = [0] * 4
         self.death_count = 0
@@ -134,6 +140,10 @@ class PacmanPlayerEnv:
             "milestone": 0.0,
             "bfs": 0.0,
             "ghost_proximity": 0.0,
+            "abandon_pellet": 0.0,
+            "region_dirty": 0.0,
+            "region_cleared": 0.0,
+            "circular_loop": 0.0,
         }
 
         self._reward_calc.reset()
@@ -172,6 +182,7 @@ class PacmanPlayerEnv:
         start_cell = (self.player.grid_y, self.player.grid_x)
         self.visited_tiles.add(start_cell)
         self.last_cell = start_cell
+        self.last_region = (start_cell[0] // 4, start_cell[1] // 4)
 
         return self._get_observation()
 
@@ -207,9 +218,37 @@ class PacmanPlayerEnv:
             "pacman_died": False,
             "level_completed": False,
             "oscillating": False,
+            "abandoned_close_pellet": False,
+            "left_dirty_region": False,
+            "cleared_region": False,
+            "circular_loop": False,
         }
 
         start_cell = (self.player.grid_y, self.player.grid_x)
+
+        # Adjacent pellets before step
+        adjacent_pellets_before = []
+        if self.pellets and self.maze:
+            h, w = len(self.maze), len(self.maze[0])
+            for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                ny, nx = start_cell[0] + dy, start_cell[1] + dx
+                if 0 <= ny < h and 0 <= nx < w and self.pellets[ny][nx] in (1, 2):
+                    adjacent_pellets_before.append((ny, nx))
+
+        # Active ghost distance before step
+        min_ghost_dist_before = -1
+        if self.stage > 1 and self.movement is not None and self.player is not None and self.maze is not None:
+            py_b, px_b = self.player.grid_y, self.player.grid_x
+            bfs_b = self.movement.bfs_distances((py_b, px_b))
+            w_b = len(self.maze[0])
+            active_dists = [
+                bfs_b[g.grid_y * w_b + g.grid_x]
+                for g in self.ghosts
+                if not g.in_prison and not g.is_edible and 0 <= g.grid_y * w_b + g.grid_x < len(bfs_b) and bfs_b[g.grid_y * w_b + g.grid_x] >= 0
+            ]
+            if active_dists:
+                min_ghost_dist_before = min(active_dists)
+
         potential_before = self._cached_potential if self.use_bfs_shaping else 0.0
         cell_changed = False
 
@@ -232,7 +271,23 @@ class PacmanPlayerEnv:
 
         current_pos = (self.player.grid_y, self.player.grid_x)
 
-        # Anti-oscillation tracking
+        # Active ghost distance after step
+        min_ghost_dist_after = -1
+        threat_dist = float("inf")
+        if self.stage > 1 and self.movement is not None and self.player is not None and self.maze is not None:
+            py_a, px_a = self.player.grid_y, self.player.grid_x
+            bfs_a = self.movement.bfs_distances((py_a, px_a))
+            w_a = len(self.maze[0])
+            active_dists = [
+                bfs_a[g.grid_y * w_a + g.grid_x]
+                for g in self.ghosts
+                if not g.in_prison and not g.is_edible and 0 <= g.grid_y * w_a + g.grid_x < len(bfs_a) and bfs_a[g.grid_y * w_a + g.grid_x] >= 0
+            ]
+            if active_dists:
+                min_ghost_dist_after = min(active_dists)
+                threat_dist = float(min_ghost_dist_after)
+
+        # Anti-oscillation tracking (2-cell A->B->A)
         if cell_changed and self.prev_prev_cell is not None:
             if current_pos == self.prev_prev_cell:
                 events["oscillating"] = True
@@ -241,6 +296,46 @@ class PacmanPlayerEnv:
         if cell_changed:
             self.prev_prev_cell = self.last_cell
             self.last_cell = current_pos
+
+            # ── 1. Region Tracking (4x4) ──
+            curr_region = (current_pos[0] // 4, current_pos[1] // 4)
+            if self.last_region is not None and curr_region != self.last_region:
+                rem_old = self.region_pellets.get(self.last_region, 0)
+                if 0 < rem_old <= 2:
+                    events["left_dirty_region"] = True
+                elif rem_old == 0:
+                    events["cleared_region"] = True
+            self.last_region = curr_region
+
+            # ── 2. Close-Pellet Abandonment Penalty ──
+            if adjacent_pellets_before and not (events["pellet_eaten"] or events["super_pellet_eaten"]):
+                all_moved_away = True
+                for py_p, px_p in adjacent_pellets_before:
+                    d_before = abs(start_cell[0] - py_p) + abs(start_cell[1] - px_p)
+                    d_after = abs(current_pos[0] - py_p) + abs(current_pos[1] - px_p)
+                    if d_after <= d_before:
+                        all_moved_away = False
+                        break
+                if all_moved_away:
+                    events["abandoned_close_pellet"] = True
+
+            # ── 3. Zero-Pellet Circular Loop Detection ──
+            history_list = list(self.cell_history)
+            if current_pos in history_list[:-1]:
+                match_idx = history_list[:-1].index(current_pos)
+                pellets_in_loop = any(list(self.pellet_history)[match_idx:])
+                if not pellets_in_loop:
+                    events["circular_loop"] = True
+
+            self.cell_history.append(current_pos)
+            self.pellet_history.append(events["pellet_eaten"] or events["super_pellet_eaten"])
+
+        if events["pacman_died"]:
+            self.cell_history.clear()
+            self.pellet_history.clear()
+            self.last_cell = None
+            self.prev_prev_cell = None
+            self.last_region = (current_pos[0] // 4, current_pos[1] // 4)
 
         # ── BFS potential shaping ──
         bfs_shaping = 0.0
@@ -262,6 +357,9 @@ class PacmanPlayerEnv:
             ghosts=self.ghosts,
             movement=self.movement,
             maze=self.maze,
+            threat_dist=threat_dist,
+            min_ghost_dist_after=min_ghost_dist_after,
+            min_ghost_dist_before=min_ghost_dist_before,
         )
         for key, val in breakdown.items():
             self.episode_reward_breakdown[key] += val
@@ -375,6 +473,14 @@ class PacmanPlayerEnv:
         self.total_pellets = total
         self.remaining_pellets = total
 
+        reg_dict: dict[tuple[int, int], int] = {}
+        for y in range(height):
+            for x in range(width):
+                if pellets[y][x] in (1, 2):
+                    r = (y // 4, x // 4)
+                    reg_dict[r] = reg_dict.get(r, 0) + 1
+        self.region_pellets = reg_dict
+
     def _update_entities(self) -> None:
         if self.movement is None or self.player is None or self.maze is None:
             return
@@ -387,29 +493,6 @@ class PacmanPlayerEnv:
                 self.player.end_powered_mode()
                 for ghost in self.ghosts:
                     ghost.is_edible = False
-
-        frection = self.step_count // self.total_pellets
-
-        if frection > 0.9:
-            print(
-                f"90% of the maze cleared, max pellets {self.total_pellets},",
-                f" step count {self.step_count}",
-            )
-        elif frection > 0.75:
-            print(
-                f"90% of the maze cleared, max pellets {self.total_pellets},",
-                f" step count {self.step_count}",
-            )
-        elif frection > 0.6:
-            print(
-                f"90% of the maze cleared, max pellets {self.total_pellets},",
-                f" step count {self.step_count}",
-            )
-        elif frection > 0.4:
-            print(
-                f"90% of the maze cleared, max pellets {self.total_pellets},",
-                f" step count {self.step_count}",
-            )
 
         self._ghost_ctrl.update(
             ghosts=self.ghosts,
@@ -440,10 +523,16 @@ class PacmanPlayerEnv:
                 self.pellets[py][px] = 0
                 self.remaining_pellets -= 1
                 events["pellet_eaten"] = True
+                reg = (py // 4, px // 4)
+                if reg in self.region_pellets and self.region_pellets[reg] > 0:
+                    self.region_pellets[reg] -= 1
             elif pellet_type == 2:
                 self.pellets[py][px] = 0
                 self.remaining_pellets -= 1
                 events["super_pellet_eaten"] = True
+                reg = (py // 4, px // 4)
+                if reg in self.region_pellets and self.region_pellets[reg] > 0:
+                    self.region_pellets[reg] -= 1
                 self.player.start_powered_mode(mode=PacmanMode.PUNCH, duration=30.0)
                 for ghost in self.ghosts:
                     ghost.is_edible = True

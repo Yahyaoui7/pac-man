@@ -34,7 +34,7 @@ class PlayerActorCritic(nn.Module):
         """
         latent, hidden = self.backbone(grid, extra_features, hidden)
         logits = self.actor(latent)
-        value = self.critic(latent.detach())
+        value = self.critic(latent)
         return logits, value, hidden
 
 

@@ -11,7 +11,7 @@ from AI_arena.models.cnn_player import PlayerActorCritic
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
 
-from AI_arena.player.observation import format_player_observation
+from AI_arena.player.data.observation import format_player_observation
 
 DEFAULT_STAGE1_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage2.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")

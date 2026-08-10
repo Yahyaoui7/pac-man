@@ -16,7 +16,7 @@ from AI_arena.data.constants import (
     CNN_HEIGHT,
     CNN_WIDTH,
 )
-from AI_arena.player.observation import PLAYER_EXTRA_FEATURE_COUNT
+from AI_arena.player.data.observation import PLAYER_EXTRA_FEATURE_COUNT
 
 PlayerSample = tuple[Tensor, Tensor, Tensor, Tensor]
 

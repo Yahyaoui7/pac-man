@@ -9,11 +9,13 @@ from pathlib import Path
 from src.game_loop import GameStarter
 from src.logic.parsing import Parser
 
-DEFAULT_CONFIG = Path(__file__).parent.parent.parent / "config.json"
+DEFAULT_CONFIG = Path(__file__).parent.parent.parent / "../config.json"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Launch Pac-Man game with active AI Player model.")
+    parser = argparse.ArgumentParser(
+        description="Launch Pac-Man game with active AI Player model."
+    )
     parser.add_argument(
         "--config",
         type=str,
@@ -31,6 +33,7 @@ def main() -> int:
     config = parsed.parser_all()
 
     import os
+
     os.environ.pop("SDL_VIDEODRIVER", None)
 
     game = GameStarter(config)

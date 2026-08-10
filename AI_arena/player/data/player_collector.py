@@ -10,8 +10,8 @@ from pathlib import Path
 
 import torch
 
-from AI_arena.player.expert import PacmanExpert
-from AI_arena.player.observation import format_player_observation
+from AI_arena.player.data.expert import PacmanExpert
+from AI_arena.player.data.observation import format_player_observation
 from AI_arena.player.player_env import PacmanPlayerEnv
 
 DEFAULT_DATASET_PATH = (

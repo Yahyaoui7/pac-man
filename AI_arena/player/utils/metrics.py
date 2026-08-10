@@ -6,7 +6,6 @@ from typing import Any, Sequence
 
 BD_LABELS = {
     "step": "Step",
-    "new_tile": "NewTile",
     "oscillation": "Osc",
     "pellet": "Pellet",
     "super_pellet": "Super",
@@ -14,6 +13,11 @@ BD_LABELS = {
     "complete": "Complete",
     "death": "Death",
     "bfs": "BFS",
+    "ghost_proximity": "GhostProx",
+    "abandon_pellet": "AbndPellet",
+    "region_dirty": "DirtyReg",
+    "region_cleared": "CleanReg",
+    "circular_loop": "CircLoop",
 }
 
 

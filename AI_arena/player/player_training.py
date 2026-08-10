@@ -216,9 +216,11 @@ def train() -> None:
                 rollout_dones.append(torch.tensor([done], dtype=torch.float32))
                 rollout_values.append(value.squeeze(-1).cpu())
 
+                if done or info.get("events", {}).get("pacman_died", False):
+                    policy_hidden = None
+
                 if done:
                     obs = env.reset()
-                    policy_hidden = None
 
                     ep_steps = max(1.0, float(current_ep_steps))
                     osc_cnt = float(info["episode_event_counts"].get("osc", 0))

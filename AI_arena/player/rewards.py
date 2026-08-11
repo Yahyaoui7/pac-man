@@ -53,10 +53,10 @@ class RewardCalculator:
             "milestone": 0.0,
             "bfs": 0.0,
             "ghost_proximity": 0.0,
-            "abandon_pellet": 0.0,
-            "region_dirty": 0.0,
             "region_cleared": 0.0,
-            "circular_loop": 0.0,
+            "region_dirty": 0.0,
+            "backtrack": 0.0,
+            "incomplete": 0.0,
         }
 
         eaten = total_pellets - remaining_pellets
@@ -77,30 +77,30 @@ class RewardCalculator:
         elif frac >= 0.6:
             pellet_bonus = 1.5
 
-        # ── Context-aware oscillation penalty (2-cell A->B->A) ──
+        # ── Oscillation: only punish true 2-cell flips, and gently ──
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
             if threat_dist > 5 and (player is None or player.powered_timer <= 0):
                 breakdown["oscillation"] = OSCILLATION_REWARD
 
-        # ── Zero-Pellet Circular Loop Penalty (2x2 / 3-cell squares) ──
-        if events.get("circular_loop", False):
-            if threat_dist > 4 and (player is None or player.powered_timer <= 0):
-                breakdown["circular_loop"] = -4.0
+        # ── Mild anti-backtrack (coverage inefficiency) ──
+        if events.get("backtracked", False):
+            if threat_dist > 5 and (player is None or player.powered_timer <= 0):
+                breakdown["backtrack"] = -0.2
 
-        # ── Close-Pellet Abandonment Penalty ──
-        if events.get("abandoned_close_pellet", False):
-            if threat_dist > 3 and (player is None or player.powered_timer <= 0):
-                breakdown["abandon_pellet"] = -3.0
-
-        # ── Region-Leaving Penalty & Cleared Bonus ──
-        if events.get("left_dirty_region", False):
-            if threat_dist > 4 and (player is None or player.powered_timer <= 0):
-                breakdown["region_dirty"] = -5.0
-
+        # ── Region bonus / penalty ──
         if events.get("cleared_region", False):
-            breakdown["region_cleared"] = +5.0
+            breakdown["region_cleared"] = +2.0  # ← small reward for clearing
+
+        # ← CHANGED: tiny penalty for stragglers — only once model knows how to clear
+        if events.get("left_dirty_region", False):
+            if threat_dist > 6 and (player is None or player.powered_timer <= 0):
+                breakdown["region_dirty"] = -1.0
+
+        # ← CHANGED: gentle incomplete penalty. Don't murder the agent for trying.
+        if events.get("truncated", False) and remaining_pellets > 0:
+            breakdown["incomplete"] = -0.2 * remaining_pellets
 
         # ── Pellet & Event Rewards ──
         if events["pellet_eaten"]:
@@ -119,42 +119,31 @@ class RewardCalculator:
         if events["pacman_died"]:
             breakdown["death"] = DEATH_REWARD
 
-        # ── Ghost proximity & Suicidal Avoidance ──
-        if (
-            self.stage > 1
-            and movement is not None
-            and player is not None
-            and maze is not None
-        ):
+        # ── Ghost proximity ──
+        if self.stage > 1 and player is not None and min_ghost_dist_after >= 0:
             powered = player.powered_timer > 0
+            d = min_ghost_dist_after
 
-            for ghost in ghosts:
-                if ghost.in_prison:
-                    continue
-                d = min_ghost_dist_after
-                if d < 0:
-                    continue
+            has_edible_nearby = any(not g.in_prison and g.is_edible for g in ghosts)
+            has_threat_nearby = any(not g.in_prison and not g.is_edible for g in ghosts)
 
-                if powered and ghost.is_edible:
-                    # HUNT MODE: reward closing in on edible ghosts
-                    if d == 1:
-                        breakdown["ghost_proximity"] += 10.0
-                    elif d == 2:
-                        breakdown["ghost_proximity"] += 5.0
-                    elif d == 3:
-                        breakdown["ghost_proximity"] += 2.0
-                elif not ghost.is_edible:
-                    # AVOID MODE: Severe penalties when dangerously close
-                    if d == 1:
-                        breakdown["ghost_proximity"] -= 12.0
-                    elif d == 2:
-                        breakdown["ghost_proximity"] -= 4.0
-                    elif d == 3:
-                        breakdown["ghost_proximity"] -= 1.5
+            if powered and has_edible_nearby:
+                if d == 1:
+                    breakdown["ghost_proximity"] += 10.0
+                elif d == 2:
+                    breakdown["ghost_proximity"] += 5.0
+                elif d == 3:
+                    breakdown["ghost_proximity"] += 2.0
+            elif has_threat_nearby and not powered:
+                if d == 1:
+                    breakdown["ghost_proximity"] -= 4.0
+                elif d == 2:
+                    breakdown["ghost_proximity"] -= 1.5
+                elif d == 3:
+                    breakdown["ghost_proximity"] -= 0.3
 
-                    # Suicidal move check: stepping closer to a non-edible ghost when d <= 2
-                    if min_ghost_dist_before > 0 and d < min_ghost_dist_before and d <= 2:
-                        breakdown["ghost_proximity"] -= 15.0
+                if min_ghost_dist_before > 0 and d < min_ghost_dist_before and d <= 2:
+                    breakdown["ghost_proximity"] -= 10.0
 
         breakdown["bfs"] = 2 * bfs_shaping
         return sum(breakdown.values()), breakdown

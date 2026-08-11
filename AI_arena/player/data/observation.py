@@ -8,7 +8,7 @@ import torch
 
 from AI_arena.data.formatter import DIRECTIONS, ObservationFormatter
 
-PLAYER_EXTRA_FEATURE_COUNT = 45
+PLAYER_EXTRA_FEATURE_COUNT = 61
 POWER_TIMER_MAX = 30.0
 
 
@@ -21,8 +21,18 @@ def format_player_observation(
     movement: Any,
     initial_pellet_count: int | None = None,
     device: str | torch.device = "cpu",
+    visit_counts: list[list[int]] | None = None,  # ← CHANGED
+    prev_nearest_pellet_dist: float = -1.0,
+    prev_nearest_ghost_dist: float = -1.0,
+    prev_nearest_pp_dist: float = -1.0,
+    steps_since_pellet: int = 0,
+    last_positions: list[tuple[int, int]] = [],
+    just_died: float = 0.0,
+    same_action_count: int = 0,
+    region_completion_frac: float = 0.0,
+    region_is_dirty: float = 0.0,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Return grid [1,12,50,25], player features [1,45], and mask [1,4]."""
+    """Return grid [1,7,50,25], player features [1,61], and mask [1,4]."""
     ghost_states = [
         {
             "grid_x": ghost.grid_x,
@@ -40,6 +50,7 @@ def format_player_observation(
         ghost_states=ghost_states,
         movement=movement,
         device=device,
+        visit_counts=visit_counts,  # ← CHANGED
     )
 
     height = len(maze)
@@ -76,22 +87,22 @@ def format_player_observation(
     remaining = [normal_remaining / denominator, power_remaining / denominator]
     power_timer = [max(0.0, min(1.0, float(player.powered_timer) / POWER_TIMER_MAX))]
 
-    # ── NEW: BFS-based spatial features (10 features) ──
+    # BFS-based spatial features
     bfs_dist = (
         movement.bfs_distances((py, px))
         if movement is not None
         else [0] * (width * height)
     )
 
-    # Distance to each ghost (4)
+    ghost_distances_raw = []
     ghost_distances = []
     for ghost in ghosts:
         gx, gy = ghost.grid_x, ghost.grid_y
         cell_idx = gy * width + gx
         dist = bfs_dist[cell_idx] if (0 <= cell_idx < len(bfs_dist)) else -1
+        ghost_distances_raw.append(dist)
         ghost_distances.append((dist + 1) / max_dim)
 
-    # Nearest power pellet distance (1)
     power_pellet_positions = [
         (gy, gx) for gy in range(height) for gx in range(width) if pellets[gy][gx] == 2
     ]
@@ -103,7 +114,6 @@ def format_player_observation(
         nearest_pp_dist = -1
     nearest_pp_dist_norm = (nearest_pp_dist + 1) / max_dim
 
-    # Nearest normal pellet distance (1)
     normal_pellet_positions = [
         (gy, gx) for gy in range(height) for gx in range(width) if pellets[gy][gx] == 1
     ]
@@ -115,29 +125,78 @@ def format_player_observation(
         nearest_np_dist = -1
     nearest_np_dist_norm = (nearest_np_dist + 1) / max_dim
 
-    # Maze size context (3)
+    # Local adjacent pellet features (4)
+    local_pellet = [0.0, 0.0, 0.0, 0.0]
+    dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    for i, (dy, dx) in enumerate(dirs):
+        ny, nx = py + dy, px + dx
+        if 0 <= ny < height and 0 <= nx < width and pellets[ny][nx] in (1, 2):
+            local_pellet[i] = 1.0
+
+    # Delta / trend features (3)
+    delta_pellet = 0.0
+    if prev_nearest_pellet_dist >= 0 and nearest_np_dist >= 0:
+        delta_pellet = (prev_nearest_pellet_dist - nearest_np_dist) / max_dim
+
+    delta_ghost = 0.0
+    min_ghost_dist = min((d for d in ghost_distances_raw if d >= 0), default=-1)
+    if prev_nearest_ghost_dist >= 0 and min_ghost_dist >= 0:
+        delta_ghost = (prev_nearest_ghost_dist - min_ghost_dist) / max_dim
+
+    delta_pp = 0.0
+    if prev_nearest_pp_dist >= 0 and nearest_pp_dist >= 0:
+        delta_pp = (prev_nearest_pp_dist - nearest_pp_dist) / max_dim
+
+    steps_since_pellet_norm = min(steps_since_pellet, 100) / 100.0
+
+    last_offset_y = 0.0
+    last_offset_x = 0.0
+    second_last_offset_y = 0.0
+    second_last_offset_x = 0.0
+    if last_positions:
+        last_offset_y = (py - last_positions[-1][0]) / max_dim
+        last_offset_x = (px - last_positions[-1][1]) / max_dim
+    if len(last_positions) > 1:
+        second_last_offset_y = (py - last_positions[-2][0]) / max_dim
+        second_last_offset_x = (px - last_positions[-2][1]) / max_dim
+
+    just_died_flag = [just_died]
+    same_action_norm = min(same_action_count, 20) / 20.0
+
     maze_size = [
         float(width) / 50.0,
         float(height) / 25.0,
         float(width * height - 1) / 1000.0,
     ]
 
-    # Player powered boolean (1) — distinct from continuous power_timer
     player_powered_flag = [1.0 if player.powered_timer > 0 else 0.0]
 
     features = [
-        *player_direction,  # 4
-        *ghost_directions,  # 16
-        *edible,  # 4
-        *timers,  # 4
-        *action_features,  # 4
-        *remaining,  # 2
-        *power_timer,  # 1
-        *ghost_distances,  # 4  ← NEW
-        nearest_pp_dist_norm,  # 1  ← NEW
-        nearest_np_dist_norm,  # 1  ← NEW
-        *maze_size,  # 3  ← NEW
-        *player_powered_flag,  # 1  ← NEW
+        *player_direction,
+        *ghost_directions,
+        *edible,
+        *timers,
+        *action_features,
+        *remaining,
+        *power_timer,
+        *ghost_distances,
+        nearest_pp_dist_norm,
+        nearest_np_dist_norm,
+        *maze_size,
+        *player_powered_flag,
+        *local_pellet,
+        delta_pellet,
+        delta_ghost,
+        delta_pp,
+        steps_since_pellet_norm,
+        last_offset_y,
+        last_offset_x,
+        second_last_offset_y,
+        second_last_offset_x,
+        region_completion_frac,
+        region_is_dirty,
+        *just_died_flag,
+        same_action_norm,
     ]
     if len(features) != PLAYER_EXTRA_FEATURE_COUNT:
         raise ValueError(

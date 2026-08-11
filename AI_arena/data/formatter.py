@@ -18,6 +18,8 @@ from src.logic.config import EAST, NORTH, SOUTH, WEST
 
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
+VISIT_COUNT_NORMALIZE = 10.0  # ← visits >= 10 saturate at 1.0
+
 
 class ObservationFormatter:
     """Centralized observation builder creating identical tensors for Pac-Man and Ghost models."""
@@ -32,6 +34,9 @@ class ObservationFormatter:
         movement: Any,
         device: torch.device | str = "cpu",
         last_action: int | None = None,
+        visit_counts: (
+            list[list[int]] | None
+        ) = None,  # ← CHANGED: int visit counts per cell
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Construct unified tensors efficiently."""
         device = torch.device(device)
@@ -74,7 +79,16 @@ class ObservationFormatter:
             else:
                 grid[0, 4, gy, gx] += 1.0
 
-        # Build Extra Features (45 floats)
+        # Channel 6: Visit-count heatmap (0.0 = never visited, 1.0 = visited 10+ times)
+        # NOTE: CNN_CHANNEL_COUNT must be >= 7
+        if CNN_CHANNEL_COUNT > 6 and visit_counts is not None:
+            for y in range(height):
+                for x in range(width):
+                    c = visit_counts[y][x]
+                    if c > 0:
+                        grid[0, 6, y, x] = min(float(c) / VISIT_COUNT_NORMALIZE, 1.0)
+
+        # Build Extra Features
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]
         last_action_vec = [
             float(last_action == a_idx) if last_action is not None else 0.0
@@ -117,7 +131,7 @@ class ObservationFormatter:
             g_dir = gst.get("direction", "NONE")
             features.extend([float(g_dir == d) for d in DIRECTIONS])
 
-        # Power-pellet distance — append BEFORE tensor creation
+        # Power-pellet distance
         power_pellet_positions = [
             (gy, gx)
             for gy in range(height)

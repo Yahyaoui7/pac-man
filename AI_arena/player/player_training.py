@@ -468,12 +468,19 @@ def train() -> None:
             if quit_listener.stop_requested:
                 logger.log(f"\n'q' pressed — stopping at update {update}.")
                 torch.save(policy.state_dict(), checkpoint_path)
-                logger.log(f"Checkpoint: {checkpoint_path}")
-                logger.log(
-                    f"Best ({best_avg_pct:.1f}%): {best_checkpoint_path}"
-                    f" | Death rate: {death_rate:.1f}%"
-                )
                 break
+
+            # ── Free rollout tensors & release PyTorch CUDA allocator memory ──
+            del b_grids, b_features, b_valid_actions, b_actions, b_log_probs
+            del b_rewards, b_dones, b_values, b_seq_hiddens
+            del b_grids_seq, b_features_seq, b_valid_actions_seq, b_actions_seq, b_log_probs_seq
+            del advantages, returns, advantages_seq, returns_seq
+            del rollout_grids, rollout_features, rollout_valid_actions
+            del rollout_actions, rollout_log_probs, rollout_rewards, rollout_dones, rollout_values, rollout_seq_hiddens
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+
+
 
     except KeyboardInterrupt:
         logger.log(f"\nKeyboardInterrupt — saving at update {last_update_completed}.")

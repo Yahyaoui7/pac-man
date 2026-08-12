@@ -10,11 +10,42 @@ from pathlib import Path
 
 
 class TrainingLogger:
-    """Appends every log line to a file and optionally mirrors to stdout."""
+    """Appends every log line to a file and optionally mirrors to stdout.
+
+    Enforces a PID lock so only one training session writes to the log at a time.
+    A second process attempting to start will exit immediately with a clear error.
+    """
 
     def __init__(self, log_path: Path, quiet: bool = False) -> None:
         self.quiet = quiet
         self.log_path = log_path
+        self._lock_path = log_path.with_suffix(".lock")
+
+        # ── Exclusive instance lock ──────────────────────────────────────────
+        my_pid = str(threading.current_thread().native_id or "")
+        import os
+        my_pid = str(os.getpid())
+
+        if self._lock_path.exists():
+            existing_pid = self._lock_path.read_text().strip()
+            # Check if that PID is actually still alive
+            try:
+                os.kill(int(existing_pid), 0)
+                # Process still alive — refuse to start
+                print(
+                    f"\n{'!'*60}\n"
+                    f"ERROR: Another training session is already running (PID {existing_pid}).\n"
+                    f"Kill it first:  kill -SIGINT {existing_pid}\n"
+                    f"Then re-run training.\n"
+                    f"{'!'*60}\n"
+                )
+                raise SystemExit(1)
+            except (ProcessLookupError, ValueError):
+                # Stale lock — previous session was killed without cleanup
+                self._lock_path.unlink(missing_ok=True)
+
+        self._lock_path.write_text(my_pid)
+
         self._file = open(log_path, "a", encoding="utf-8", buffering=1)
         self._file.write(
             f"\n{'='*70}\n"
@@ -32,6 +63,7 @@ class TrainingLogger:
     def close(self) -> None:
         if not self._file.closed:
             self._file.close()
+        self._lock_path.unlink(missing_ok=True)
 
 
 class QuitListener:

@@ -14,6 +14,12 @@ class MovementSystem:
         self.maze = maze
         self.rng = random.Random()
         self.pattern_42: Optional[List[Tuple[int, int]]] = None
+        self._dist_cache: dict[tuple[int, int], list[int]] = {}
+
+    def clear_cache(self) -> None:
+        """Clear precomputed distance cache if maze structure changes."""
+        self._dist_cache.clear()
+
 
     def set_direction(self, entity: Entity, direction: str) -> None:
         """Set entity direction and convert it to grid_y/grid_x movement."""
@@ -168,43 +174,10 @@ class MovementSystem:
 
         return neighbors
 
-    def bfs_path(
-        self, start: tuple[int, int], target: tuple[int, int]
-    ) -> list[tuple[int, int]]:
-        """Find the shortest path from ghost to player."""
-        queue = deque([start])
-        visited = {start}
-        parent: dict[tuple[int, int], tuple[int, int]] = {}
-
-        while queue:
-            current = queue.popleft()
-
-            if current == target:
-                path = []
-                while current != start:
-                    path.append(current)
-                    current = parent[current]
-                path.append(start)
-                path.reverse()
-                return path
-
-            for neighbor in self.get_neighbors(current[0], current[1]):
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    parent[neighbor] = current
-                    queue.append(neighbor)
-
-        return []
-
-    def bfs_distances(
+    def bfs_distances_uncached(
         self, source: tuple[int, int]
     ) -> list[int]:
-        """Single BFS from source returning flat distance array.
-
-        Returns a flat list of length height*width where
-        result[y * width + x] = shortest distance from source to (y,x),
-        or -1 if unreachable.
-        """
+        """Single BFS from source returning flat distance array (uncached fallback)."""
         h = len(self.maze)
         w = len(self.maze[0])
         dist = [-1] * (h * w)
@@ -231,6 +204,67 @@ class MovementSystem:
                         dist[idx] = cd + 1
                         queue.append((ny, nx))
         return dist
+
+    def bfs_distances(
+        self, source: tuple[int, int]
+    ) -> list[int]:
+        """Return flat distance array from source to all cells (O(1) cached)."""
+        if self.pattern_42 is not None:
+            return self.bfs_distances_uncached(source)
+        if source not in self._dist_cache:
+            self._dist_cache[source] = self.bfs_distances_uncached(source)
+        return self._dist_cache[source]
+
+    def bfs_path(
+        self, start: tuple[int, int], target: tuple[int, int]
+    ) -> list[tuple[int, int]]:
+        """Find the shortest path from start to target in O(path_length) using distance cache."""
+        if start == target:
+            return [start]
+        if self.pattern_42 is not None:
+            queue = deque([start])
+            visited = {start}
+            parent: dict[tuple[int, int], tuple[int, int]] = {}
+            while queue:
+                current = queue.popleft()
+                if current == target:
+                    path = []
+                    while current != start:
+                        path.append(current)
+                        current = parent[current]
+                    path.append(start)
+                    path.reverse()
+                    return path
+                for neighbor in self.get_neighbors(current[0], current[1]):
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        parent[neighbor] = current
+                        queue.append(neighbor)
+            return []
+
+        w = len(self.maze[0])
+        target_dists = self.bfs_distances(target)
+        start_dist = target_dists[start[0] * w + start[1]]
+        if start_dist < 0:
+            return []
+
+        path = [start]
+        curr = start
+        while curr != target:
+            curr_dist = target_dists[curr[0] * w + curr[1]]
+            best_nbr = None
+            best_dist = curr_dist
+            for nbr in self.get_neighbors(curr[0], curr[1]):
+                d = target_dists[nbr[0] * w + nbr[1]]
+                if 0 <= d < best_dist:
+                    best_dist = d
+                    best_nbr = nbr
+            if best_nbr is None:
+                break
+            path.append(best_nbr)
+            curr = best_nbr
+
+        return path if path[-1] == target else []
 
     def direction_to_next_cell(
         self,
@@ -297,20 +331,36 @@ class MovementSystem:
         target_grid_y: int,
         target_grid_x: int,
     ) -> None:
-        """Move ghost toward target using BFS pathfinding."""
+        """Move ghost toward target using direct O(1) distance matrix lookup."""
         if self.is_centered(ghost):
             self.update_cell_position(ghost)
             start = (ghost.grid_y, ghost.grid_x)
             target = (target_grid_y, target_grid_x)
 
-            path = self.bfs_path(start, target)
-
-            if len(path) >= 2:
-                next_cell = path[1]
-                direction = self.direction_to_next_cell(start, next_cell)
-
-                if direction is not None:
-                    self.set_direction(ghost, direction)
+            if start != target:
+                if self.pattern_42 is not None:
+                    path = self.bfs_path(start, target)
+                    if len(path) >= 2:
+                        next_cell = path[1]
+                        direction = self.direction_to_next_cell(start, next_cell)
+                        if direction is not None:
+                            self.set_direction(ghost, direction)
+                else:
+                    w = len(self.maze[0])
+                    target_dists = self.bfs_distances(target)
+                    curr_d = target_dists[start[0] * w + start[1]]
+                    if curr_d > 0:
+                        best_nbr = None
+                        best_dist = curr_d
+                        for nbr in self.get_neighbors(start[0], start[1]):
+                            d = target_dists[nbr[0] * w + nbr[1]]
+                            if 0 <= d < best_dist:
+                                best_dist = d
+                                best_nbr = nbr
+                        if best_nbr is not None:
+                            direction = self.direction_to_next_cell(start, best_nbr)
+                            if direction is not None:
+                                self.set_direction(ghost, direction)
 
         self.update_entity(ghost)
 

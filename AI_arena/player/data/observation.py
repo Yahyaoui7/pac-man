@@ -80,12 +80,11 @@ def format_player_observation(
         for ghost in ghosts
     ]
     action_features = valid_actions[0].float().tolist()
-    normal_remaining = sum(cell == 1 for row in pellets for cell in row)
-    power_remaining = sum(cell == 2 for row in pellets for cell in row)
-    walkable_count = sum(cell != 15 for row in maze for cell in row)
-    denominator = max(initial_pellet_count or walkable_count, 1)
-    remaining = [normal_remaining / denominator, power_remaining / denominator]
-    power_timer = [max(0.0, min(1.0, float(player.powered_timer) / POWER_TIMER_MAX))]
+
+    normal_remaining = 0
+    power_remaining = 0
+    nearest_np_dist = -1
+    nearest_pp_dist = -1
 
     # BFS-based spatial features
     bfs_dist = (
@@ -103,26 +102,28 @@ def format_player_observation(
         ghost_distances_raw.append(dist)
         ghost_distances.append((dist + 1) / max_dim)
 
-    power_pellet_positions = [
-        (gy, gx) for gy in range(height) for gx in range(width) if pellets[gy][gx] == 2
-    ]
-    if power_pellet_positions:
-        nearest_pp_dist = min(
-            bfs_dist[gy * width + gx] for gy, gx in power_pellet_positions
-        )
-    else:
-        nearest_pp_dist = -1
-    nearest_pp_dist_norm = (nearest_pp_dist + 1) / max_dim
+    # Single pass over pellets to count and find min distances
+    for gy in range(height):
+        p_row = pellets[gy]
+        for gx in range(width):
+            val = p_row[gx]
+            if val == 1:
+                normal_remaining += 1
+                d = bfs_dist[gy * width + gx]
+                if d >= 0 and (nearest_np_dist == -1 or d < nearest_np_dist):
+                    nearest_np_dist = d
+            elif val == 2:
+                power_remaining += 1
+                d = bfs_dist[gy * width + gx]
+                if d >= 0 and (nearest_pp_dist == -1 or d < nearest_pp_dist):
+                    nearest_pp_dist = d
 
-    normal_pellet_positions = [
-        (gy, gx) for gy in range(height) for gx in range(width) if pellets[gy][gx] == 1
-    ]
-    if normal_pellet_positions:
-        nearest_np_dist = min(
-            bfs_dist[gy * width + gx] for gy, gx in normal_pellet_positions
-        )
-    else:
-        nearest_np_dist = -1
+    walkable_count = sum(cell != 15 for row in maze for cell in row)
+    denominator = max(initial_pellet_count or walkable_count, 1)
+    remaining = [normal_remaining / denominator, power_remaining / denominator]
+    power_timer = [max(0.0, min(1.0, float(player.powered_timer) / POWER_TIMER_MAX))]
+
+    nearest_pp_dist_norm = (nearest_pp_dist + 1) / max_dim
     nearest_np_dist_norm = (nearest_np_dist + 1) / max_dim
 
     # Local adjacent pellet features (4)

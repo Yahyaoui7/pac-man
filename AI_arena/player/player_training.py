@@ -24,9 +24,9 @@ from AI_arena.player.utils import (
 # CONFIGURATION — edit these by hand
 # ═══════════════════════════════════════════════════════════════════════════════
 
-STAGE = 1
+STAGE = 2
 NUM_UPDATES = 1000
-ROLLOUT_STEPS = 512
+ROLLOUT_STEPS = 8000
 SEQ_LEN = 16  # Temporal sequence chunk length for GRU BPTT
 NUM_SEQUENCES = ROLLOUT_STEPS // SEQ_LEN  # 128 sequence chunks per rollout
 MINIBATCH_SEQS = 4  # 4 sequences per minibatch (64 total frames)
@@ -216,8 +216,8 @@ def train() -> None:
                 rollout_dones.append(torch.tensor([done], dtype=torch.float32))
                 rollout_values.append(value.squeeze(-1).cpu())
 
-                if done or info.get("events", {}).get("pacman_died", False):
-                    policy_hidden = None
+                # if done or info.get("events", {}).get("pacman_died", False):
+                #     policy_hidden = None
 
                 if done:
                     obs = env.reset()

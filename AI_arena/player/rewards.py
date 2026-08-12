@@ -145,5 +145,5 @@ class RewardCalculator:
                 if min_ghost_dist_before > 0 and d < min_ghost_dist_before and d <= 2:
                     breakdown["ghost_proximity"] -= 10.0
 
-        breakdown["bfs"] = 2 * bfs_shaping
+        breakdown["bfs"] = 0.5 * bfs_shaping
         return sum(breakdown.values()), breakdown

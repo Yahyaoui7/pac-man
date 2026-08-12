@@ -13,7 +13,11 @@ from src.graphics.entitys.player import Player
 
 from AI_arena.player.data.observation import format_player_observation
 
-DEFAULT_STAGE1_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage2.pt"
+BEST_STAGE_PATH = (
+    Path(__file__).parent.parent / "models" / "player_rl_stage2_best.pt"
+)
+
+DEFAULT_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage2.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
 
@@ -25,8 +29,10 @@ class CNNPlayerController:
         self.model = PlayerActorCritic().to(self.device)
 
         if model_path is None:
-            if DEFAULT_STAGE1_PATH.exists():
-                path = DEFAULT_STAGE1_PATH
+            if BEST_STAGE_PATH.exists():
+                path = BEST_STAGE_PATH
+            elif DEFAULT_STAGE_PATH.exists():
+                path = DEFAULT_STAGE_PATH
             else:
                 path = Path(__file__).parent.parent / "models" / "player_sl_best.pt"
         else:

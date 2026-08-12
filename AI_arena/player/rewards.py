@@ -77,12 +77,15 @@ class RewardCalculator:
         elif frac >= 0.6:
             pellet_bonus = 1.5
 
-        # ── Oscillation: only punish true 2-cell flips, and gently ──
+        # ── Oscillation: punish even near ghosts (halved), never fully disable ──
         if events.get("oscillating", False) and not (
             events["pellet_eaten"] or events["super_pellet_eaten"]
         ):
-            if threat_dist > 5 and (player is None or player.powered_timer <= 0):
-                breakdown["oscillation"] = OSCILLATION_REWARD
+            if player is None or player.powered_timer <= 0:
+                # Halve the penalty when near a ghost (threat_dist ≤ 5) instead of
+                # disabling it entirely — prevents infinite flapping when scared
+                scale = 0.4 if threat_dist <= 5 else 1.0
+                breakdown["oscillation"] = OSCILLATION_REWARD * scale
 
         # ── Mild anti-backtrack (coverage inefficiency) ──
         if events.get("backtracked", False):
@@ -142,8 +145,13 @@ class RewardCalculator:
                 elif d == 3:
                     breakdown["ghost_proximity"] -= 0.3
 
+                # Approaching a very close ghost: proportional penalty (was -10, too large)
                 if min_ghost_dist_before > 0 and d < min_ghost_dist_before and d <= 2:
-                    breakdown["ghost_proximity"] -= 10.0
+                    breakdown["ghost_proximity"] -= 2.0
+
+                # Evasion success: reward agent for increasing distance from a close ghost
+                if min_ghost_dist_before > 0 and d > min_ghost_dist_before and min_ghost_dist_before <= 3:
+                    breakdown["ghost_proximity"] += 1.5
 
         breakdown["bfs"] = 0.5 * bfs_shaping
         return sum(breakdown.values()), breakdown

@@ -201,6 +201,7 @@ class PacmanPlayerEnv:
             self._cached_potential = self._potential_at(
                 self.player.grid_y, self.player.grid_x
             )
+            self._last_pellet_grid_frac = 1.0  # track fraction for throttled recompute
 
         start_cell = (self.player.grid_y, self.player.grid_x)
         self.visited_tiles.add(start_cell)
@@ -310,26 +311,9 @@ class PacmanPlayerEnv:
             self.prev_nearest_pp_dist = min(pp_dists) if pp_dists else -1
 
         # Active ghost distance before step
-        min_ghost_dist_before = -1
-        if (
-            self.stage > 1
-            and self.movement is not None
-            and self.player is not None
-            and self.maze is not None
-        ):
-            py_b, px_b = self.player.grid_y, self.player.grid_x
-            bfs_b = self.movement.bfs_distances((py_b, px_b))
-            w_b = len(self.maze[0])
-            active_dists = [
-                bfs_b[g.grid_y * w_b + g.grid_x]
-                for g in self.ghosts
-                if not g.in_prison
-                and not g.is_edible
-                and 0 <= g.grid_y * w_b + g.grid_x < len(bfs_b)
-                and bfs_b[g.grid_y * w_b + g.grid_x] >= 0
-            ]
-            if active_dists:
-                min_ghost_dist_before = min(active_dists)
+        min_ghost_dist_before = (
+            self.prev_nearest_ghost_dist if self.stage > 1 else -1
+        )
 
         potential_before = self._cached_potential if self.use_bfs_shaping else 0.0
         cell_changed = False
@@ -447,7 +431,12 @@ class PacmanPlayerEnv:
         bfs_shaping = 0.0
         if self.use_bfs_shaping:
             if events["pellet_eaten"] or events["super_pellet_eaten"]:
-                self._pellet_dist_grid = self._compute_pellet_distance_grid()
+                # Throttle: only recompute every 5% of total pellets consumed
+                new_frac = self.remaining_pellets / max(self.total_pellets, 1)
+                old_frac = getattr(self, "_last_pellet_grid_frac", 1.0)
+                if old_frac - new_frac >= 0.05:
+                    self._pellet_dist_grid = self._compute_pellet_distance_grid()
+                    self._last_pellet_grid_frac = new_frac
             potential_after = self._potential_at(*current_pos)
             bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
             self._cached_potential = potential_after
@@ -504,20 +493,7 @@ class PacmanPlayerEnv:
         if truncated:
             self.episode_event_counts["truncated"] += 1
 
-        min_ghost_dist = -1
-        if self.stage > 1 and self.movement is not None and self.player is not None:
-            py2, px2 = self.player.grid_y, self.player.grid_x
-            bfs_from_player = self.movement.bfs_distances((py2, px2))
-            w2 = len(self.maze[0]) if self.maze else 1
-            active_dists = [
-                bfs_from_player[g.grid_y * w2 + g.grid_x]
-                for g in self.ghosts
-                if not g.in_prison
-                and 0 <= g.grid_y * w2 + g.grid_x < len(bfs_from_player)
-                and bfs_from_player[g.grid_y * w2 + g.grid_x] >= 0
-            ]
-            if active_dists:
-                min_ghost_dist = min(active_dists)
+        min_ghost_dist = min_ghost_dist_after
 
         info = {
             "step": self.step_count,
@@ -687,13 +663,24 @@ class PacmanPlayerEnv:
                 if self.pellets[y][x] in (1, 2):
                     dist[y][x] = 0
                     q.append((y, x))
+        from src.logic.config import EAST, NORTH, SOUTH, WEST
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        wall_bits = [NORTH, SOUTH, WEST, EAST]
+
         while q:
             y, x = q.popleft()
             d = dist[y][x]
-            for ny, nx in self.movement.get_neighbors(y, x):
-                if dist[ny][nx] == -1:
-                    dist[ny][nx] = d + 1
-                    q.append((ny, nx))
+            cell = self.maze[y][x]
+            for i, (dy, dx) in enumerate(directions):
+                ny, nx = y + dy, x + dx
+                if (
+                    0 <= ny < h
+                    and 0 <= nx < w
+                    and not (cell & wall_bits[i])
+                ):
+                    if dist[ny][nx] == -1:
+                        dist[ny][nx] = d + 1
+                        q.append((ny, nx))
         return dist
 
     def _potential_at(self, y: int, x: int) -> float:

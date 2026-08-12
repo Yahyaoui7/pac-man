@@ -168,29 +168,36 @@ def train() -> None:
             update_start = time.time()
 
             # ── Rollout collection ──
-            rollout_grids: list[torch.Tensor] = []
-            rollout_features: list[torch.Tensor] = []
-            rollout_valid_actions: list[torch.Tensor] = []
-            rollout_actions: list[torch.Tensor] = []
-            rollout_log_probs: list[torch.Tensor] = []
-            rollout_rewards: list[torch.Tensor] = []
-            rollout_dones: list[torch.Tensor] = []
-            rollout_values: list[torch.Tensor] = []
-            rollout_seq_hiddens: list[torch.Tensor] = []
 
             save_window_episodes: list[dict[str, float]] = []
             policy_hidden: torch.Tensor | None = None
+
+            # ── Pre-allocate rollout buffers (avoids 8000 allocs + torch.cat) ──
+            # Shapes are determined by the first observation; allocate on CPU.
+            _sample_grid, _sample_feat, _sample_valid = obs
+            grid_shape = _sample_grid.shape[1:]   # (C, H, W)
+            feat_shape = _sample_feat.shape[1:]    # (F,)
+            act_shape  = _sample_valid.shape[1:]   # (A,)
+
+            ra_grids         = torch.zeros((ROLLOUT_STEPS, *grid_shape),  dtype=torch.float32)
+            ra_features      = torch.zeros((ROLLOUT_STEPS, *feat_shape),  dtype=torch.float32)
+            ra_valid_actions = torch.zeros((ROLLOUT_STEPS, *act_shape),   dtype=torch.bool)
+            ra_actions       = torch.zeros(ROLLOUT_STEPS,                 dtype=torch.long)
+            ra_log_probs     = torch.zeros(ROLLOUT_STEPS,                 dtype=torch.float32)
+            ra_rewards       = torch.zeros(ROLLOUT_STEPS,                 dtype=torch.float32)
+            ra_dones         = torch.zeros(ROLLOUT_STEPS,                 dtype=torch.float32)
+            ra_values        = torch.zeros(ROLLOUT_STEPS,                 dtype=torch.float32)
+            ra_seq_hiddens   = torch.zeros(NUM_SEQUENCES, 128,            dtype=torch.float32)
 
             for step in range(ROLLOUT_STEPS):
                 grid, features, valid_actions = obs
 
                 # Record hidden state at start of each sequence chunk
                 if step % SEQ_LEN == 0:
-                    rollout_seq_hiddens.append(
-                        policy_hidden.view(128).cpu()
-                        if policy_hidden is not None
-                        else torch.zeros(128)
-                    )
+                    seq_idx = step // SEQ_LEN
+                    if policy_hidden is not None:
+                        ra_seq_hiddens[seq_idx] = policy_hidden.view(128).detach()
+                    # else: stays zero (already initialised)
 
                 with torch.no_grad():
                     logits, value, policy_hidden = policy(
@@ -207,14 +214,14 @@ def train() -> None:
                 current_ep_reward += reward
                 current_ep_steps += 1
 
-                rollout_grids.append(grid)
-                rollout_features.append(features)
-                rollout_valid_actions.append(valid_actions)
-                rollout_actions.append(action.cpu())
-                rollout_log_probs.append(log_prob.cpu())
-                rollout_rewards.append(torch.tensor([reward], dtype=torch.float32))
-                rollout_dones.append(torch.tensor([done], dtype=torch.float32))
-                rollout_values.append(value.squeeze(-1).cpu())
+                ra_grids[step]         = grid[0]
+                ra_features[step]      = features[0]
+                ra_valid_actions[step] = valid_actions[0]
+                ra_actions[step]       = action.cpu()
+                ra_log_probs[step]     = log_prob.cpu()
+                ra_rewards[step]       = reward
+                ra_dones[step]         = float(done)
+                ra_values[step]        = value.squeeze(-1).cpu()
 
                 # if done or info.get("events", {}).get("pacman_died", False):
                 #     policy_hidden = None
@@ -251,21 +258,18 @@ def train() -> None:
                 )
                 next_value = next_value.squeeze(-1)
 
-            # ── Truncate tensors to match full sequence chunks ──
+            # ── Transfer pre-allocated buffers to device (single transfer per update) ──
             num_seq_steps = NUM_SEQUENCES * SEQ_LEN
-            b_grids = torch.cat(rollout_grids, dim=0)[:num_seq_steps].to(device)
-            b_features = torch.cat(rollout_features, dim=0)[:num_seq_steps].to(device)
-            b_valid_actions = torch.cat(rollout_valid_actions, dim=0)[
-                :num_seq_steps
-            ].to(device)
-            b_actions = torch.cat(rollout_actions, dim=0)[:num_seq_steps].to(device)
-            b_log_probs = torch.cat(rollout_log_probs, dim=0)[:num_seq_steps].to(device)
-            b_rewards = torch.cat(rollout_rewards, dim=0)[:num_seq_steps].to(device)
-            b_dones = torch.cat(rollout_dones, dim=0)[:num_seq_steps].to(device)
-            b_values = torch.cat(rollout_values, dim=0)[:num_seq_steps].to(device)
-            b_seq_hiddens = torch.stack(rollout_seq_hiddens, dim=0)[:NUM_SEQUENCES].to(
-                device
-            )  # (NUM_SEQUENCES, 128)
+            b_grids         = ra_grids[:num_seq_steps].to(device)
+            b_features      = ra_features[:num_seq_steps].to(device)
+            b_valid_actions = ra_valid_actions[:num_seq_steps].to(device)
+            b_actions       = ra_actions[:num_seq_steps].to(device)
+            b_log_probs     = ra_log_probs[:num_seq_steps].to(device)
+            b_rewards       = ra_rewards[:num_seq_steps].to(device)
+            b_dones         = ra_dones[:num_seq_steps].to(device)
+            b_values        = ra_values[:num_seq_steps].to(device)
+            b_seq_hiddens   = ra_seq_hiddens[:NUM_SEQUENCES].to(device)  # (NUM_SEQUENCES, 128)
+
 
             # ── GAE ──
             advantages, returns = compute_gae(

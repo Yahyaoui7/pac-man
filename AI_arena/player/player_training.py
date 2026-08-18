@@ -12,7 +12,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from AI_arena.models.cnn_player import PlayerActorCritic, load_sl_weights_into_ppo
+from AI_arena.models.cnn_player import (
+    PlayerActorCritic,
+    load_checkpoint_into_policy,
+    load_sl_weights_into_ppo,
+)
 from AI_arena.player.player_env import PacmanPlayerEnv
 from AI_arena.player.utils import (
     QuitListener,
@@ -26,10 +30,10 @@ from AI_arena.player.utils import (
 
 STAGE = 2
 NUM_UPDATES = 1000
-ROLLOUT_STEPS = 8000
+ROLLOUT_STEPS = 5012
 SEQ_LEN = 16  # Temporal sequence chunk length for GRU BPTT
-NUM_SEQUENCES = ROLLOUT_STEPS // SEQ_LEN  # 128 sequence chunks per rollout
-MINIBATCH_SEQS = 4  # 4 sequences per minibatch (64 total frames)
+NUM_SEQUENCES = ROLLOUT_STEPS // SEQ_LEN  # Sequence chunks per rollout
+MINIBATCH_SEQS = 8  # 4 sequences per minibatch (64 total frames)
 PPO_EPOCHS = 2
 MINIBATCH_SIZE = 64
 
@@ -37,8 +41,8 @@ LEARNING_RATE = 3e-4
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.1
-ENTROPY_COEF = 0.015
-VALUE_COEF = 0.5
+ENTROPY_COEF = 0.01
+VALUE_COEF = 0.25
 MAX_GRAD_NORM = 0.5
 
 SEED = 42
@@ -56,25 +60,26 @@ def compute_gae(
     rewards: torch.Tensor,
     values: torch.Tensor,
     dones: torch.Tensor,
+    terminated: torch.Tensor,
     next_value: torch.Tensor,
     gamma: float,
     gae_lambda: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Generalized Advantage Estimation."""
+    """Generalized Advantage Estimation with proper truncation bootstrapping."""
+    n_steps = len(rewards)
     advantages = torch.zeros_like(rewards)
     last_gae = 0.0
-    for t in reversed(range(len(rewards))):
-        if t == len(rewards) - 1:
-            next_non_terminal = 1.0 - dones[t]
+    for t in reversed(range(n_steps)):
+        if t == n_steps - 1:
+            next_non_terminal = 1.0 - terminated[t]
             next_val = next_value
         else:
-            next_non_terminal = 1.0 - dones[t]
+            next_non_terminal = 1.0 - terminated[t]
             next_val = values[t + 1]
 
         delta = rewards[t] + gamma * next_val * next_non_terminal - values[t]
-        advantages[t] = last_gae = (
-            delta + gamma * gae_lambda * next_non_terminal * last_gae
-        )
+        next_non_done = 1.0 - dones[t]
+        advantages[t] = last_gae = delta + gamma * gae_lambda * next_non_done * last_gae
 
     returns = advantages + values
     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -82,7 +87,7 @@ def compute_gae(
 
 
 def train() -> None:
-    """Main PPO training loop with GRU memory."""
+    """Main PPO training loop with GRU memory and reset-safe sequence training."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cuda":
         torch.set_float32_matmul_precision("high")
@@ -108,20 +113,22 @@ def train() -> None:
     sl_best_path = MODEL_DIR / "player_sl_best.pt"
 
     if RESUME and not SL_WARMSTART:
-        target = checkpoint_path
-        if not target.exists() and STAGE > 1:
-            stage1_best = MODEL_DIR / f"player_rl_stage{STAGE - 1}_best.pt"
-            stage1_last = MODEL_DIR / f"player_rl_stage{STAGE - 1}.pt"
-            if stage1_best.exists():
-                target = stage1_best
-            elif stage1_last.exists():
-                target = stage1_last
-
-        if target.exists():
-            weights = torch.load(target, map_location=device, weights_only=True)
-            policy.load_state_dict(weights)
-            loaded_checkpoint = True
-            logger.log(f"Resumed from {target.name}")
+        candidates = [
+            checkpoint_path,
+            best_checkpoint_path,
+            MODEL_DIR / f"player_rl_stage{STAGE - 1}_best.pt",
+            MODEL_DIR / f"player_rl_stage{STAGE - 1}.pt",
+            Path(__file__).parent.parent
+            / "data"
+            / f"player_rl_stage{STAGE - 1}_best.pt",
+            Path(__file__).parent.parent / "data" / f"player_rl_stage{STAGE - 1}.pt",
+        ]
+        for cand in candidates:
+            if cand.exists():
+                if load_checkpoint_into_policy(policy, cand, device=device):
+                    loaded_checkpoint = True
+                    logger.log(f"Resumed from {cand.name} ({cand})")
+                    break
 
     ref_policy: PlayerActorCritic | None = None
     if not loaded_checkpoint:
@@ -175,13 +182,14 @@ def train() -> None:
             rollout_log_probs: list[torch.Tensor] = []
             rollout_rewards: list[torch.Tensor] = []
             rollout_dones: list[torch.Tensor] = []
+            rollout_terminated: list[torch.Tensor] = []
+            rollout_resets: list[torch.Tensor] = []
             rollout_values: list[torch.Tensor] = []
             rollout_seq_hiddens: list[torch.Tensor] = []
 
             save_window_episodes: list[dict[str, float]] = []
             policy_hidden: torch.Tensor | None = None
-
-
+            step_just_reset = True
 
             for step in range(ROLLOUT_STEPS):
                 grid, features, valid_actions = obs
@@ -200,12 +208,12 @@ def train() -> None:
                         features.to(device),
                         policy_hidden,
                     )
-                    masked_logits = logits.masked_fill(~valid_actions.to(device), -1e4)
+                    masked_logits = logits.masked_fill(~valid_actions.to(device), -1e8)
                     dist = Categorical(logits=masked_logits)
                     action = dist.sample()
                     log_prob = dist.log_prob(action)
 
-                next_obs, reward, done, info = env.step(action.item())
+                next_obs, reward, done, info, executed_action = env.step(action.item())
                 current_ep_reward += reward
                 current_ep_steps += 1
 
@@ -216,13 +224,24 @@ def train() -> None:
                 rollout_log_probs.append(log_prob.cpu())
                 rollout_rewards.append(torch.tensor([reward], dtype=torch.float32))
                 rollout_dones.append(torch.tensor([done], dtype=torch.float32))
+                rollout_terminated.append(
+                    torch.tensor([info.get("terminated", False)], dtype=torch.float32)
+                )
+                rollout_resets.append(
+                    torch.tensor([1.0 if step_just_reset else 0.0], dtype=torch.float32)
+                )
                 rollout_values.append(value.squeeze(-1).cpu())
 
-                # if done or info.get("events", {}).get("pacman_died", False):
-                #     policy_hidden = None
+                if done or info.get("events", {}).get("pacman_died", False):
+                    policy_hidden = None
+                    step_just_reset = True
+                else:
+                    step_just_reset = False
 
                 if done:
+                    policy_hidden = None
                     obs = env.reset()
+                    step_just_reset = True
 
                     ep_steps = max(1.0, float(current_ep_steps))
                     osc_cnt = float(info["episode_event_counts"].get("osc", 0))
@@ -264,17 +283,25 @@ def train() -> None:
             b_log_probs = torch.cat(rollout_log_probs, dim=0)[:num_seq_steps].to(device)
             b_rewards = torch.cat(rollout_rewards, dim=0)[:num_seq_steps].to(device)
             b_dones = torch.cat(rollout_dones, dim=0)[:num_seq_steps].to(device)
+            b_terminated = torch.cat(rollout_terminated, dim=0)[:num_seq_steps].to(
+                device
+            )
+            b_resets = torch.cat(rollout_resets, dim=0)[:num_seq_steps].to(device)
             b_values = torch.cat(rollout_values, dim=0)[:num_seq_steps].to(device)
             b_seq_hiddens = torch.stack(rollout_seq_hiddens, dim=0)[:NUM_SEQUENCES].to(
                 device
             )  # (NUM_SEQUENCES, 128)
 
-
             # ── GAE ──
             advantages, returns = compute_gae(
-                b_rewards, b_values, b_dones, next_value, GAMMA, GAE_LAMBDA
+                b_rewards,
+                b_values,
+                b_dones,
+                b_terminated,
+                next_value,
+                GAMMA,
+                GAE_LAMBDA,
             )
-
             # ── Reshape into Sequence Chunks for BPTT ──
             b_grids_seq = b_grids.view(NUM_SEQUENCES, SEQ_LEN, *b_grids.shape[1:])
             b_features_seq = b_features.view(
@@ -285,6 +312,7 @@ def train() -> None:
             )
             b_actions_seq = b_actions.view(NUM_SEQUENCES, SEQ_LEN)
             b_log_probs_seq = b_log_probs.view(NUM_SEQUENCES, SEQ_LEN)
+            b_resets_seq = b_resets.view(NUM_SEQUENCES, SEQ_LEN)
             advantages_seq = advantages.view(NUM_SEQUENCES, SEQ_LEN)
             returns_seq = returns.view(NUM_SEQUENCES, SEQ_LEN)
 
@@ -309,13 +337,16 @@ def train() -> None:
                     mb_old_log_probs = b_log_probs_seq[mb_seq_idx]
                     mb_adv = advantages_seq[mb_seq_idx]
                     mb_returns = returns_seq[mb_seq_idx]
+                    mb_resets = b_resets_seq[mb_seq_idx]
 
                     mb_hidden = b_seq_hiddens[mb_seq_idx].unsqueeze(0).detach()
 
                     optimizer.zero_grad()
                     with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
-                        logits, values, _ = policy(mb_grid, mb_features, mb_hidden)
-                        masked_logits = logits.masked_fill(~mb_valid, -1e4)
+                        logits, values, _ = policy(
+                            mb_grid, mb_features, mb_hidden, dones=mb_resets
+                        )
+                        masked_logits = logits.masked_fill(~mb_valid, -1e8)
                         dist = Categorical(logits=masked_logits)
 
                         new_log_probs = dist.log_prob(mb_actions)
@@ -327,20 +358,16 @@ def train() -> None:
                             torch.clamp(ratio, 1.0 - CLIP_EPS, 1.0 + CLIP_EPS) * mb_adv
                         )
                         policy_loss = -torch.min(surr1, surr2).mean()
-                        mb_returns_norm = (mb_returns - mb_returns.mean()) / (
-                            mb_returns.std() + 1e-8
+                        value_loss = F.smooth_l1_loss(
+                            values.reshape(-1), mb_returns.reshape(-1)
                         )
-                        value_loss = F.mse_loss(
-                            values.reshape(-1), mb_returns_norm.reshape(-1)
-                        )
-
                         kl_loss = torch.tensor(0.0, device=device)
                         if ref_policy is not None:
                             with torch.no_grad():
                                 ref_logits, _, _ = ref_policy(
-                                    mb_grid, mb_features, mb_hidden
+                                    mb_grid, mb_features, mb_hidden, dones=mb_resets
                                 )
-                                ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
+                                ref_masked = ref_logits.masked_fill(~mb_valid, -1e8)
                                 ref_probs = F.softmax(ref_masked, dim=-1)
                                 ref_log_p = F.log_softmax(ref_masked, dim=-1)
                             log_p = F.log_softmax(masked_logits, dim=-1)
@@ -472,15 +499,29 @@ def train() -> None:
 
             # ── Free rollout tensors & release PyTorch CUDA allocator memory ──
             del b_grids, b_features, b_valid_actions, b_actions, b_log_probs
-            del b_rewards, b_dones, b_values, b_seq_hiddens
-            del b_grids_seq, b_features_seq, b_valid_actions_seq, b_actions_seq, b_log_probs_seq
+            del b_rewards, b_dones, b_terminated, b_resets, b_values, b_seq_hiddens
+            del (
+                b_grids_seq,
+                b_features_seq,
+                b_valid_actions_seq,
+                b_actions_seq,
+                b_log_probs_seq,
+                b_resets_seq,
+            )
             del advantages, returns, advantages_seq, returns_seq
             del rollout_grids, rollout_features, rollout_valid_actions
-            del rollout_actions, rollout_log_probs, rollout_rewards, rollout_dones, rollout_values, rollout_seq_hiddens
+            del (
+                rollout_actions,
+                rollout_log_probs,
+                rollout_rewards,
+                rollout_dones,
+                rollout_terminated,
+                rollout_resets,
+                rollout_values,
+                rollout_seq_hiddens,
+            )
             if device.type == "cuda":
                 torch.cuda.empty_cache()
-
-
 
     except KeyboardInterrupt:
         logger.log(f"\nKeyboardInterrupt — saving at update {last_update_completed}.")

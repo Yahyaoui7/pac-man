@@ -7,7 +7,10 @@ from typing import Any
 
 import torch
 
-from AI_arena.models.cnn_player import PlayerActorCritic
+from AI_arena.models.cnn_player import (
+    PlayerActorCritic,
+    load_checkpoint_into_policy,
+)
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
 
@@ -38,13 +41,11 @@ class CNNPlayerController:
         else:
             path = Path(model_path)
 
-        if path.exists():
-            weights = torch.load(path, map_location=self.device, weights_only=True)
-            self.model.load_state_dict(weights)
+        if path.exists() and load_checkpoint_into_policy(self.model, path, device=self.device):
             print(f"Loaded player RL checkpoint from {path}")
         else:
             print(
-                f"Warning: Player RL checkpoint {path} not found. Using untrained weights."
+                f"Warning: Player RL checkpoint {path} not found or failed to load. Using untrained weights."
             )
 
         self.model.eval()

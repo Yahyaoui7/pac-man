@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import torch
 from torch import Tensor, nn
 
@@ -14,9 +15,12 @@ from AI_arena.models.cnn_backbone import PacmanCNNBackbone
 
 
 class PlayerActorCritic(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, extra_feature_count: int = EXTRA_FEATURE_COUNT) -> None:
         super().__init__()
-        self.backbone = PacmanCNNBackbone(dropout_prob=0.0)
+        self.backbone = PacmanCNNBackbone(
+            dropout_prob=0.0,
+            extra_feature_count=extra_feature_count,
+        )
         self.actor = nn.Linear(128, ACTION_COUNT)
         self.critic = nn.Linear(128, 1)
 
@@ -25,14 +29,15 @@ class PlayerActorCritic(nn.Module):
         grid: Tensor,
         extra_features: Tensor,
         hidden: Tensor | None = None,
+        dones: Tensor | None = None,
     ) -> tuple[Tensor, Tensor, Tensor]:
         """
         Returns:
-            logits: (batch, 4)
-            value: (batch, 1)
+            logits: (batch, 4) or (batch, seq_len, 4)
+            value: (batch, 1) or (batch, seq_len, 1)
             hidden: (1, batch, 128) — pass to next step
         """
-        latent, hidden = self.backbone(grid, extra_features, hidden)
+        latent, hidden = self.backbone(grid, extra_features, hidden, dones=dones)
         logits = self.actor(latent)
         value = self.critic(latent)
         return logits, value, hidden
@@ -52,9 +57,47 @@ class PlayerImitationCNN(nn.Module):
         grid: Tensor,
         extra_features: Tensor,
         hidden: Tensor | None = None,
+        dones: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
-        latent, hidden = self.backbone(grid, extra_features, hidden)
+        latent, hidden = self.backbone(grid, extra_features, hidden, dones=dones)
         return self.action_head(latent), hidden
+
+
+def load_checkpoint_into_policy(
+    policy: PlayerActorCritic,
+    checkpoint_path: str | Path,
+    device: str | torch.device = "cpu",
+) -> bool:
+    """Load checkpoint weights with automatic shape matching for feature dimension changes."""
+    path = Path(checkpoint_path)
+    if not path.exists():
+        return False
+    state_dict = torch.load(path, map_location=device, weights_only=True)
+    if isinstance(state_dict, dict) and "model_state" in state_dict:
+        state_dict = state_dict["model_state"]
+
+    policy_dict = policy.state_dict()
+    matched_dict = {}
+
+    for k, v in state_dict.items():
+        # Handle action_head -> actor mapping if from SL model
+        target_k = "actor" + k[len("action_head"):] if k.startswith("action_head") else k
+        if target_k in policy_dict:
+            if policy_dict[target_k].shape == v.shape:
+                matched_dict[target_k] = v
+            elif (
+                target_k == "backbone.proj.0.weight"
+                and policy_dict[target_k].shape[0] == v.shape[0]
+            ):
+                # Copy existing slice and zero-initialize new feature weights
+                min_cols = min(policy_dict[target_k].shape[1], v.shape[1])
+                matched = policy_dict[target_k].clone()
+                matched[:, :min_cols] = v[:, :min_cols]
+                matched_dict[target_k] = matched
+
+    policy_dict.update(matched_dict)
+    policy.load_state_dict(policy_dict)
+    return True
 
 
 def load_sl_weights_into_ppo(
@@ -62,23 +105,7 @@ def load_sl_weights_into_ppo(
     sl_checkpoint_path: str,
     device: str | torch.device = "cpu",
 ) -> PlayerActorCritic:
-    sl_dict = torch.load(sl_checkpoint_path, map_location=device)
-    if isinstance(sl_dict, dict) and "model_state" in sl_dict:
-        sl_dict = sl_dict["model_state"]
-
-    ppo_dict = ppo_model.state_dict()
-    mapped_dict = {}
-
-    for k, v in sl_dict.items():
-        if k.startswith("action_head"):
-            new_k = k.replace("action_head", "actor")
-            if new_k in ppo_dict and ppo_dict[new_k].shape == v.shape:
-                mapped_dict[new_k] = v
-        elif k in ppo_dict and ppo_dict[k].shape == v.shape:
-            mapped_dict[k] = v
-
-    ppo_dict.update(mapped_dict)
-    ppo_model.load_state_dict(ppo_dict)
+    load_checkpoint_into_policy(ppo_model, sl_checkpoint_path, device=device)
     print(
         f"Successfully loaded SL pre-trained weights from {sl_checkpoint_path} into PPO actor network!"
     )

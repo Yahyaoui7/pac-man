@@ -94,7 +94,7 @@ class PacmanPlayerEnv:
 
         self.episode_event_counts: dict[str, int] = {}
         self.episode_reward_breakdown: dict[str, float] = {}
-        self.ghost_confusion_prob = 0.90
+        self.ghost_confusion_prob = 0.10
         self.death_count = 0
 
         # ← NEW: spatial / temporal memory state
@@ -146,6 +146,7 @@ class PacmanPlayerEnv:
             "ghost_eaten": 0,
             "completed": 0,
             "truncated": 0,
+            "exploration": 0,
         }
         self.episode_reward_breakdown = {
             "step": 0.0,
@@ -162,10 +163,19 @@ class PacmanPlayerEnv:
             "region_dirty": 0.0,
             "backtrack": 0.0,  # ← NEW
             "incomplete": 0.0,  # ← NEW
+            "predictive_threat": 0.0,
+            "evasion_skill": 0.0,
+            "super_bait": 0.0,
+            "zone_control": 0.0,
+            "threat_mastery": 0.0,
+            "ghost_lure": 0.0,
+            "survival_truncation": 0.0,
+            "exploration": 0.0,
+            "zone_stagnation": 0.0,
         }
 
         self._reward_calc.reset()
-
+        # self.reward_calculator.reset()
         # ← NEW: curriculum-friendly sizing
         mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
         mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
@@ -242,17 +252,11 @@ class PacmanPlayerEnv:
         if not 0 <= action < ACTION_COUNT:
             raise ValueError(f"Invalid action index {action}")
 
-        # ← NEW: stuck / repetition detector
+        # Stuck / repetition detector
         if self.last_action is not None and action == self.last_action:
             self.same_action_count += 1
         else:
             self.same_action_count = 0
-
-        _, _, valid_actions = self._get_observation()
-        if not bool(valid_actions[0, action]):
-            legal = torch.where(valid_actions[0])[0].tolist()
-            if legal:
-                action = self.rng.choice(legal)
 
         assert self.player is not None
         self.player.next_direction = DIRECTIONS[action]
@@ -311,9 +315,7 @@ class PacmanPlayerEnv:
             self.prev_nearest_pp_dist = min(pp_dists) if pp_dists else -1
 
         # Active ghost distance before step
-        min_ghost_dist_before = (
-            self.prev_nearest_ghost_dist if self.stage > 1 else -1
-        )
+        min_ghost_dist_before = self.prev_nearest_ghost_dist if self.stage > 1 else -1
 
         potential_before = self._cached_potential if self.use_bfs_shaping else 0.0
         cell_changed = False
@@ -444,7 +446,6 @@ class PacmanPlayerEnv:
         # ← NEW: mark truncation in events so reward calc can penalize incomplete
         truncated = self.step_count >= self.max_steps
         events["truncated"] = truncated
-
         reward, breakdown = self._reward_calc.calculate(
             events=events,
             bfs_shaping=bfs_shaping,
@@ -455,10 +456,10 @@ class PacmanPlayerEnv:
             player=self.player,
             ghosts=self.ghosts,
             movement=self.movement,
-            maze=self.maze,
+            maze=self.maze,  # ← MUST pass maze for corner detection
             threat_dist=threat_dist,
             min_ghost_dist_after=min_ghost_dist_after,
-            min_ghost_dist_before=min_ghost_dist_before,
+            min_ghost_dist_before=min_ghost_dist_before,  # ← CRITICAL for evasion_skill
         )
         for key, val in breakdown.items():
             self.episode_reward_breakdown[key] += val
@@ -480,8 +481,9 @@ class PacmanPlayerEnv:
         self.step_count += 1
 
         terminated = bool(
-            self.episode_event_counts["died"] > LIVES or events["level_completed"]
+            self.episode_event_counts["died"] >= LIVES or events["level_completed"]
         )
+        truncated = bool(self.step_count >= self.max_steps and not terminated)
         done = terminated or truncated
 
         pellets_eaten = self.total_pellets - self.remaining_pellets
@@ -511,7 +513,7 @@ class PacmanPlayerEnv:
         if done:
             info["episode_event_counts"] = dict(self.episode_event_counts)
             info["episode_reward_breakdown"] = dict(self.episode_reward_breakdown)
-        return self._get_observation(), reward, done, info
+        return self._get_observation(), reward, done, info, action
 
     # ------------------------------------------------------------------ #
     #  Internals
@@ -619,7 +621,7 @@ class PacmanPlayerEnv:
                 reg = (py // 4, px // 4)
                 if reg in self.region_pellets and self.region_pellets[reg] > 0:
                     self.region_pellets[reg] -= 1
-                self.player.start_powered_mode(mode=PacmanMode.PUNCH, duration=30.0)
+                self.player.start_powered_mode(mode=PacmanMode.PUNCH, duration=45.0)
                 for ghost in self.ghosts:
                     ghost.is_edible = True
 
@@ -652,6 +654,22 @@ class PacmanPlayerEnv:
 
         return events
 
+    def _get_min_ghost_distance(self):
+        """Return minimum Manhattan distance to non-edible, non-prison ghosts."""
+        if not self.ghosts:
+            return -1
+
+        px, py = self.player.grid_x, self.player.grid_y
+        min_dist = float("inf")
+
+        for ghost in self.ghosts:
+            if ghost.in_prison or ghost.is_edible:
+                continue
+            dist = abs(ghost.grid_x - px) + abs(ghost.grid_y - py)
+            min_dist = min(min_dist, dist)
+
+        return min_dist if min_dist != float("inf") else -1
+
     def _compute_pellet_distance_grid(self) -> list[list[int]]:
         from collections import deque
 
@@ -664,6 +682,7 @@ class PacmanPlayerEnv:
                     dist[y][x] = 0
                     q.append((y, x))
         from src.logic.config import EAST, NORTH, SOUTH, WEST
+
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         wall_bits = [NORTH, SOUTH, WEST, EAST]
 
@@ -673,11 +692,7 @@ class PacmanPlayerEnv:
             cell = self.maze[y][x]
             for i, (dy, dx) in enumerate(directions):
                 ny, nx = y + dy, x + dx
-                if (
-                    0 <= ny < h
-                    and 0 <= nx < w
-                    and not (cell & wall_bits[i])
-                ):
+                if 0 <= ny < h and 0 <= nx < w and not (cell & wall_bits[i]):
                     if dist[ny][nx] == -1:
                         dist[ny][nx] = d + 1
                         q.append((ny, nx))

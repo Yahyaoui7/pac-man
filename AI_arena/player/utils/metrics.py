@@ -19,17 +19,76 @@ BD_LABELS = {
 }
 
 
-def format_breakdown_line(recent_episodes: Sequence[dict[str, Any]]) -> str:
-    """Return a compact 'Key: +X.X' string averaged over the last window."""
-    if not recent_episodes:
-        return " | ".join(f"{label}: +0.0" for label in BD_LABELS.values())
+def format_breakdown_line(episodes):
+    """Format reward breakdown with consistent old-style naming."""
+    if not episodes:
+        return ""
 
+    # Aggregate all breakdown keys from episodes
+    all_keys = set()
+    for ep in episodes:
+        all_keys.update(ep.get("episode_reward_breakdown", {}).keys())
+
+    # Map internal keys to display names (old format)
+    KEY_MAP = {
+        "step": "Step",
+        "oscillation": "Osc",
+        "pellet": "Pellet",
+        "super_pellet": "Super",
+        "ghost": "Ghost",
+        "complete": "Complete",
+        "death": "Death",
+        "milestone": "Milestone",
+        "bfs": "BFS",
+        "ghost_proximity": "GhostProx",
+        "region_cleared": "CleanReg",
+        "region_dirty": "DirtyReg",
+        "backtrack": "Backtrack",
+        "incomplete": "Incomplete",
+        "predictive_threat": "PredThreat",
+        "evasion_skill": "Evasion",
+        "super_bait": "SuperBait",
+        "zone_control": "ZoneCtrl",
+        "threat_mastery": "ThreatMaster",
+        "ghost_lure": "GhostLure",
+        "survival_truncation": "Survival",
+    }
+
+    # Sum each key across episodes
+    totals = {}
+    for ep in episodes:
+        bd = ep.get("episode_reward_breakdown", {})
+        for key, display_name in KEY_MAP.items():
+            totals[display_name] = totals.get(display_name, 0.0) + bd.get(key, 0.0)
+
+    # Format with fixed-width (old style)
     parts = []
-    for key, label in BD_LABELS.items():
-        avg = sum(
-            ep["episode_reward_breakdown"].get(key, 0.0) for ep in recent_episodes
-        ) / len(recent_episodes)
-        parts.append(f"{label}: {avg:+.1f}")
+    for display_name in [
+        "Step",
+        "Osc",
+        "Pellet",
+        "Super",
+        "Ghost",
+        "Complete",
+        "Death",
+        "Milestone",
+        "BFS",
+        "GhostProx",
+        "CleanReg",
+        "DirtyReg",
+        "Backtrack",
+        "Incomplete",
+        "PredThreat",
+        "Evasion",
+        "SuperBait",
+        "ZoneCtrl",
+        "ThreatMaster",
+        "GhostLure",
+        "Survival",
+    ]:
+        val = totals.get(display_name, 0.0)
+        parts.append(f"{display_name}: {val:+.1f}")
+
     return " | ".join(parts)
 
 

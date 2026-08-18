@@ -75,12 +75,14 @@ class PacmanCNNBackbone(nn.Module):
         grid: Tensor,
         extra_features: Tensor,
         hidden: Tensor | None = None,
+        dones: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
         """
         Args:
-            grid: (batch, 6, 50, 25) or (batch, seq_len, 6, 50, 25)
-            extra_features: (batch, 45) or (batch, seq_len, 45)
+            grid: (batch, 7, 25, 50) or (batch, seq_len, 7, 25, 50)
+            extra_features: (batch, extra_feature_count) or (batch, seq_len, extra_feature_count)
             hidden: (1, batch, 128) or None
+            dones: (batch, seq_len) or (batch, seq_len, 1) or None — 1.0 if step is after reset
 
         Returns:
             latent: (batch, 128) or (batch, seq_len, 128)
@@ -98,7 +100,25 @@ class PacmanCNNBackbone(nn.Module):
             x = self.proj(x)  # (b * l, 128)
 
             x = x.view(b, l, 128)  # (batch, seq_len, 128)
-            out, hidden = self.gru(x, hidden)  # out: (batch, seq_len, 128)
+
+            if dones is not None:
+                dones_tensor = dones.view(b, l, 1).to(device=grid.device, dtype=x.dtype)
+                h = (
+                    hidden
+                    if hidden is not None
+                    else torch.zeros(1, b, 128, device=grid.device, dtype=x.dtype)
+                )
+                outs: list[Tensor] = []
+                for t in range(l):
+                    mask = dones_tensor[:, t : t + 1].permute(1, 0, 2)  # (1, b, 1)
+                    h = h * (1.0 - mask)
+                    out_t, h = self.gru(x[:, t : t + 1], h)
+                    outs.append(out_t)
+                out = torch.cat(outs, dim=1)
+                hidden = h
+            else:
+                out, hidden = self.gru(x, hidden)  # out: (batch, seq_len, 128)
+
             return self.out(out), hidden
 
         # Single step mode: (batch, channels, height, width)

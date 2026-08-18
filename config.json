@@ -7,9 +7,9 @@
     "highscore_filename": "highscores.json",
     "levels": [
         {
-            "width": 10,
-            "height": 12,
-            "seed": 454,
+            "width": 25,
+            "height": 25,
+            "seed": 12,
             "level_max_time": 180
         },
         {

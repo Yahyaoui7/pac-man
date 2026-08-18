@@ -8,7 +8,7 @@ import torch
 
 from AI_arena.data.formatter import DIRECTIONS, ObservationFormatter
 
-PLAYER_EXTRA_FEATURE_COUNT = 61
+PLAYER_EXTRA_FEATURE_COUNT = 65
 POWER_TIMER_MAX = 30.0
 
 
@@ -126,13 +126,32 @@ def format_player_observation(
     nearest_pp_dist_norm = (nearest_pp_dist + 1) / max_dim
     nearest_np_dist_norm = (nearest_np_dist + 1) / max_dim
 
-    # Local adjacent pellet features (4)
+    # Local adjacent pellet features (4: UP, DOWN, LEFT, RIGHT)
     local_pellet = [0.0, 0.0, 0.0, 0.0]
     dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     for i, (dy, dx) in enumerate(dirs):
         ny, nx = py + dy, px + dx
         if 0 <= ny < height and 0 <= nx < width and pellets[ny][nx] in (1, 2):
             local_pellet[i] = 1.0
+
+    # Local adjacent ghost danger features (4: UP, DOWN, LEFT, RIGHT)
+    local_danger = [0.0, 0.0, 0.0, 0.0]
+    if player.powered_timer <= 0:
+        active_ghost_cells = [
+            (g.grid_y, g.grid_x)
+            for g in ghosts
+            if not getattr(g, "in_prison", False) and not getattr(g, "is_edible", False)
+        ]
+        for i, (dy, dx) in enumerate(dirs):
+            ny, nx = py + dy, px + dx
+            if (ny, nx) in active_ghost_cells:
+                local_danger[i] = 1.0
+            elif movement is not None and movement.can_move(py, px, DIRECTIONS[i]):
+                # Also flag immediate 1-step hazard into ghost neighborhood
+                for gy, gx in active_ghost_cells:
+                    if abs(gy - ny) + abs(gx - nx) <= 1:
+                        local_danger[i] = 1.0
+                        break
 
     # Delta / trend features (3)
     delta_pellet = 0.0
@@ -186,6 +205,7 @@ def format_player_observation(
         *maze_size,
         *player_powered_flag,
         *local_pellet,
+        *local_danger,
         delta_pellet,
         delta_ghost,
         delta_pp,

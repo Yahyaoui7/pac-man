@@ -1,4 +1,4 @@
-"""Game constants for Pac-Man RL environment."""
+"""Game constants for Pac-Man RL environment — Survival Mode."""
 
 from __future__ import annotations
 
@@ -12,46 +12,47 @@ GHOST_SPECS = [
 ]
 
 MAZE_WIDTH_MIN = 10
-MAZE_WIDTH_MAX = 15
+MAZE_WIDTH_MAX = 30
 MAZE_HEIGHT_MIN = 10
-MAZE_HEIGHT_MAX = 15
-
-MAX_PHYSICS_TICKS = 300
+MAZE_HEIGHT_MAX = 20
+MAX_PHYSICS_TICKS = 40
 GHOST_RESPAWN_TICKS = 25
 MAZE_STEP_MULTIPLIER = 12.0
 
-# ── Reward constants ──
-# ← CHANGED: step penalty is mild — time pressure, not torture
-STEP_REWARD = -0.002
+# ═══════════════════════════════════════════════════════════════════
+# STAGE 2 BALANCED REWARDS (Survival + Completion)
+# ═══════════════════════════════════════════════════════════════════
 
-# ← CHANGED: death should feel bad, but not break training
-DEATH_REWARD = -200.0
-
-# ← CHANGED: oscillation is a gentle nudge, not a sledgehammer
-# A random agent will still oscillate; we don't want to drown the signal
-OSCILLATION_REWARD = -15.0
-
-# ← CHANGED: completion is the jackpot — make it impossible to ignore
-COMPLETION_REWARD = 1500.0
-
-# ← CHANGED: pellets are the primary income source
-PELLET_REWARD = 1.5
-
-EAT_GHOST_REWARD = 90.0
+STEP_REWARD = -0.01
+DEATH_REWARD = -150.0
+OSCILLATION_REWARD = -10.0
+COMPLETION_REWARD = 2000.0
+EAT_GHOST_REWARD = 150.0
+PELLET_REWARD = 1.0
 SUPER_PELLET_REWARD = 5.0
 
-# ← CHANGED: fewer lives = shorter episodes = more completion attempts per hour
-# 100 lives means every episode is 100% truncation. The agent never gets a "fresh start."
-LIVES = 20
+SURVIVAL_TRUNCATION_BASE = 10.0
+SURVIVAL_TRUNCATION_PELLET_BONUS = 20.0
 
+# ═══════════════════════════════════════════════════════════════════
+# Stage 2 survival shaping
+# ═══════════════════════════════════════════════════════════════════
+
+CLOSE_DODGE_REWARD = 1.0
+ESCAPE_BOX_REWARD = 4.0
+BAIT_SUPER_PELLET_REWARD = 5.0
+BAIT_SUPER_PELLET_RADIUS = 4
+CORNERED_MIN_MOVES = 4
+NEAR_GHOST_DIST = 2
+
+LIVES = 5
+
+# ═══════════════════════════════════════════════════════════════════
+# Milestones
+# ═══════════════════════════════════════════════════════════════════
 MILESTONE_REWARDS = {
-    0.10: 5.0,
-    0.20: 5.0,
-    0.30: 5.0,
-    0.40: 5.0,
+    0.25: 5.0,
     0.50: 10.0,
-    0.60: 10.0,
-    0.70: 10.0,
-    0.80: 15.0,
-    0.90: 20.0,
+    0.75: 15.0,
+    0.90: 25.0,
 }

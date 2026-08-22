@@ -94,7 +94,7 @@ class PacmanPlayerEnv:
 
         self.episode_event_counts: dict[str, int] = {}
         self.episode_reward_breakdown: dict[str, float] = {}
-        self.ghost_confusion_prob = 0.10
+        self.ghost_confusion_prob = 0.50
         self.death_count = 0
 
         # ← NEW: spatial / temporal memory state
@@ -481,7 +481,8 @@ class PacmanPlayerEnv:
         self.step_count += 1
 
         terminated = bool(
-            self.episode_event_counts["died"] >= LIVES or events["level_completed"]
+            self.episode_event_counts["died"] >= max(1, LIVES - 1)
+            or events["level_completed"]
         )
         truncated = bool(self.step_count >= self.max_steps and not terminated)
         done = terminated or truncated

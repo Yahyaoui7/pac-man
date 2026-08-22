@@ -30,18 +30,18 @@ from AI_arena.player.utils import (
 
 STAGE = 2
 NUM_UPDATES = 1000
-ROLLOUT_STEPS = 5012
+ROLLOUT_STEPS = 3000
 SEQ_LEN = 16  # Temporal sequence chunk length for GRU BPTT
 NUM_SEQUENCES = ROLLOUT_STEPS // SEQ_LEN  # Sequence chunks per rollout
-MINIBATCH_SEQS = 8  # 4 sequences per minibatch (64 total frames)
+MINIBATCH_SEQS = 16  # 4 sequences per minibatch (64 total frames)
 PPO_EPOCHS = 2
 MINIBATCH_SIZE = 64
 
-LEARNING_RATE = 3e-4
+LEARNING_RATE = 2e-4
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
-CLIP_EPS = 0.1
-ENTROPY_COEF = 0.01
+CLIP_EPS = 0.2
+ENTROPY_COEF = 0.015
 VALUE_COEF = 0.25
 MAX_GRAD_NORM = 0.5
 

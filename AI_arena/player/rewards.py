@@ -121,8 +121,11 @@ class RewardCalculator:
     def _pellet_reward(
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
+        additional = 0
         if events.get("pellet_eaten", False):
-            breakdown["pellet"] = PELLET_REWARD + 2.0 * frac
+            if frac > 0.75:
+                additional = 4.0
+            breakdown["pellet"] = PELLET_REWARD + 2.0 * frac + additional
 
     def _super_pellet_reward(
         self,

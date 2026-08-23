@@ -12,9 +12,9 @@ GHOST_SPECS = [
 ]
 
 MAZE_WIDTH_MIN = 10
-MAZE_WIDTH_MAX = 43
+MAZE_WIDTH_MAX = 40
 MAZE_HEIGHT_MIN = 10
-MAZE_HEIGHT_MAX = 23
+MAZE_HEIGHT_MAX = 20
 MAX_PHYSICS_TICKS = 40
 GHOST_RESPAWN_TICKS = 2
 MAZE_STEP_MULTIPLIER = 12.0
@@ -23,12 +23,12 @@ MAZE_STEP_MULTIPLIER = 12.0
 # STAGE 2 BALANCED REWARDS (Survival + Completion)
 # ═══════════════════════════════════════════════════════════════════
 
-STEP_REWARD = -0.01
-DEATH_REWARD = -150.0
+STEP_REWARD = -0.1
+DEATH_REWARD = -350.0
 OSCILLATION_REWARD = -10.0
 COMPLETION_REWARD = 5000.0
 EAT_GHOST_REWARD = 150.0
-PELLET_REWARD = 3.0
+PELLET_REWARD = 1.5
 SUPER_PELLET_REWARD = 5.0
 
 SURVIVAL_TRUNCATION_BASE = 10.0
@@ -48,11 +48,18 @@ NEAR_GHOST_DIST = 2
 LIVES = 2
 
 # ═══════════════════════════════════════════════════════════════════
+# Telemetry (leading indicators for trap-avoidance learning)
+# ═══════════════════════════════════════════════════════════════════
+# After leaving a cornered+threatened state, a death within this many
+# steps retroactively marks the escape attempt as failed.
+ESCAPE_CONFIRM_STEPS = 8
+
+# ═══════════════════════════════════════════════════════════════════
 # Milestones
 # ═══════════════════════════════════════════════════════════════════
 MILESTONE_REWARDS = {
-    0.25: 20.0,
-    0.50: 50.0,
-    0.75: 100.0,
-    0.90: 200.0,
+    0.50: 20.0,
+    0.75: 50.0,
+    0.85: 100.0,
+    0.95: 200.0,
 }

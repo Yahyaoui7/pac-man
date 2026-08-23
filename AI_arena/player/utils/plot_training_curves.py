@@ -46,14 +46,14 @@ except ImportError:
 
 UPD_RE = re.compile(r"Upd\s+(\d+)/\d+")
 TOT_EP_RE = re.compile(r"Tot Ep:\s*(\d+)")
-EPOCH_RWD_RE = re.compile(r"Averge?\s+Epoch Rwd:\s*([+-]?\d+\.?\d*)")
+EPOCH_RWD_RE = re.compile(r"A(?:vg|verage?)\s+Epoch Rwd:\s*([+-]?\d+\.?\d*)")
 AVG_RWD_RE = re.compile(r"(?<!Epoch )Avg Rwd:\s*([+-]?\d+\.?\d*)")
 AVG_PELLETS_RE = re.compile(r"Avg Pellets:\s*(\d+\.?\d*)\s*\(\s*(\d+\.?\d*)%\)")
 MAX_PELLETS_RE = re.compile(r"Max (?:Epoch )?Pellets:\s*(\d+)\s*\(\s*(\d+\.?\d*)%\)")
 LOSS_RE = re.compile(r"Loss \(P/V\):\s*([+-]?\d+\.\d+)/(\d+\.\d+)")
 TIME_RE = re.compile(r"Time:\s*([\d.]+)s\s*\(\s*([\d.]+)s/upd\)")
 MAZE_AREA_RE = re.compile(
-    r"Avg Maze Area:\s*(\d+\.?\d*)\s*\(\s*(\d+\.?\d*)x(\d+\.?\d*)\)"
+    r"Avg Maze(?: Area)?:\s*(\d+\.?\d*)\s*\(\s*(\d+\.?\d*)x(\d+\.?\d*)\)"
 )
 
 # Reward-breakdown regexes (new)

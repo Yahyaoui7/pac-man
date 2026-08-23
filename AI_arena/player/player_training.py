@@ -21,8 +21,11 @@ from AI_arena.player.player_env import PacmanPlayerEnv
 from AI_arena.player.utils import (
     QuitListener,
     TrainingLogger,
+    compute_survival_stats,
     format_breakdown_line,
+    format_survival_line,
 )
+from AI_arena.player.utils.evaluate import append_history, run_evaluation
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURATION — edit these by hand
@@ -41,7 +44,7 @@ LEARNING_RATE = 2e-4
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENTROPY_COEF = 0.015
+ENTROPY_COEF = 0.04
 VALUE_COEF = 0.25
 MAX_GRAD_NORM = 0.5
 
@@ -49,6 +52,17 @@ SEED = 42
 SAVE_INTERVAL = 50
 RESUME = True  # set True to resume from checkpoint
 SL_WARMSTART = False  # set True to warm-start from supervised-learning weights
+
+# ── Fixed-seed evaluation & stall detection ──────────────────────────────
+# Runs the greedy policy on an identical benchmark maze set every
+# EVAL_INTERVAL updates. This is how you tell "learning" from "noise"
+# long before pellet%/win-rate move: paired seeds kill most variance.
+EVAL_INTERVAL = SAVE_INTERVAL
+EVAL_EPISODES = 20  # ~ the cost of one extra update, amortized over 50
+EVAL_SEED_BASE = 10000  # benchmark mazes — never change between runs
+EVAL_DEVICE = "cpu"
+EVAL_STALL_PATIENCE = 5  # evals without meaningful improvement before warning
+EVAL_MIN_IMPROVEMENT = 2.0  # score points that count as "real" progress
 
 MODEL_DIR = Path(__file__).parent.parent / "models"
 LOG_FILE = Path("training_log.txt")
@@ -116,12 +130,10 @@ def train() -> None:
         candidates = [
             checkpoint_path,
             best_checkpoint_path,
-            MODEL_DIR / f"player_rl_stage{STAGE - 1}_best.pt",
-            MODEL_DIR / f"player_rl_stage{STAGE - 1}.pt",
-            Path(__file__).parent.parent
-            / "data"
-            / f"player_rl_stage{STAGE - 1}_best.pt",
-            Path(__file__).parent.parent / "data" / f"player_rl_stage{STAGE - 1}.pt",
+            MODEL_DIR / "player_rl_stage2_best.pt",
+            MODEL_DIR / "player_rl_stage2.pt",
+            Path(__file__).parent.parent / "data" / "player_rl_stage2_best.pt",
+            Path(__file__).parent.parent / "data" / "player_rl_stage2.pt",
         ]
         for cand in candidates:
             if cand.exists():
@@ -169,6 +181,15 @@ def train() -> None:
 
     best_avg_pct = 0.0
     best_avg_pellets = 0.0
+
+    # ── Eval-based best tracking & stall detection ──
+    eval_env: PacmanPlayerEnv | None = None
+    best_eval_score = float("-inf")
+    best_eval_update = -1
+    last_meaningful_improve_upd = -1  # upd of last ≥ EVAL_MIN_IMPROVEMENT jump
+    eval_best_active = False  # once True, the *_best.pt checkpoint is eval-owned
+    last_stall_warn_update = -1
+    prev_eval: dict[str, Any] | None = None
 
     try:
         for update in range(1, NUM_UPDATES + 1):
@@ -253,8 +274,10 @@ def train() -> None:
                         "osc_count": osc_cnt,
                         "osc_pct": (osc_cnt / ep_steps) * 100.0,
                         "maze": info["maze"],
+                        "max_steps": float(info.get("max_steps", 0)),
                         "episode_event_counts": info["episode_event_counts"],
                         "episode_reward_breakdown": info["episode_reward_breakdown"],
+                        "telemetry": info.get("telemetry", {}),
                     }
                     current_ep_reward = 0.0
                     current_ep_steps = 0
@@ -415,8 +438,13 @@ def train() -> None:
 
             avg_policy_loss = total_policy_loss / max(1, num_minibatches)
             avg_value_loss = total_value_loss / max(1, num_minibatches)
+            avg_entropy = total_entropy_loss / max(1, num_minibatches)
 
-            is_best = bool(recent_episodes and avg_pct > best_avg_pct)
+            # Train-window "best" only until the first fixed-seed eval runs;
+            # afterwards the eval score owns the *_best.pt checkpoint.
+            is_best = bool(
+                recent_episodes and not eval_best_active and avg_pct > best_avg_pct
+            )
             if is_best:
                 best_avg_pct = avg_pct
                 best_avg_pellets = avg_pellets
@@ -460,6 +488,14 @@ def train() -> None:
                 avg_osc_pct = 0.0
 
             breakdown_line = format_breakdown_line(save_window_episodes)
+            breakdown_chunk = f"{breakdown_line} | " if breakdown_line else ""
+
+            surv_window = (
+                save_window_episodes if save_window_episodes else recent_episodes
+            )
+            survival_line = format_survival_line(
+                compute_survival_stats(list(surv_window))
+            )
 
             logger.log(
                 f"Upd {update:03d}/{NUM_UPDATES:03d} | "
@@ -469,28 +505,112 @@ def train() -> None:
                 f"Avg Pellets: {avg_pellets:5.1f} ({avg_pct:4.1f}%) | "
                 f"Osc%: {avg_osc_pct:4.1f}% | "
                 f"Avg Rwd: {avg_reward:4.1f} | "
-                f"{breakdown_line} | "
+                f"{breakdown_chunk}"
+                f"Ent: {avg_entropy:.3f} | "
                 f"Loss (P/V): {avg_policy_loss:.4f}/{avg_value_loss:.4f} | "
                 f"Time: {total_elapsed:5.1f}s ({update_elapsed:4.2f}s/upd)"
                 f" | Complete: {completion_rate:5.1%}"
                 f" | Truncated: {truncation_rate:5.1%}"
                 f" | Avg Maze: {avg_area:.1f} ({avg_w:.1f}x{avg_h:.1f})"
             )
-
-            death_rate = (
-                sum(
-                    ep["episode_event_counts"].get("died", 0) > 0
-                    for ep in save_window_episodes
-                )
-                / max(1, len(save_window_episodes))
-                * 100
-                if save_window_episodes
-                else 0.0
-            )
+            logger.log(f"   SURV | {survival_line}")
 
             if update % SAVE_INTERVAL == 0 or update == NUM_UPDATES:
                 torch.save(policy.state_dict(), checkpoint_path)
                 save_window_episodes = []
+
+                # ── Fixed-seed benchmark eval (paired seeds across all evals) ──
+                if update % EVAL_INTERVAL == 0 or update == NUM_UPDATES:
+                    if eval_env is None:
+                        eval_env = PacmanPlayerEnv(
+                            seed=EVAL_SEED_BASE, stage=STAGE, device="cpu"
+                        )
+                    t_eval = time.time()
+                    eval_result = run_evaluation(
+                        policy,
+                        device=EVAL_DEVICE,
+                        stage=STAGE,
+                        episodes=EVAL_EPISODES,
+                        seed_base=EVAL_SEED_BASE,
+                        env=eval_env,
+                    )
+                    eval_result["update"] = update
+                    eval_result["checkpoint"] = checkpoint_path.name
+                    append_history(eval_result)
+
+                    score = float(eval_result["eval_score"])
+                    es = eval_result["survival"]
+                    esc_str = (
+                        f"{es['escape_rate'] * 100:.0f}%"
+                        if es["escape_rate"] >= 0
+                        else "n/a"
+                    )
+                    delta_score = (
+                        f" ({score - prev_eval['eval_score']:+.1f})"
+                        if prev_eval is not None
+                        else ""
+                    )
+                    logger.log(
+                        f"  EVAL @{update:03d}: score {score:7.1f}{delta_score} | "
+                        f"pellet {eval_result['avg_pellet_pct']:5.1f}% | "
+                        f"comp {eval_result['completion_rate'] * 100:5.1f}% | "
+                        f"death {eval_result['death_rate'] * 100:5.1f}% | "
+                        f"life {es['avg_steps_lived']:4.0f}mv/{es['avg_life_pct']:3.0f}% | "
+                        f"esc {esc_str:>4}[{es['escape_samples']:3d}] | "
+                        f"corn {es['cornered_steps_per_ep']:5.2f}/ep | "
+                        f"MinD {es['avg_min_ghost_dist']:5.2f} | "
+                        f"conf {eval_result['env']['ghost_confusion']:.2f} | "
+                        f"({time.time() - t_eval:.1f}s)"
+                    )
+
+                    prev_best = best_eval_score
+                    if score > best_eval_score:
+                        if best_eval_update >= 0:
+                            logger.log(
+                                f"  EVAL: new best score {score:.1f} "
+                                f"(was {best_eval_score:.1f} @upd {best_eval_update}) "
+                                f"→ saved {best_checkpoint_path.name}"
+                            )
+                        best_eval_score = score
+                        best_eval_update = update
+                        eval_best_active = True
+                        last_stall_warn_update = -1
+                        torch.save(policy.state_dict(), best_checkpoint_path)
+
+                    # ── Stall detection: kill dead runs early ──
+                    if prev_best < 0 or score > prev_best + EVAL_MIN_IMPROVEMENT:
+                        last_meaningful_improve_upd = update
+
+                    stall_due = (
+                        last_meaningful_improve_upd >= 0
+                        and update - last_meaningful_improve_upd
+                        >= EVAL_STALL_PATIENCE * EVAL_INTERVAL
+                    )
+                    warned_recently = (
+                        last_stall_warn_update >= 0
+                        and update - last_stall_warn_update
+                        < EVAL_STALL_PATIENCE * EVAL_INTERVAL
+                    )
+                    if stall_due and not warned_recently:
+                        logger.log("!" * 60)
+                        logger.log(
+                            f"STALL WARNING @upd {update}: no meaningful eval "
+                            f"improvement (≥{EVAL_MIN_IMPROVEMENT:.0f} pts) for "
+                            f"{update - last_meaningful_improve_upd} updates."
+                        )
+                        logger.log(
+                            f"  best score {best_eval_score:.1f} @upd "
+                            f"{best_eval_update}; current {score:.1f}."
+                        )
+                        logger.log(
+                            "  If the SURV lines above are also flat (Esc% / Corn / "
+                            "CDth not trending), this run is probably NOT learning —"
+                            " consider killing it ('q') and changing reward/curriculum."
+                        )
+                        logger.log("!" * 60)
+                        last_stall_warn_update = update
+
+                    prev_eval = eval_result
 
             if quit_listener.stop_requested:
                 logger.log(f"\n'q' pressed — stopping at update {update}.")
@@ -539,7 +659,17 @@ def train() -> None:
             f"{time.time() - start_time:.1f}s"
         )
         logger.log(f"Checkpoint: {checkpoint_path}")
-        logger.log(f"Best: {best_checkpoint_path} (peak {best_avg_pct:.1f}%)")
+        if best_eval_update >= 0:
+            logger.log(
+                f"Best (eval score {best_eval_score:.1f} @upd {best_eval_update}):"
+                f" {best_checkpoint_path}"
+            )
+        else:
+            logger.log(
+                f"Best (train avg {best_avg_pct:.1f}% | {best_avg_pellets:.0f}"
+                f" pellets): {best_checkpoint_path}"
+            )
+        logger.log("Eval history: AI_arena/evals/eval_history.json")
         logger.log("=" * 60)
         quit_listener.stop()
         logger.close()

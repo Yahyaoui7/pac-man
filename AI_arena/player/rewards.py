@@ -115,8 +115,21 @@ class RewardCalculator:
     #  BALANCED REWARD METHODS
     # ═══════════════════════════════════════════════════════════════════
 
-    def _step_reward(self, breakdown: dict[str, float]) -> None:
-        breakdown["step"] = STEP_REWARD
+    def _step_reward(
+        self, events: dict[str, bool], breakdown: dict[str, float]
+    ) -> None:
+        """No step tax on pellet/super steps — progress should feel good."""
+        if events.get("pellet_eaten") or events.get("super_pellet_eaten"):
+            breakdown["step"] = 0.0
+        else:
+            breakdown["step"] = STEP_REWARD  # keep at -0.1 or raise to -0.2
+
+    def _hunger_penalty(
+        self, steps_since_pellet: int, breakdown: dict[str, float]
+    ) -> None:
+        grace = 25
+        if steps_since_pellet > grace:
+            breakdown["hunger"] = -0.5
 
     def _pellet_reward(
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
@@ -147,7 +160,7 @@ class RewardCalculator:
                 breakdown["milestone"] += reward
 
     def _bfs_shaping(self, bfs_shaping: float, breakdown: dict[str, float]) -> None:
-        breakdown["bfs"] = 0.2 * bfs_shaping
+        breakdown["bfs"] = 3.0 * bfs_shaping
 
     def _oscillation_penalty(
         self,
@@ -351,6 +364,14 @@ class RewardCalculator:
     #  HELPERS
     # ═══════════════════════════════════════════════════════════════════
 
+    def is_cornered(self, px: int, py: int, maze: list[list[int]]) -> bool:
+        """Public wrapper so the env can log trap exposure without reward coupling."""
+        return self._is_cornered(px, py, maze)
+
+    def count_threatening(self, px: int, py: int, ghosts: list) -> int:
+        """Public count of hunting ghosts within Manhattan distance 8."""
+        return self._count_threatening_ghosts(px, py, ghosts, None)[0]
+
     def _is_cornered(self, px: int, py: int, maze: list[list[int]]) -> bool:
         """Check if Pac-Man is in a dead-end or corner (≤1 escape route)."""
         if not maze:
@@ -402,6 +423,7 @@ class RewardCalculator:
         step_count: int,
         max_steps: int,
         player,
+        steps_since_pellet,
         ghosts: list,
         movement,
         maze: list[list[int]] | None,
@@ -425,6 +447,7 @@ class RewardCalculator:
             "region_dirty": 0.0,
             "backtrack": 0.0,
             "incomplete": 0.0,
+            "hunger": 0.0,
             "predictive_threat": 0.0,
             "evasion_skill": 0.0,
             "super_bait": 0.0,
@@ -454,9 +477,10 @@ class RewardCalculator:
         self._super_pellet_reward(events, powered, threatening, breakdown)
         self._bfs_shaping(bfs_shaping, breakdown)
         self._milestone_reward(frac, breakdown)
-        self._step_reward(breakdown)
         self._ghost_eat_reward(events, breakdown)
 
+        self._step_reward(events, breakdown)
+        self._hunger_penalty(steps_since_pellet, breakdown)
         # ── ANTI-STAGNATION / ANTI-OSCILLATION ──
         self._zone_stagnation_penalty(px, py, breakdown)
         self._oscillation_penalty(events, threat_dist, breakdown)

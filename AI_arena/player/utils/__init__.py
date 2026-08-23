@@ -7,7 +7,9 @@ from AI_arena.player.utils.metrics import (
     BD_LABELS,
     compute_negative_stats,
     compute_positive_stats,
+    compute_survival_stats,
     format_breakdown_line,
+    format_survival_line,
 )
 
 __all__ = [
@@ -16,5 +18,7 @@ __all__ = [
     "BD_LABELS",
     "compute_positive_stats",
     "compute_negative_stats",
+    "compute_survival_stats",
     "format_breakdown_line",
+    "format_survival_line",
 ]

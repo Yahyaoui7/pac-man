@@ -11,6 +11,7 @@ from AI_arena.player.data.observation import format_player_observation
 
 from AI_arena.player.constants import (
     DIRECTIONS,
+    ESCAPE_CONFIRM_STEPS,
     GHOST_RESPAWN_TICKS,
     GHOST_SPECS,
     LIVES,
@@ -40,7 +41,7 @@ class PacmanPlayerEnv:
         max_steps: int | None = None,
         stage: int = 1,
         device: str | torch.device = "cpu",
-        use_bfs_shaping: bool = True,
+        use_bfs_shaping: bool = False,
         maze_w_min: int | None = None,  # ← NEW: curriculum override
         maze_w_max: int | None = None,  # ← NEW
         maze_h_min: int | None = None,  # ← NEW
@@ -94,7 +95,10 @@ class PacmanPlayerEnv:
 
         self.episode_event_counts: dict[str, int] = {}
         self.episode_reward_breakdown: dict[str, float] = {}
-        self.ghost_confusion_prob = 0.50
+        self.episode_telemetry: dict[str, float] = {}
+        self._in_corner_threat = False
+        self._open_escape_deadline = -1
+        self.ghost_confusion_prob = 0.01
         self.death_count = 0
 
         # ← NEW: spatial / temporal memory state
@@ -148,6 +152,18 @@ class PacmanPlayerEnv:
             "truncated": 0,
             "exploration": 0,
         }
+        self.episode_telemetry = {
+            "cornered_steps": 0.0,
+            "cornered_entries": 0.0,
+            "escape_success": 0.0,
+            "escape_failure": 0.0,
+            "deaths_cornered": 0.0,
+            "min_ghost_dist_sum": 0.0,
+            "min_ghost_dist_cnt": 0.0,
+            "approach_steps": 0.0,
+        }
+        self._in_corner_threat = False
+        self._open_escape_deadline = -1
         self.episode_reward_breakdown = {
             "step": 0.0,
             "oscillation": 0.0,
@@ -162,6 +178,7 @@ class PacmanPlayerEnv:
             "region_cleared": 0.0,
             "region_dirty": 0.0,
             "backtrack": 0.0,  # ← NEW
+            "hunger": 0.0,
             "incomplete": 0.0,  # ← NEW
             "predictive_threat": 0.0,
             "evasion_skill": 0.0,
@@ -189,6 +206,9 @@ class PacmanPlayerEnv:
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
         self.movement = MovementSystem(self.maze)
+        # MovementSystem owns an unseeded Random() used for frightened-ghost
+        # flee targets — reseed it so identical seeds give identical ghosts.
+        self.movement.rng.seed(current_seed)
         self._ghost_ctrl.movement = self.movement
 
         # Dynamic max steps based on maze size
@@ -455,6 +475,7 @@ class PacmanPlayerEnv:
             max_steps=self.max_steps,
             player=self.player,
             ghosts=self.ghosts,
+            steps_since_pellet=self.steps_since_pellet,
             movement=self.movement,
             maze=self.maze,  # ← MUST pass maze for corner detection
             threat_dist=threat_dist,
@@ -463,6 +484,9 @@ class PacmanPlayerEnv:
         )
         for key, val in breakdown.items():
             self.episode_reward_breakdown[key] += val
+
+        if self.stage > 1 and self.maze is not None:
+            self._update_telemetry(events, min_ghost_dist_before, min_ghost_dist_after)
 
         if events["pellet_eaten"]:
             self.episode_event_counts["pellet"] += 1
@@ -510,11 +534,75 @@ class PacmanPlayerEnv:
             "stage": self.stage,
             "maze": (len(self.maze[0]), len(self.maze)) if self.maze else (0, 0),
             "min_ghost_dist": min_ghost_dist,
+            "max_steps": self.max_steps,
         }
         if done:
             info["episode_event_counts"] = dict(self.episode_event_counts)
             info["episode_reward_breakdown"] = dict(self.episode_reward_breakdown)
+            info["telemetry"] = dict(self.episode_telemetry)
         return self._get_observation(), reward, done, info, action
+
+    def set_seed(self, seed: int) -> None:
+        """Re-seed the episode RNG — used for deterministic evaluation runs."""
+        self.seed = seed
+        self.rng.seed(seed)
+
+    def _update_telemetry(
+        self,
+        events: dict[str, bool],
+        min_ghost_dist_before: int,
+        min_ghost_dist_after: int,
+    ) -> None:
+        """Track leading indicators of trap-avoidance skill (cheap, no reward coupling).
+
+        cornered+threatened = ≤1 open neighbour cell AND ≥1 hunting ghost within
+        Manhattan distance 8. Exposure is luck; escaping it is the skill.
+        """
+        tel = self.episode_telemetry
+        step_idx = self.step_count  # incremented later in step()
+
+        if min_ghost_dist_after >= 0:
+            tel["min_ghost_dist_sum"] += float(min_ghost_dist_after)
+            tel["min_ghost_dist_cnt"] += 1.0
+
+        powered = bool(self.player.powered_timer > 0)
+        if (
+            not powered
+            and min_ghost_dist_before > 0
+            and min_ghost_dist_after > 0
+            and min_ghost_dist_after < min_ghost_dist_before
+        ):
+            tel["approach_steps"] += 1.0
+
+        if events.get("pacman_died", False):
+            # Death this step: attribute to the trap if we were cornered when
+            # the step started, or within the escape-confirm window after one.
+            if self._in_corner_threat or step_idx <= self._open_escape_deadline:
+                tel["deaths_cornered"] += 1.0
+                tel["escape_failure"] += 1.0
+            self._in_corner_threat = False
+            self._open_escape_deadline = -1
+            return
+
+        px, py = self.player.grid_x, self.player.grid_y
+        threats = self._reward_calc.count_threatening(px, py, self.ghosts)
+        in_danger = bool(
+            threats > 0 and self._reward_calc.is_cornered(px, py, self.maze)
+        )
+
+        if in_danger:
+            tel["cornered_steps"] += 1.0
+            if not self._in_corner_threat:
+                # Fresh entry into a trap; cancels any unresolved escape window.
+                self._in_corner_threat = True
+                tel["cornered_entries"] += 1.0
+                self._open_escape_deadline = -1
+        elif self._in_corner_threat:
+            self._in_corner_threat = False
+            self._open_escape_deadline = step_idx + ESCAPE_CONFIRM_STEPS
+        elif 0 <= self._open_escape_deadline and step_idx >= self._open_escape_deadline:
+            tel["escape_success"] += 1.0
+            self._open_escape_deadline = -1
 
     # ------------------------------------------------------------------ #
     #  Internals

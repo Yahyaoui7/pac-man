@@ -89,7 +89,7 @@ def run_evaluation(
             logits, _, hidden = policy(
                 grid.to(device_t), features.to(device_t), hidden
             )
-            masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e8)
+            masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e4)
             if greedy:
                 action = int(torch.argmax(masked_logits, dim=-1).item())
             else:

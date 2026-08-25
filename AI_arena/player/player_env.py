@@ -567,6 +567,48 @@ class PacmanPlayerEnv:
         self.seed = seed
         self.rng.seed(seed)
 
+    def reset_fixed(self, maze_w: int, maze_h: int, maze_seed: int) -> tuple:
+        """Reset to a specific, deterministic map.
+
+        Pins the maze size and seed so the exact same layout is reproduced
+        every time. The ghost/movement RNG is also re-seeded for full
+        determinism. Used by the map-pool curriculum so the agent can practise
+        the same map multiple times before moving on.
+        """
+        self._maze_w_min = maze_w
+        self._maze_w_max = maze_w
+        self._maze_h_min = maze_h
+        self._maze_h_max = maze_h
+        # Seed the RNG so that randint(maze_w, maze_w) and then
+        # randint(maze_seed_min, maze_seed_max) produce our target values.
+        # We bypass the RNG lottery by temporarily monkey-patching randint.
+        _orig_randint = self.rng.randint
+
+        _calls: list[int] = []
+
+        def _fixed_randint(a: int, b: int) -> int:
+            # First call → maze_w (already pinned via min==max, so a==b==maze_w)
+            # Second call → maze_h (same)
+            # Third call → current_seed (return our chosen seed)
+            _calls.append(len(_calls))
+            if len(_calls) <= 2:
+                return _orig_randint(a, b)  # a == b so always returns the pinned dim
+            if len(_calls) == 3:
+                return maze_seed
+            return _orig_randint(a, b)
+
+        self.rng.randint = _fixed_randint  # type: ignore[method-assign]
+        try:
+            obs = self.reset()
+        finally:
+            self.rng.randint = _orig_randint  # type: ignore[method-assign]
+            # Restore free-range sizing so normal reset() still works
+            self._maze_w_min = None
+            self._maze_w_max = None
+            self._maze_h_min = None
+            self._maze_h_max = None
+        return obs
+
     def _update_telemetry(
         self,
         events: dict[str, bool],

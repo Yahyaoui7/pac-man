@@ -46,6 +46,7 @@ class PacmanPlayerEnv:
         maze_w_max: int | None = None,  # ← NEW
         maze_h_min: int | None = None,  # ← NEW
         maze_h_max: int | None = None,  # ← NEW
+        start_pellets: tuple[int, ...] | None = None,  # ← completion curriculum
     ) -> None:
         if not pygame.get_init():
             os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -117,6 +118,10 @@ class PacmanPlayerEnv:
         self._maze_w_max = maze_w_max
         self._maze_h_min = maze_h_min
         self._maze_h_max = maze_h_max
+
+        # Completion curriculum: when set, each episode starts with one of
+        # these pellet counts (chosen per reset) instead of the full map.
+        self.start_pellets = start_pellets
 
         # ── Delegates ──
         self._reward_calc = RewardCalculator(stage=stage)
@@ -223,7 +228,10 @@ class PacmanPlayerEnv:
         self.ghosts = EntityFactory.create_ghosts(self.maze, GHOST_SPECS)
 
         # Create Pellets
-        self._create_pellets()
+        n_pellets = None
+        if self.start_pellets:
+            n_pellets = int(self.rng.choice(list(self.start_pellets)))
+        self._create_pellets(n_pellets)
 
         # ── BFS potential shaping ──
         if self.use_bfs_shaping:
@@ -259,13 +267,18 @@ class PacmanPlayerEnv:
     def step(
         self,
         action: int | torch.Tensor,
+        explore: bool = False,
     ) -> tuple[
         tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         float,
         bool,
         dict[str, Any],
     ]:
-        """Apply one action and advance physics until Pac-Man reaches a cell center."""
+        """Apply one action and advance physics until Pac-Man reaches a cell center.
+
+        `explore=True` marks ε-explorer steps: behavioral penalties that would
+        punish pure exploration noise (oscillation) are skipped for them.
+        """
         if isinstance(action, torch.Tensor):
             action = int(action.item())
 
@@ -481,6 +494,7 @@ class PacmanPlayerEnv:
             threat_dist=threat_dist,
             min_ghost_dist_after=min_ghost_dist_after,
             min_ghost_dist_before=min_ghost_dist_before,  # ← CRITICAL for evasion_skill
+            explore_step=explore,
         )
         for key, val in breakdown.items():
             self.episode_reward_breakdown[key] += val
@@ -535,6 +549,7 @@ class PacmanPlayerEnv:
             "maze": (len(self.maze[0]), len(self.maze)) if self.maze else (0, 0),
             "min_ghost_dist": min_ghost_dist,
             "max_steps": self.max_steps,
+            "start_pellets": self.total_pellets,
         }
         if done:
             info["episode_event_counts"] = dict(self.episode_event_counts)
@@ -608,7 +623,14 @@ class PacmanPlayerEnv:
     #  Internals
     # ------------------------------------------------------------------ #
 
-    def _create_pellets(self) -> None:
+    def _create_pellets(self, count: int | None = None) -> None:
+        """Fill the maze with pellets.
+
+        count=None → classic full map (normal pellets everywhere, super
+        pellets in corners). count=N → completion curriculum: exactly N
+        NORMAL pellets placed among the BFS-farthest walkable cells from the
+        player spawn, so completing the level reduces to navigating to them.
+        """
         if self.maze is None:
             raise RuntimeError("Maze must be created first.")
 
@@ -644,6 +666,40 @@ class PacmanPlayerEnv:
                 else:
                     pellets[y][x] = 1
                     total += 1
+
+        if count is not None and count > 0:
+            # Pick N walkable cells within a per-episode distance band
+            # (near / mid / far relative to spawn). Normal pellets only, so
+            # the completion signal isn't tangled with powered-mode hunting.
+            # Tiered bands create a gradual difficulty ladder toward
+            # long-range navigation instead of demanding it cold.
+            py, px = self.player.grid_y, self.player.grid_x
+            bfs = self.movement.bfs_distances((py, px))
+            candidates = []
+            for y in range(height):
+                for x in range(width):
+                    if pellets[y][x] in (1, 2):
+                        d = bfs[y * width + x]
+                        if d >= 0:
+                            candidates.append((d, y, x))
+            candidates.sort()
+            bands = [(4, 9), (10, 17), (18, 10**9)]
+            self.rng.shuffle(bands)
+            chosen = None
+            for lo, hi in bands:
+                band_pool = [c for c in candidates if lo <= c[0] <= hi]
+                if len(band_pool) >= count:
+                    chosen = self.rng.sample(band_pool, count)
+                    break
+            if chosen is None:
+                # No single band fits — spread uniformly over ALL candidates
+                # (never fall back to far-only placement).
+                chosen = self.rng.sample(candidates, min(count, len(candidates)))
+            pellets = [[0] * width for _ in range(height)]
+            total = 0
+            for _, gy, gx in chosen:
+                pellets[gy][gx] = 1
+                total += 1
 
         self.pellets = pellets
         self.total_pellets = total

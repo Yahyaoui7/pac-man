@@ -35,6 +35,7 @@ class RewardCalculator:
         self.last_min_ghost_dist: int = -1
         self.last_action_was_toward_ghost: bool = False
         self.steps_in_corner: int = 0
+        self.osc_streak: int = 0
 
     # ═══════════════════════════════════════════════════════════════════
     #  RESET
@@ -54,6 +55,7 @@ class RewardCalculator:
         self.last_min_ghost_dist = -1
         self.last_action_was_toward_ghost = False
         self.steps_in_corner = 0
+        self.osc_streak = 0
 
     # ═══════════════════════════════════════════════════════════════════
     #  ACTIVE REWARD METHODS
@@ -167,12 +169,21 @@ class RewardCalculator:
         events: dict[str, bool],
         threat_dist: float,
         breakdown: dict[str, float],
+        explore_step: bool = False,
     ) -> None:
+        """Penalize policy-driven oscillation unconditionally, ESCALATING with
+        consecutive offences (−10 → −20 → −30 capped): one accidental flip is
+        cheap, habitual wiggle is expensive. ε-explorer steps are exempt and
+        leave the streak untouched."""
+        if explore_step:
+            return
         if events.get("oscillating", False) and not (
             events.get("pellet_eaten", False) or events.get("super_pellet_eaten", False)
         ):
-            if threat_dist > 4:
-                breakdown["oscillation"] = OSCILLATION_REWARD
+            self.osc_streak += 1
+            breakdown["oscillation"] = OSCILLATION_REWARD * min(self.osc_streak, 3)
+        else:
+            self.osc_streak = 0
 
     def _ghost_proximity_penalty(
         self,
@@ -430,6 +441,7 @@ class RewardCalculator:
         threat_dist: float = float("inf"),
         min_ghost_dist_after: int = -1,
         min_ghost_dist_before: int = -1,
+        explore_step: bool = False,
     ) -> tuple[float, dict[str, float]]:
         """Return (total_reward, breakdown_dict)."""
         breakdown = {
@@ -469,8 +481,13 @@ class RewardCalculator:
         threatening, edible_nearby, min_threat_dist, min_edible_dist = (
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
-        self._survival_truncation_reward(events, frac, breakdown)
-        # ── CORE NAVIGATION & COMPLETION (North Star) ──
+        #         # ── MINIMAL SIGNAL MODE: alive + pellets + completion, no wiggle.
+        # Three quiet supports stay on (they shape the target, not noise):
+        #   bfs shaping  → dense gradient toward pellets (sparse-cliff guard)
+        #   zone stagnation → anti-camping (parking must not be free)
+        #   oscillation  → unconditional on policy steps
+        # Everything else (step tax, hunger, predictive threat, proximity,
+        # zone control, truncation bonus) intentionally OFF.
         self._death_penalty(events, breakdown)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
@@ -478,30 +495,13 @@ class RewardCalculator:
         self._bfs_shaping(bfs_shaping, breakdown)
         self._milestone_reward(frac, breakdown)
         self._ghost_eat_reward(events, breakdown)
+        self._exploration_reward(px, py, breakdown)
 
-        self._step_reward(events, breakdown)
-        self._hunger_penalty(steps_since_pellet, breakdown)
-        # ── ANTI-STAGNATION / ANTI-OSCILLATION ──
         self._zone_stagnation_penalty(px, py, breakdown)
-        self._oscillation_penalty(events, threat_dist, breakdown)
+        self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
 
-        self._predictive_threat_reward(
-            px,
-            py,
-            ghosts,
-            maze,
-            powered,
-            breakdown,
-        )
-        self._zone_control_reward(
-            px,
-            py,
-            maze,
-            powered,
-            threatening,
-            breakdown,
-        )
-        # ── STAGE 2 SURVIVAL SHAPING ──
+        # ── SURVIVAL TEACHER (re-enabled Aug 26 via ladder contingency B:
+        # Death% plateaued ~88% > 100 upd against full-power ghosts) ──
         if self.stage > 1:
             self._ghost_proximity_penalty(
                 min_ghost_dist_after,

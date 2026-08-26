@@ -16,6 +16,7 @@ cell center to cell center (up to `MAX_PHYSICS_TICKS = 40` physics ticks).
 | `device` | cpu | Device of returned observation tensors |
 | `use_bfs_shaping` | False | Optional potential-based reward shaping |
 | `maze_{w,h}_{min,max}` | None | Curriculum overrides of default sizes (w 10–30, h 10–20) |
+| `start_pellets` | None | Completion curriculum: episode starts with one of these pellet counts (sampled per reset), placed at BFS-farthest walkable cells as **normal** pellets. `None` = classic full map. The eval benchmark never uses this |
 
 Side effects at init: SDL dummy video driver, pygame init, sprite library
 load. Delegates created here and shared for the env's lifetime:
@@ -38,6 +39,13 @@ load. Delegates created here and shared for the env's lifetime:
 5. Spawns player at maze center, ghosts in the four corners
    (`EntityFactory`), fills pellets: every walkable cell gets value 1,
    corners get super pellets (value 2), center + spawn cell excluded.
+   With `start_pellets` set, instead exactly N normal pellets are placed
+   within a per-episode **distance band** from spawn — near (4–9),
+   mid (10–17) or far (18+) BFS steps, chosen uniformly — so completion
+   starts achievable and gradually demands long-range navigation
+   (`_create_pellets(count)`). The +5000 completion reward therefore fires
+   regularly and becomes learnable. `info["start_pellets"]` reports the
+   episode's count.
 6. Initializes visit counts / visited heatmap, region bookkeeping (4×4
    regions), distance-snapshot state.
 7. Returns `(grid, features, valid_actions)`.

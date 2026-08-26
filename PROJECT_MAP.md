@@ -6,6 +6,10 @@
 
 This project implements a Pac-Man game with Reinforcement Learning (PPO) and Supervised Learning (CNN) agents.
 
+> **RL documentation:** detailed, up-to-date docs for the RL system live in
+> [`AI_arena/docs/`](AI_arena/docs/README.md) (training loop, environment,
+> rewards, model/observation, evaluation & telemetry).
+
 ---
 
 ## File Index

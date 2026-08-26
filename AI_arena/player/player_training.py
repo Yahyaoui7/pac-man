@@ -44,25 +44,42 @@ LEARNING_RATE = 2e-4
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_EPS = 0.2
-ENTROPY_COEF = 0.04
+ENTROPY_COEF = 0.015
 VALUE_COEF = 0.25
 MAX_GRAD_NORM = 0.5
 
+
+ROLLOUT_EPSILON = 0.03
+
 SEED = 42
 SAVE_INTERVAL = 50
-RESUME = True  # set True to resume from checkpoint
-SL_WARMSTART = False  # set True to warm-start from supervised-learning weights
+RESUME = True
+SL_WARMSTART = False
 
-# ── Fixed-seed evaluation & stall detection ──────────────────────────────
-# Runs the greedy policy on an identical benchmark maze set every
-# EVAL_INTERVAL updates. This is how you tell "learning" from "noise"
-# long before pellet%/win-rate move: paired seeds kill most variance.
 EVAL_INTERVAL = SAVE_INTERVAL
-EVAL_EPISODES = 20  # ~ the cost of one extra update, amortized over 50
-EVAL_SEED_BASE = 10000  # benchmark mazes — never change between runs
+EVAL_EPISODES = 20
+EVAL_SEED_BASE = 10000
 EVAL_DEVICE = "cpu"
-EVAL_STALL_PATIENCE = 5  # evals without meaningful improvement before warning
-EVAL_MIN_IMPROVEMENT = 2.0  # score points that count as "real" progress
+EVAL_STALL_PATIENCE = 5
+EVAL_MIN_IMPROVEMENT = 2.0
+
+# ── Completion curriculum ────────────────────────────────────────────────
+# Start each episode with only a few pellets (chosen per-episode) placed at
+# BFS-far cells, so "complete the level" reduces to "reach these pellets"
+# and the +5000 completion reward becomes learnable. None = full pellet map.
+# The eval benchmark env is NOT affected — it always uses full maps, so
+# eval scores stay comparable across this curriculum switch. Graduate
+# (e.g. → (5, 8, 12) → None) once Complete% in the logs is consistently high.
+START_PELLETS: tuple[int, ...] | None = (1, 2, 3)
+
+# Dense gradient toward the objective. With few pellets per episode there is
+# no natural per-step reward guiding navigation (the full-map pellet stream
+# used to provide it), so enable potential-based shaping: reward =
+# γ·Φ(s′) − Φ(s) with Φ = −BFS-distance to the nearest pellet. Telescoping
+# makes it unfarmable and provably optimal-policy-preserving. Roughly ±3 per
+# cell moved toward/away. Keep ON while START_PELLETS is small; revisit on
+# full maps (the dense pellet stream makes it redundant there).
+USE_BFS_SHAPING = True
 
 MODEL_DIR = Path(__file__).parent.parent / "models"
 LOG_FILE = Path("training_log.txt")
@@ -112,14 +129,23 @@ def train() -> None:
 
     logger.log("=" * 60)
     logger.log(f"Stage {STAGE} PPO Training | Device: {device}")
-    logger.log(f"Updates: {NUM_UPDATES} | Rollout: {ROLLOUT_STEPS}")
+    logger.log(
+        f"Updates: {NUM_UPDATES} | Rollout: {ROLLOUT_STEPS} | "
+        f"eps-explorer: {ROLLOUT_EPSILON:.2f}"
+    )
     logger.log("=" * 60)
 
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     checkpoint_path = MODEL_DIR / f"player_rl_stage{STAGE}.pt"
     best_checkpoint_path = MODEL_DIR / f"player_rl_stage{STAGE}_best.pt"
 
-    env = PacmanPlayerEnv(seed=SEED, stage=STAGE, device="cpu")
+    env = PacmanPlayerEnv(
+        seed=SEED,
+        stage=STAGE,
+        device="cpu",
+        start_pellets=START_PELLETS,
+        use_bfs_shaping=USE_BFS_SHAPING,
+    )
     policy = PlayerActorCritic().to(device)
     optimizer = torch.optim.Adam(policy.parameters(), lr=LEARNING_RATE)
 
@@ -230,11 +256,38 @@ def train() -> None:
                         policy_hidden,
                     )
                     masked_logits = logits.masked_fill(~valid_actions.to(device), -1e8)
-                    dist = Categorical(logits=masked_logits)
-                    action = dist.sample()
-                    log_prob = dist.log_prob(action)
+                    if ROLLOUT_EPSILON > 0:
+                        probs = F.softmax(masked_logits, dim=-1)
+                        valid_f = valid_actions.to(device).float()
+                        uniform = valid_f / valid_f.sum(dim=-1, keepdim=True).clamp(
+                            min=1.0
+                        )
+                        mix = (
+                            1.0 - ROLLOUT_EPSILON
+                        ) * probs + ROLLOUT_EPSILON * uniform
+                        # Branch-explicit sampling: decide the branch first,
+                        # then sample PURELY from that branch's distribution —
+                        # total P(a) = (1−ε)·π(a) + ε·uniform(a), identical to
+                        # Categorical(mix), but labels each step as exploration.
+                        if torch.rand(1).item() < ROLLOUT_EPSILON:
+                            dist = Categorical(probs=uniform)
+                            explore_branch = True
+                        else:
+                            dist = Categorical(probs=probs)
+                            explore_branch = False
+                        action = dist.sample()
+                        # Behavior log-prob is the true MIXTURE prob either way,
+                        # keeping PPO importance ratios correct.
+                        log_prob = torch.log(mix[0, action])
+                    else:
+                        explore_branch = False
+                        dist = Categorical(logits=masked_logits)
+                        action = dist.sample()
+                        log_prob = dist.log_prob(action)
 
-                next_obs, reward, done, info, executed_action = env.step(action.item())
+                next_obs, reward, done, info, executed_action = env.step(
+                    action.item(), explore=explore_branch
+                )
                 current_ep_reward += reward
                 current_ep_steps += 1
 

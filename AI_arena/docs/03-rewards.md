@@ -1,73 +1,70 @@
 # 03 — Rewards (`rewards.py` + `constants.py`)
 
-Last updated: **2026-08-23**
+Last updated: **2026-08-25** — *Minimal Signal Mode*
 
 `RewardCalculator.calculate(...)` runs every env step and returns
 `(total_reward, breakdown_dict)`. The breakdown is summed per episode and
-printed in the training log (`format_breakdown_line`), so each term below is
-directly observable.
+printed in the training log (`format_breakdown_line`, sparse: zero terms are
+omitted), so each term below is directly observable.
 
-## Active terms (Stage 2)
+## Minimal Signal Mode (current)
+
+Target stated by the project: **stay alive + eat pellets + zero oscillation**,
+with the cleanest possible reward. Active terms:
 
 | Breakdown key | Trigger | Value |
 |---|---|---|
 | `death` | Pac-Man dies | **−350** |
-| `complete` | Level cleared | **+5000** + min(remaining_steps × 0.1, 100) |
+| `complete` | Level cleared | **+1000** + min(remaining_steps × 0.1, 100) *(lowered from 5000 — frequent tiny-map completions favour a flatter stream)* |
 | `pellet` | Normal pellet | +1.5 + 2.0 × cleared-fraction (+4 extra once >75% cleared) |
-| `super_pellet` / `super_bait` | Power pellet | +5 (+ up to 6 scaled by #threatening ghosts — bait bonus) |
+| `super_pellet` / `super_bait` | Power pellet | +5 (+ up to 6 bait bonus) |
 | `milestone` | 50/75/85/95% pellets (once each) | +20/+50/+100/+200 |
 | `ghost` | Eat edible ghost | +150 |
-| `step` | Every step | −0.1 (0 on pellet/super steps) |
-| `hunger` | >25 steps without a pellet | −0.5 |
-| `zone_stagnation` | 12 steps in same 3×3 block, then per step after | −5 flat, then −0.5/step |
-| `oscillation` | A→B→A or 4-cell loop, no pellet eaten, threat dist > 4 | −10 |
-| `predictive_threat` | Hunting ghost near (Manhattan ≤ 8), not powered | d≥5: +0.30 · d=4: +0.15 · d=3: −0.5 · d=2: −1.5 · d=1: −4.0 |
-| `zone_control` | Cornered (≤1 open neighbour) while not powered | threatened: −10, then −2.5/extra consecutive step; safe corner: −0.1 |
-| `survival_truncation` | Episode ends on step budget | +200 + cleared% × 50 |
-| `ghost_proximity` *(stage>1)* | Static repulsion field by min BFS ghost distance | d=1 −4 · d=2 −1.5 · d=3 −0.5 · d=4 −0.2 · d=5 −0.05; plus moving closer: −0.4 × max(0, 6−d) |
+| `exploration` | First visit to a tile this episode (**ON** Aug 25 — the carrot for "force more exploration") | **+1 per brand-new tile**, one-time, unfarmable |
+| `bfs` | Potential shaping (**ON**) | `3 × (γΦ′ − Φ)`, Φ = −BFS dist to nearest pellet ⇒ ~±3/cell; telescoping ⇒ unfarmable |
+| `zone_stagnation` | 12 steps in same 3×3 block, then per step | −5 flat, then −0.5/step (anti-camping) |
+| `oscillation` | A→B→A or 4-cell loop without pellet eaten; unconditional; **escalating**: −10 × min(consecutive-offence streak, 3), streak resets on any clean step | −10 → −20 → −30 (cap); ε-explorer steps exempt and streak-neutral |
+| `ghost_proximity` | **Re-enabled Aug 26** (ladder contingency B: Death% plateaued ~88% >100 upd vs full-power ghosts). Static field by min BFS ghost distance + approach penalty | d=1 −4 · d=2 −1.5 · d=3 −0.5 · d=4 −0.2 · d=5 −0.05; moving closer: −0.4 × (6−d). Off while powered (hunting stays free) |
 
-Scale intuition: one completion ≈ 16 deaths; one death ≈ 230 pellets.
-The reward is deliberately survival-first: dying costs more than any single
-episode can earn back through pellets alone.
+Everything else is intentionally disabled in this mode: `step` tax, `hunger`,
+`predictive_threat`, `evasion_skill`, `super_bait` extras beyond the base,
+`zone_control`, `ghost_proximity`, `survival_truncation`, region terms.
+Rationale: one dense gradient toward pellets (`bfs`), one hard signal against
+wiggling (`oscillation`), one guard against camping (`zone_stagnation`), plus
+the three outcome events (death / completion / pellets). Camping or wiggling
+now earns exactly nothing; progress pays continuously; outcomes pay big.
 
-## Defined but currently DISABLED (not called from `calculate()`)
+## Historical mode (pre Aug-25): full survival-first stack
 
-These exist for experiments — enable by adding the call in `calculate()`:
+Before Minimal Signal Mode these were also active: step tax −0.1 (0 on pellet
+steps), hunger −0.5 (>25 pellet-less steps), predictive threat ±(0.15…4.0) by
+ghost distance, ghost-proximity field (d=1 −4 … d=5 −0.05 + approach penalty
+−0.4×(6−d)), zone-control corner penalties (−10 then −2.5/step), survival
+truncation +200+, oscillation only when `threat_dist > 4`. All methods remain
+implemented — re-enable by uncommenting their calls in `calculate()`.
 
-| Method | Purpose | Note |
-|---|---|---|
-| `_exploration_reward` | +1 per brand-new tile visited | needs `visited_this_episode` maintenance if enabled |
-| `_evasion_skill_reward` | Credit for increasing distance to a close ghost (d≤4) | pairs with `last_min_ghost_dist` tracking |
-| `_threat_mastery_reward` | Sustained survival while ghosts within Manhattan 2–3 | uses `consecutive_threat_steps` |
-| `_ghost_lure_reward` | Approaching edible ghosts while powered | hunting behavior shaping |
-| `_dense_survival_reward` | Small per-step bonuses when threatened | overlaps with `predictive_threat` |
-| `_region_cleared/_dirty_penalty/_backtrack_penalty/_incomplete_penalty` | 4×4-region hygiene & timeout penalty | region events still computed in env; only rewards are off |
-
-Prepared-but-unused state also present: `in_danger_zone`,
-`danger_zone_entry_step/pos` (a danger-zone mechanic never implemented).
+Also still implemented but never called in any recent mode:
+`_exploration_reward` (+1/new tile), `_evasion_skill_reward`,
+`_threat_mastery_reward`, `_ghost_lure_reward`, `_dense_survival_reward`,
+region hygiene terms.
 
 ## Helpers worth knowing
 
 - `_is_cornered(px, py, maze)` — trap detector: ≤1 open neighbour via maze
-  wall-bitmask. Public wrappers `is_cornered()` / `count_threatening()`
-  exist for the env's telemetry (no reward coupling).
+  wall-bitmask. Public wrappers `is_cornered()` / `count_threatening()` exist
+  for the env's telemetry (no reward coupling).
 - `_count_threatening_ghosts(px, py, ghosts)` — non-prison, non-edible,
-  **Manhattan** distance ≤ 8. Returns counts + min distances to both
-  threatening and edible ghosts.
-- Stage gating: `ghost_proximity` and the `last_min_ghost_dist` update only
-  run when `stage > 1`.
+  **Manhattan** distance ≤ 8.
 
 ## Constants (`player/constants.py`)
 
-All numeric values above live here (`DEATH_REWARD`, `COMPLETION_REWARD`,
+All numeric values live here (`DEATH_REWARD`, `COMPLETION_REWARD`,
 `MILESTONE_REWARDS`, ...). Also:
 
 - `LIVES = 2` → an episode terminates on the **first death**
   (`died >= max(1, LIVES−1)` in the env).
 - `MAZE_STEP_MULTIPLIER = 12.0` → episode step budget = maze area × 12.
+- `ESCAPE_CONFIRM_STEPS = 8` — telemetry escape-confirm window.
 - Unused constants kept for history: `CLOSE_DODGE_REWARD`,
   `ESCAPE_BOX_REWARD`, `BAIT_SUPER_PELLET_*`, `CORNERED_MIN_MOVES`,
-  `NEAR_GHOST_DIST`, `SURVIVAL_TRUNCATION_*` (the active truncation bonus is
-  hardcoded as 200/50 inside `_survival_truncation_reward`).
-- `ESCAPE_CONFIRM_STEPS = 8` — telemetry window after leaving a trap within
-  which a death retroactively fails the escape attempt.
+  `NEAR_GHOST_DIST`, `SURVIVAL_TRUNCATION_*`.

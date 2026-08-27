@@ -70,7 +70,7 @@ EVAL_MIN_IMPROVEMENT = 2.0
 # The eval benchmark env is NOT affected — it always uses full maps, so
 # eval scores stay comparable across this curriculum switch. Graduate
 # (e.g. → (5, 8, 12) → None) once Complete% in the logs is consistently high.
-START_PELLETS: tuple[int, ...] | None = (1, 2, 3)
+START_PELLETS: tuple[int, ...] | None = (5, 10, 15)
 
 # Dense gradient toward the objective. With few pellets per episode there is
 # no natural per-step reward guiding navigation (the full-map pellet stream

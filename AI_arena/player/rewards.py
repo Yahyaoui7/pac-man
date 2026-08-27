@@ -481,37 +481,28 @@ class RewardCalculator:
         threatening, edible_nearby, min_threat_dist, min_edible_dist = (
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
-        #         # ── MINIMAL SIGNAL MODE: alive + pellets + completion, no wiggle.
-        # Three quiet supports stay on (they shape the target, not noise):
-        #   bfs shaping  → dense gradient toward pellets (sparse-cliff guard)
-        #   zone stagnation → anti-camping (parking must not be free)
-        #   oscillation  → unconditional on policy steps
-        # Everything else (step tax, hunger, predictive threat, proximity,
-        # zone control, truncation bonus) intentionally OFF.
+
         self._death_penalty(events, breakdown)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
         self._super_pellet_reward(events, powered, threatening, breakdown)
-        self._bfs_shaping(bfs_shaping, breakdown)
-        self._milestone_reward(frac, breakdown)
         self._ghost_eat_reward(events, breakdown)
         self._exploration_reward(px, py, breakdown)
-
-        self._zone_stagnation_penalty(px, py, breakdown)
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
 
-        # ── SURVIVAL TEACHER (re-enabled Aug 26 via ladder contingency B:
-        # Death% plateaued ~88% > 100 upd against full-power ghosts) ──
-        if self.stage > 1:
-            self._ghost_proximity_penalty(
-                min_ghost_dist_after,
-                min_ghost_dist_before,
-                events,
-                powered,
-                breakdown,
-            )
-            self.last_min_ghost_dist = (
-                min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist
-            )
+        # self._bfs_shaping(bfs_shaping, breakdown)
+        # self._milestone_reward(frac, breakdown)
+        # self._zone_stagnation_penalty(px, py, breakdown)
+
+        # self._ghost_proximity_penalty(
+        #     min_ghost_dist_after,
+        #     min_ghost_dist_before,
+        #     events,
+        #     powered,
+        #     breakdown,
+        # )
+        self.last_min_ghost_dist = (
+            min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist
+        )
 
         return sum(breakdown.values()), breakdown

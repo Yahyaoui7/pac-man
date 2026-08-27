@@ -8,6 +8,7 @@ dependencies = [
     "matplotlib>=3.10.9",
     "mazegenerator",
     "numpy>=2.2.6",
+    "pandas>=2.3.3",
     "pygame>=2.6.1",
     "torch>=2.13.0",
     "troch>=0.0.2",

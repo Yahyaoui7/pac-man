@@ -94,7 +94,7 @@ def collect_demonstrations(
                     kept_this_episode += 1
                     if written % 100 == 0 or written == samples:
                         print(f"Collected {written}/{samples} expert samples")
-                _, _, done, _ = env.step(decision.action)
+                _, _, done, _, _ = env.step(decision.action)
                 episode_step += 1
             episode_id += 1
     print(

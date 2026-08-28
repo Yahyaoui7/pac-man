@@ -354,8 +354,6 @@ class PacmanTrainer:
     def __init__(self, config: TrainingConfig) -> None:
         self.cfg = config
         self.device = self._select_device()
-        self.hidden_dim = 128  # must match PacmanCNNBackbone GRU hidden_size
-
         # Logging
         self.logger = TrainingLogger(config.log_file, quiet=False)
 
@@ -368,9 +366,11 @@ class PacmanTrainer:
             self.cfg.model_dir / f"player_rl_stage{self.cfg.stage}_best.pt"
         )
 
-        # Core components
         self.env = self._build_env()
         self.policy = PlayerActorCritic().to(self.device)
+        self.hidden_dim = (
+            self.policy.backbone.gru_num_layers * self.policy.backbone.gru_hidden_size
+        )  # matches PacmanCNNBackbone GRU (2 layers x 384 = 768)
         self.optimizer = self._build_optimizer()
         self.scaler = torch.amp.GradScaler("cuda", enabled=(self.device.type == "cuda"))
         self.ref_policy: PlayerActorCritic | None = None  # for SL warmstart KL reg
@@ -559,7 +559,10 @@ class PacmanTrainer:
                 features.to(self.device),
                 self.policy_hidden,
             )
-            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e8)
+            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e4)
+            masked_logits = torch.nan_to_num(
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+            )
 
             if self.cfg.rollout_epsilon > 0:
                 probs = F.softmax(masked_logits, dim=-1)
@@ -752,14 +755,27 @@ class PacmanTrainer:
         mb_adv = seq_tensors["advantages_seq"][mb_idx]
         mb_returns = seq_tensors["returns_seq"][mb_idx]
         mb_resets = seq_tensors["resets_seq"][mb_idx]
-        mb_hidden = seq_tensors["seq_hiddens"][mb_idx].unsqueeze(0).detach()
+        mb_h_raw = seq_tensors["seq_hiddens"][mb_idx]
+        mb_hidden = (
+            mb_h_raw.view(
+                -1,
+                self.policy.backbone.gru_num_layers,
+                self.policy.backbone.gru_hidden_size,
+            )
+            .permute(1, 0, 2)
+            .contiguous()
+            .detach()
+        )
 
         self.optimizer.zero_grad()
         with torch.amp.autocast("cuda", enabled=(self.device.type == "cuda")):
             logits, values, _ = self.policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            masked_logits = logits.masked_fill(~mb_valid, -1e8)
+            masked_logits = logits.masked_fill(~mb_valid, -1e4)
+            masked_logits = torch.nan_to_num(
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+            )
             dist = Categorical(logits=masked_logits)
 
             new_log_probs = dist.log_prob(mb_actions)
@@ -806,7 +822,10 @@ class PacmanTrainer:
             ref_logits, _, _ = self.ref_policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            ref_masked = ref_logits.masked_fill(~mb_valid, -1e8)
+            ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
+            ref_masked = torch.nan_to_num(
+                ref_masked, nan=-1e4, posinf=10.0, neginf=-1e4
+            )
             ref_probs = F.softmax(ref_masked, dim=-1)
             ref_log_p = F.log_softmax(ref_masked, dim=-1)
         log_p = F.log_softmax(masked_logits, dim=-1)
@@ -939,7 +958,7 @@ class PacmanTrainer:
         t_eval = time.time()
         eval_result = run_evaluation(
             self.policy,
-            device=cfg.eval_device,
+            device=self.device,
             stage=cfg.stage,
             episodes=cfg.eval_episodes,
             seed_base=cfg.eval_seed_base,

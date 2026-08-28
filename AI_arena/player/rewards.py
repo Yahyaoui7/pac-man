@@ -174,8 +174,9 @@ class RewardCalculator:
                 self.osc_streak = 0
                 return
             self.osc_streak += 1
-            if self.osc_streak >= 3:
-                breakdown["oscillation"] = -2.0  # flat small penalty
+            # Immediate & progressive penalty (-2.0, -4.0, -6.0, -8.0)
+            penalty = -2.0 * min(self.osc_streak, 4)
+            breakdown["oscillation"] = penalty
         else:
             self.osc_streak = 0
 
@@ -482,8 +483,8 @@ class RewardCalculator:
         self._pellet_reward(events, frac, breakdown)
         self._super_pellet_reward(events, powered, threatening, breakdown)
         self._ghost_eat_reward(events, breakdown)
-        self._exploration_reward(px, py, breakdown)
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
+        self._zone_stagnation_penalty(px, py, breakdown)
 
         # Dense navigation guidance — use the BFS work you're already paying for
         if bfs_shaping != 0.0:

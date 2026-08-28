@@ -8,7 +8,7 @@ import torch
 
 from AI_arena.data.formatter import DIRECTIONS, ObservationFormatter
 
-PLAYER_EXTRA_FEATURE_COUNT = 65
+PLAYER_EXTRA_FEATURE_COUNT = 50
 POWER_TIMER_MAX = 30.0
 
 
@@ -21,7 +21,7 @@ def format_player_observation(
     movement: Any,
     initial_pellet_count: int | None = None,
     device: str | torch.device = "cpu",
-    visit_counts: list[list[int]] | None = None,  # ← CHANGED
+    visit_counts: list[list[int]] | None = None,
     prev_nearest_pellet_dist: float = -1.0,
     prev_nearest_ghost_dist: float = -1.0,
     prev_nearest_pp_dist: float = -1.0,
@@ -32,7 +32,7 @@ def format_player_observation(
     region_completion_frac: float = 0.0,
     region_is_dirty: float = 0.0,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Return grid [1,7,50,25], player features [1,61], and mask [1,4]."""
+    """Return grid [1, 5, 25, 50], player features [1, 50], and mask [1, 4]."""
     ghost_states = [
         {
             "grid_x": ghost.grid_x,
@@ -50,49 +50,50 @@ def format_player_observation(
         ghost_states=ghost_states,
         movement=movement,
         device=device,
-        visit_counts=visit_counts,  # ← CHANGED
+        visit_counts=visit_counts,
     )
 
     height = len(maze)
     width = len(maze[0]) if height else 0
-    max_dim = max(width, height, 1)
+    norm_denom = float(width + height) if (width + height) > 0 else 1.0
     px, py = player.grid_x, player.grid_y
 
+    # 1. Player Direction (4: UP, DOWN, LEFT, RIGHT)
     player_direction = [float(player.direction == d) for d in DIRECTIONS]
-    ghost_directions = [
-        float(ghost.direction == direction)
-        for ghost in ghosts
-        for direction in DIRECTIONS
-    ]
-    edible = [float(ghost.is_edible) for ghost in ghosts]
-    timers = [
-        max(
-            0.0,
-            min(
-                1.0,
-                float(
-                    getattr(ghost, "frightened_timer", 0.0)
-                    or (player.powered_timer if ghost.is_edible else 0.0)
-                )
-                / POWER_TIMER_MAX,
-            ),
-        )
-        for ghost in ghosts
-    ]
+
+    # 2. Ghost Edible Flags (4: -1.0 = dangerous non-edible, +1.0 = edible)
+    edible = [1.0 if getattr(ghost, "is_edible", False) else -1.0 for ghost in ghosts]
+
+    # 3. Ghost Timers (4: normalized [0, 1] if edible, -1.0 if not edible)
+    timers = []
+    for ghost in ghosts:
+        is_edible = getattr(ghost, "is_edible", False)
+        if is_edible:
+            t = float(
+                getattr(ghost, "frightened_timer", 0.0)
+                or (player.powered_timer if is_edible else 0.0)
+            )
+            timers.append(max(0.0, min(1.0, t / POWER_TIMER_MAX)))
+        else:
+            timers.append(-1.0)
+
+    # 4. Valid Actions Mask (4: UP, DOWN, LEFT, RIGHT)
     action_features = valid_actions[0].float().tolist()
 
+    # 5. Pellets Remaining Fractions (2: normal, power)
     normal_remaining = 0
     power_remaining = 0
     nearest_np_dist = -1
     nearest_pp_dist = -1
 
-    # BFS-based spatial features
+    # BFS spatial distances
     bfs_dist = (
         movement.bfs_distances((py, px))
         if movement is not None
         else [0] * (width * height)
     )
 
+    # 6. Ghost BFS Distances (4: normalized by width+height, capped at 1.0, or -1.0 if unreachable)
     ghost_distances_raw = []
     ghost_distances = []
     for ghost in ghosts:
@@ -100,9 +101,12 @@ def format_player_observation(
         cell_idx = gy * width + gx
         dist = bfs_dist[cell_idx] if (0 <= cell_idx < len(bfs_dist)) else -1
         ghost_distances_raw.append(dist)
-        ghost_distances.append((dist + 1) / max_dim)
+        if dist >= 0:
+            ghost_distances.append(min(1.0, (dist + 1) / norm_denom))
+        else:
+            ghost_distances.append(-1.0)
 
-    # Single pass over pellets to count and find min distances
+    # Pellets single pass
     for gy in range(height):
         p_row = pellets[gy]
         for gx in range(width):
@@ -123,10 +127,15 @@ def format_player_observation(
     remaining = [normal_remaining / denominator, power_remaining / denominator]
     power_timer = [max(0.0, min(1.0, float(player.powered_timer) / POWER_TIMER_MAX))]
 
-    nearest_pp_dist_norm = (nearest_pp_dist + 1) / max_dim
-    nearest_np_dist_norm = (nearest_np_dist + 1) / max_dim
+    # 7. Nearest Pellets Distances (2: power pellet, normal pellet)
+    nearest_pp_dist_norm = (
+        min(1.0, (nearest_pp_dist + 1) / norm_denom) if nearest_pp_dist >= 0 else -1.0
+    )
+    nearest_np_dist_norm = (
+        min(1.0, (nearest_np_dist + 1) / norm_denom) if nearest_np_dist >= 0 else -1.0
+    )
 
-    # Local adjacent pellet features (4: UP, DOWN, LEFT, RIGHT)
+    # 8. Local Adjacent Pellets (4: UP, DOWN, LEFT, RIGHT)
     local_pellet = [0.0, 0.0, 0.0, 0.0]
     dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     for i, (dy, dx) in enumerate(dirs):
@@ -134,7 +143,7 @@ def format_player_observation(
         if 0 <= ny < height and 0 <= nx < width and pellets[ny][nx] in (1, 2):
             local_pellet[i] = 1.0
 
-    # Local adjacent ghost danger features (4: UP, DOWN, LEFT, RIGHT)
+    # 9. Local Adjacent Danger (4: UP, DOWN, LEFT, RIGHT)
     local_danger = [0.0, 0.0, 0.0, 0.0]
     if player.powered_timer <= 0:
         active_ghost_cells = [
@@ -147,82 +156,87 @@ def format_player_observation(
             if (ny, nx) in active_ghost_cells:
                 local_danger[i] = 1.0
             elif movement is not None and movement.can_move(py, px, DIRECTIONS[i]):
-                # Also flag immediate 1-step hazard into ghost neighborhood
                 for gy, gx in active_ghost_cells:
                     if abs(gy - ny) + abs(gx - nx) <= 1:
                         local_danger[i] = 1.0
                         break
 
-    # Delta / trend features (3)
+    # 10. Distance Deltas (3: pellet, ghost, pp)
     delta_pellet = 0.0
     if prev_nearest_pellet_dist >= 0 and nearest_np_dist >= 0:
-        delta_pellet = (prev_nearest_pellet_dist - nearest_np_dist) / max_dim
+        delta_pellet = (prev_nearest_pellet_dist - nearest_np_dist) / norm_denom
 
     delta_ghost = 0.0
     min_ghost_dist = min((d for d in ghost_distances_raw if d >= 0), default=-1)
     if prev_nearest_ghost_dist >= 0 and min_ghost_dist >= 0:
-        delta_ghost = (prev_nearest_ghost_dist - min_ghost_dist) / max_dim
+        delta_ghost = (prev_nearest_ghost_dist - min_ghost_dist) / norm_denom
 
     delta_pp = 0.0
     if prev_nearest_pp_dist >= 0 and nearest_pp_dist >= 0:
-        delta_pp = (prev_nearest_pp_dist - nearest_pp_dist) / max_dim
+        delta_pp = (prev_nearest_pp_dist - nearest_pp_dist) / norm_denom
 
+    # 11. Step & Action Memory (2)
     steps_since_pellet_norm = min(steps_since_pellet, 100) / 100.0
-
-    last_offset_y = 0.0
-    last_offset_x = 0.0
-    second_last_offset_y = 0.0
-    second_last_offset_x = 0.0
-    if last_positions:
-        last_offset_y = (py - last_positions[-1][0]) / max_dim
-        last_offset_x = (px - last_positions[-1][1]) / max_dim
-    if len(last_positions) > 1:
-        second_last_offset_y = (py - last_positions[-2][0]) / max_dim
-        second_last_offset_x = (px - last_positions[-2][1]) / max_dim
-
-    just_died_flag = [just_died]
     same_action_norm = min(same_action_count, 20) / 20.0
 
-    maze_size = [
-        float(width) / 50.0,
-        float(height) / 25.0,
-        float(width * height - 1) / 1000.0,
-    ]
+    # 12. NEW: Ghost Relative Coordinates (8: 4 ghosts x 2 axes [dx, dy] in [-1.0, 1.0])
+    ghost_rel_coords = []
+    for g in ghosts:
+        if not getattr(g, "in_prison", False):
+            dx_norm = (g.grid_x - px) / float(max(width, 1))
+            dy_norm = (g.grid_y - py) / float(max(height, 1))
+            ghost_rel_coords.extend([max(-1.0, min(1.0, dx_norm)), max(-1.0, min(1.0, dy_norm))])
+        else:
+            ghost_rel_coords.extend([-1.0, -1.0])
 
-    player_powered_flag = [1.0 if player.powered_timer > 0 else 0.0]
+    # 13. NEW: Surrounded Danger Counters (2: within Manhattan dist 3 and 5)
+    active_dangerous_ghosts = [
+        g for g in ghosts
+        if not getattr(g, "in_prison", False) and not getattr(g, "is_edible", False)
+    ]
+    ghost_count_d3 = sum(
+        1 for g in active_dangerous_ghosts
+        if (abs(g.grid_x - px) + abs(g.grid_y - py)) <= 3
+    )
+    ghost_count_d5 = sum(
+        1 for g in active_dangerous_ghosts
+        if (abs(g.grid_x - px) + abs(g.grid_y - py)) <= 5
+    )
+    surrounded_d3_norm = ghost_count_d3 / 4.0
+    surrounded_d5_norm = ghost_count_d5 / 4.0
+
+    # 14. NEW: Topology Flags (2: dead-end flag, junction flag)
+    num_valid_actions = sum(1 for v in action_features if v > 0.5)
+    dead_end_flag = 1.0 if num_valid_actions == 1 else 0.0
+    junction_flag = 1.0 if num_valid_actions >= 3 else 0.0
 
     features = [
-        *player_direction,
-        *ghost_directions,
-        *edible,
-        *timers,
-        *action_features,
-        *remaining,
-        *power_timer,
-        *ghost_distances,
-        nearest_pp_dist_norm,
-        nearest_np_dist_norm,
-        *maze_size,
-        *player_powered_flag,
-        *local_pellet,
-        *local_danger,
-        delta_pellet,
-        delta_ghost,
-        delta_pp,
-        steps_since_pellet_norm,
-        last_offset_y,
-        last_offset_x,
-        second_last_offset_y,
-        second_last_offset_x,
-        region_completion_frac,
-        region_is_dirty,
-        *just_died_flag,
-        same_action_norm,
+        *player_direction,         # 4
+        *edible,                   # 4
+        *timers,                   # 4
+        *action_features,          # 4
+        *remaining,                # 2
+        *power_timer,              # 1
+        *ghost_distances,          # 4
+        nearest_pp_dist_norm,      # 1
+        nearest_np_dist_norm,      # 1
+        *local_pellet,             # 4
+        *local_danger,             # 4
+        delta_pellet,              # 1
+        delta_ghost,               # 1
+        delta_pp,                  # 1
+        steps_since_pellet_norm,   # 1
+        same_action_norm,          # 1
+        *ghost_rel_coords,         # 8
+        surrounded_d3_norm,        # 1
+        surrounded_d5_norm,        # 1
+        dead_end_flag,             # 1
+        junction_flag,             # 1
     ]
+
     if len(features) != PLAYER_EXTRA_FEATURE_COUNT:
         raise ValueError(
-            f"Expected {PLAYER_EXTRA_FEATURE_COUNT} player features, "
-            f"got {len(features)}"
+            f"Expected {PLAYER_EXTRA_FEATURE_COUNT} player features, got {len(features)}"
         )
     return (
         grid,

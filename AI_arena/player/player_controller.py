@@ -77,9 +77,9 @@ class CNNPlayerController:
             logits, value, self._hidden = self.model(grid, extra_features, self._hidden)
             logits = logits.float()
             value = value.float()
-            masked_logits = logits.masked_fill(~valid_actions, -1e9)
+            masked_logits = logits.masked_fill(~valid_actions, -1e4)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e9, posinf=10.0, neginf=-1e9
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
             )
             probs = torch.softmax(masked_logits, dim=-1)[0]
             probs = torch.nan_to_num(probs, nan=0.0, posinf=1.0, neginf=0.0)

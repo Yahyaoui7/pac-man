@@ -139,8 +139,8 @@ class RewardCalculator:
         additional = 0
         if events.get("pellet_eaten", False):
             if frac > 0.75:
-                additional = 4.0
-            breakdown["pellet"] = PELLET_REWARD + 2.0 * frac + additional
+                additional = 2.0
+            breakdown["pellet"] = PELLET_REWARD + 1.0 * frac + additional
 
     def _super_pellet_reward(
         self,
@@ -162,26 +162,20 @@ class RewardCalculator:
                 breakdown["milestone"] += reward
 
     def _bfs_shaping(self, bfs_shaping: float, breakdown: dict[str, float]) -> None:
-        breakdown["bfs"] = 3.0 * bfs_shaping
+        breakdown["bfs"] = 1.0 * bfs_shaping
 
-    def _oscillation_penalty(
-        self,
-        events: dict[str, bool],
-        threat_dist: float,
-        breakdown: dict[str, float],
-        explore_step: bool = False,
-    ) -> None:
-        """Penalize policy-driven oscillation unconditionally, ESCALATING with
-        consecutive offences (−10 → −20 → −30 capped): one accidental flip is
-        cheap, habitual wiggle is expensive. ε-explorer steps are exempt and
-        leave the streak untouched."""
+    def _oscillation_penalty(self, events, threat_dist, breakdown, explore_step=False):
         if explore_step:
             return
         if events.get("oscillating", False) and not (
             events.get("pellet_eaten", False) or events.get("super_pellet_eaten", False)
         ):
+            if threat_dist < 4:
+                self.osc_streak = 0
+                return
             self.osc_streak += 1
-            breakdown["oscillation"] = OSCILLATION_REWARD * min(self.osc_streak, 3)
+            if self.osc_streak >= 3:
+                breakdown["oscillation"] = -2.0  # flat small penalty
         else:
             self.osc_streak = 0
 
@@ -199,9 +193,9 @@ class RewardCalculator:
         d = min_ghost_dist_after
         # Static repulsion: the closer, the stronger
         if d == 1:
-            breakdown["ghost_proximity"] -= 4.0
+            breakdown["ghost_proximity"] -= 2.0
         elif d == 2:
-            breakdown["ghost_proximity"] -= 1.5
+            breakdown["ghost_proximity"] -= 0.75
         elif d == 3:
             breakdown["ghost_proximity"] -= 0.5
         elif d == 4:
@@ -364,10 +358,11 @@ class RewardCalculator:
         breakdown: dict[str, float],
     ) -> None:
         if not powered and threatening > 0:
-            if min_threat_dist >= 5:
-                breakdown["survival_truncation"] += 0.5
-            elif min_threat_dist >= 3:
-                breakdown["survival_truncation"] += 0.1
+            breakdown["survival_truncation"] += (
+                0.25
+                if min_threat_dist >= 5
+                else (0.05 if min_threat_dist >= 3 else 0.1)
+            )
         else:
             breakdown["survival_truncation"] += 0.2
 
@@ -490,19 +485,39 @@ class RewardCalculator:
         self._exploration_reward(px, py, breakdown)
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
 
-        # self._bfs_shaping(bfs_shaping, breakdown)
-        # self._milestone_reward(frac, breakdown)
-        # self._zone_stagnation_penalty(px, py, breakdown)
+        # Dense navigation guidance — use the BFS work you're already paying for
+        if bfs_shaping != 0.0:
+            self._bfs_shaping(bfs_shaping, breakdown)
 
-        # self._ghost_proximity_penalty(
-        #     min_ghost_dist_after,
-        #     min_ghost_dist_before,
-        #     events,
-        #     powered,
-        #     breakdown,
-        # )
+        # Gradual ghost-avoidance gradient — THE most important missing signal
+        self._ghost_proximity_penalty(
+            min_ghost_dist_after,
+            min_ghost_dist_before,
+            events,
+            powered,
+            breakdown,
+        )
+
+        # Credit for escaping a close ghost
+        self._evasion_skill_reward(min_ghost_dist_after, breakdown)
+
+        # Mild corner penalty (anti-trap)
+        self._zone_control_reward(
+            px,
+            py,
+            maze,
+            threatening,
+            powered,
+            breakdown,
+        )
+
+        # Milestones — break the +1000 completion into reachable chunks
+        # self._milestone_reward(frac, breakdown)
+
+        # Survival bonus — give the value function a positive terminal to aim for
+        self._dense_survival_reward(threatening, min_threat_dist, powered, breakdown)
+
         self.last_min_ghost_dist = (
             min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist
         )
-
         return sum(breakdown.values()), breakdown

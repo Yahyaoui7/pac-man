@@ -24,7 +24,7 @@ MAZE_STEP_MULTIPLIER = 12.0
 # ═══════════════════════════════════════════════════════════════════
 
 STEP_REWARD = -0.1
-DEATH_REWARD = -350.0
+DEATH_REWARD = -50.0
 OSCILLATION_REWARD = -10.0
 COMPLETION_REWARD = 1000.0
 EAT_GHOST_REWARD = 150.0
@@ -45,7 +45,7 @@ BAIT_SUPER_PELLET_RADIUS = 4
 CORNERED_MIN_MOVES = 4
 NEAR_GHOST_DIST = 2
 
-LIVES = 2
+LIVES = 3
 
 # ═══════════════════════════════════════════════════════════════════
 # Telemetry (leading indicators for trap-avoidance learning)

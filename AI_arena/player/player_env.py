@@ -204,9 +204,13 @@ class PacmanPlayerEnv:
         mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
         mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
 
-        maze_w = self.rng.randint(mw_min, mw_max)
-        maze_h = self.rng.randint(mh_min, mh_max)
-        current_seed = self.rng.randint(1, 44444)
+        # maze_w = self.rng.randint(mw_min, mw_max)
+        # maze_h = self.rng.randint(mh_min, mh_max)
+        # current_seed = self.rng.randint(1, 44444)
+
+        maze_w = 25
+        maze_h = 20
+        current_seed = 20
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze

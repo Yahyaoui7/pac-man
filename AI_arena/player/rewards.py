@@ -90,7 +90,7 @@ class RewardCalculator:
         cell = (py, px)
         if cell not in self.visited_this_episode:
             self.visited_this_episode.add(cell)
-            breakdown["exploration"] = 1.0
+            breakdown["exploration"] = 0.1
 
     def _ghost_eat_reward(
         self, events: dict[str, bool], breakdown: dict[str, float]
@@ -129,9 +129,9 @@ class RewardCalculator:
     def _hunger_penalty(
         self, steps_since_pellet: int, breakdown: dict[str, float]
     ) -> None:
-        grace = 25
+        grace = 40
         if steps_since_pellet > grace:
-            breakdown["hunger"] = -0.5
+            breakdown["hunger"] = -0.3
 
     def _pellet_reward(
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
@@ -488,7 +488,7 @@ class RewardCalculator:
         # Dense navigation guidance — use the BFS work you're already paying for
         if bfs_shaping != 0.0:
             self._bfs_shaping(bfs_shaping, breakdown)
-
+        self._hunger_penalty(steps_since_pellet, breakdown)
         # Gradual ghost-avoidance gradient — THE most important missing signal
         self._ghost_proximity_penalty(
             min_ghost_dist_after,
@@ -515,7 +515,6 @@ class RewardCalculator:
         # self._milestone_reward(frac, breakdown)
 
         # Survival bonus — give the value function a positive terminal to aim for
-        self._dense_survival_reward(threatening, min_threat_dist, powered, breakdown)
 
         self.last_min_ghost_dist = (
             min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist

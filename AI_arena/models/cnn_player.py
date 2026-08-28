@@ -18,11 +18,21 @@ class PlayerActorCritic(nn.Module):
     def __init__(self, extra_feature_count: int = EXTRA_FEATURE_COUNT) -> None:
         super().__init__()
         self.backbone = PacmanCNNBackbone(
-            dropout_prob=0.0,
+            dropout_prob=0.1,
             extra_feature_count=extra_feature_count,
+            gru_hidden_size=384,
         )
-        self.actor = nn.Linear(128, ACTION_COUNT)
-        self.critic = nn.Linear(128, 1)
+        # Deeper heads, but with LeakyReLU (safe in float16)
+        self.actor = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.1),
+            nn.Linear(128, ACTION_COUNT)
+        )
+        self.critic = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.1),
+            nn.Linear(128, 1)
+        )
 
     def forward(
         self,
@@ -31,18 +41,10 @@ class PlayerActorCritic(nn.Module):
         hidden: Tensor | None = None,
         dones: Tensor | None = None,
     ) -> tuple[Tensor, Tensor, Tensor]:
-        """
-        Returns:
-            logits: (batch, 4) or (batch, seq_len, 4)
-            value: (batch, 1) or (batch, seq_len, 1)
-            hidden: (1, batch, 128) — pass to next step
-        """
         latent, hidden = self.backbone(grid, extra_features, hidden, dones=dones)
         logits = self.actor(latent)
         value = self.critic(latent)
         return logits, value, hidden
-
-
 class PlayerImitationCNN(nn.Module):
     def __init__(self, extra_feature_count: int = EXTRA_FEATURE_COUNT) -> None:
         super().__init__()

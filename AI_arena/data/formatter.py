@@ -25,6 +25,65 @@ class ObservationFormatter:
     """Centralized observation builder creating identical tensors for Pac-Man and Ghost models."""
 
     @staticmethod
+    def _paint_entity_patch(
+        channel: torch.Tensor, cy: int, cx: int, height: int, width: int
+    ) -> None:
+        """Paint a 3×3 graduated heat map patch (center=1.0, orthogonal=0.5, diagonal=0.25).
+
+        Natural border clipping is preserved; out-of-bounds cells remain implicit 0s.
+        """
+        pattern = (
+            (0, 0, 1.00),
+            (-1, 0, 0.50),
+            (1, 0, 0.50),
+            (0, -1, 0.50),
+            (0, 1, 0.50),
+            (-1, -1, 0.25),
+            (-1, 1, 0.25),
+            (1, -1, 0.25),
+            (1, 1, 0.25),
+        )
+        for dy, dx, val in pattern:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < height and 0 <= nx < width:
+                channel[ny, nx] = torch.maximum(
+                    channel[ny, nx],
+                    torch.tensor(val, device=channel.device, dtype=channel.dtype),
+                )
+
+    @staticmethod
+    def _paint_signed_ghost_patch(
+        channel: torch.Tensor,
+        cy: int,
+        cx: int,
+        height: int,
+        width: int,
+        is_edible: bool,
+    ) -> None:
+        """Paint signed 3x3 ghost patch: Positive for non-edible (danger), Negative for edible."""
+        sign = -1.0 if is_edible else 1.0
+        pattern = (
+            (0, 0, 1.00),
+            (-1, 0, 0.50),
+            (1, 0, 0.50),
+            (0, -1, 0.50),
+            (0, 1, 0.50),
+            (-1, -1, 0.25),
+            (-1, 1, 0.25),
+            (1, -1, 0.25),
+            (1, 1, 0.25),
+        )
+        for dy, dx, val in pattern:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < height and 0 <= nx < width:
+                target = sign * val
+                curr = channel[ny, nx].item()
+                if is_edible:
+                    channel[ny, nx] = min(curr, target)
+                else:
+                    channel[ny, nx] = max(curr, target)
+
+    @staticmethod
     def format_observation(
         maze: list[list[int]],
         pellets: list[list[int]],
@@ -36,7 +95,7 @@ class ObservationFormatter:
         last_action: int | None = None,
         visit_counts: (
             list[list[int]] | None
-        ) = None,  # ← CHANGED: int visit counts per cell
+        ) = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Construct unified tensors efficiently."""
         device = torch.device(device)
@@ -53,8 +112,8 @@ class ObservationFormatter:
         maze_tensor = torch.tensor(maze, dtype=torch.int32, device=device)
         pellets_tensor = torch.tensor(pellets, dtype=torch.int32, device=device)
 
-        # Channel 0: Walkable (1 = can walk, 0 = wall)
-        grid[0, 0, :height, :width] = (maze_tensor != 15).float()
+        # Channel 0: Raw Maze Bitmask Topology (maze[y][x] / 15.0)
+        grid[0, 0, :height, :width] = maze_tensor.float() / 15.0
 
         # Channel 1: Normal pellets
         grid[0, 1, :height, :width] = (pellets_tensor == 1).float()
@@ -62,31 +121,22 @@ class ObservationFormatter:
         # Channel 2: Power pellets
         grid[0, 2, :height, :width] = (pellets_tensor == 2).float()
 
-        # Channel 3: Player position
+        # Channel 3: Player position (3×3 positive heat map patch)
         px, py = player_pos
         py = max(0, min(CNN_HEIGHT - 1, py))
         px = max(0, min(CNN_WIDTH - 1, px))
-        grid[0, 3, py, px] = 1.0
+        ObservationFormatter._paint_entity_patch(grid[0, 3], py, px, height, width)
 
-        # Channels 4 & 5: Ghost counts (non-edible vs edible)
+        # Channel 4: Signed Ghost positions (Positive = dangerous, Negative = edible)
         for idx in range(min(GHOST_COUNT, len(ghost_states))):
             gst = ghost_states[idx]
             gx, gy = gst["grid_x"], gst["grid_y"]
             gy = max(0, min(CNN_HEIGHT - 1, gy))
             gx = max(0, min(CNN_WIDTH - 1, gx))
-            if gst.get("is_edible", False):
-                grid[0, 5, gy, gx] += 1.0
-            else:
-                grid[0, 4, gy, gx] += 1.0
-
-        # Channel 6: Visit-count heatmap (0.0 = never visited, 1.0 = visited 10+ times)
-        # NOTE: CNN_CHANNEL_COUNT must be >= 7
-        if CNN_CHANNEL_COUNT > 6 and visit_counts is not None:
-            for y in range(height):
-                for x in range(width):
-                    c = visit_counts[y][x]
-                    if c > 0:
-                        grid[0, 6, y, x] = min(float(c) / VISIT_COUNT_NORMALIZE, 1.0)
+            is_edible = gst.get("is_edible", False)
+            ObservationFormatter._paint_signed_ghost_patch(
+                grid[0, 4], gy, gx, height, width, is_edible=is_edible
+            )
 
         # Build Extra Features
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]

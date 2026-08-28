@@ -90,6 +90,9 @@ def run_evaluation(
                 grid.to(device_t), features.to(device_t), hidden
             )
             masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e4)
+            masked_logits = torch.nan_to_num(
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+            )
             if greedy:
                 action = int(torch.argmax(masked_logits, dim=-1).item())
             else:

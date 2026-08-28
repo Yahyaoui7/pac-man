@@ -116,7 +116,7 @@ def load_sl_weights_into_ppo(
 
 def main() -> None:
     model = PlayerActorCritic()
-    dummy_grid = torch.zeros((2, CNN_CHANNEL_COUNT, 50, 25), dtype=torch.float32)
+    dummy_grid = torch.zeros((2, CNN_CHANNEL_COUNT, 25, 50), dtype=torch.float32)
     dummy_features = torch.zeros((2, EXTRA_FEATURE_COUNT), dtype=torch.float32)
 
     # Test with hidden state

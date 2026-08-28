@@ -85,7 +85,7 @@ class PacmanPlayerEnv:
         self.region_pellets_initial: dict[tuple[int, int], int] = {}  # ← NEW
         self.last_region: tuple[int, int] | None = None
 
-        self.use_reverse_mask = False
+        self.use_reverse_mask = True
         self.use_bfs_shaping = use_bfs_shaping
         self.bfs_shaping_gamma = 0.99
 
@@ -742,11 +742,25 @@ class PacmanPlayerEnv:
                 # No single band fits — spread uniformly over ALL candidates
                 # (never fall back to far-only placement).
                 chosen = self.rng.sample(candidates, min(count, len(candidates)))
+            valid_sp_locs = [
+                (y, x)
+                for y in range(height)
+                for x in range(width)
+                if pellets[y][x] == 2
+            ]
             pellets = [[0] * width for _ in range(height)]
             total = 0
+            # Include 2 super pellets in curriculum mode so Pac-Man has defensive tools (only when count > 2)
+            if valid_sp_locs and count > 2:
+                sp_chosen = self.rng.sample(valid_sp_locs, min(2, len(valid_sp_locs)))
+                for sy, sx in sp_chosen:
+                    pellets[sy][sx] = 2
+                    total += 1
+
             for _, gy, gx in chosen:
-                pellets[gy][gx] = 1
-                total += 1
+                if pellets[gy][gx] == 0:
+                    pellets[gy][gx] = 1
+                    total += 1
 
         self.pellets = pellets
         self.total_pellets = total
@@ -939,11 +953,14 @@ class PacmanPlayerEnv:
         )
 
         if self.last_action is not None and self.use_reverse_mask:
-            rev = self._reverse_action(self.last_action)
-            if valid_player_actions[0, rev]:
-                if valid_player_actions.sum().item() > 1:
-                    valid_player_actions = valid_player_actions.clone()
-                    valid_player_actions[0, rev] = False
+            # Reversals are masked when safe (ghost dist >= 4 or unthreatened) to prevent 50%+ oscillation.
+            # When ghosts are close (< 4), reversals are unmasked so Pac-Man can retreat.
+            if self.prev_nearest_ghost_dist < 0 or self.prev_nearest_ghost_dist >= 4:
+                rev = self._reverse_action(self.last_action)
+                if valid_player_actions[0, rev]:
+                    if valid_player_actions.sum().item() > 1:
+                        valid_player_actions = valid_player_actions.clone()
+                        valid_player_actions[0, rev] = False
 
         return grid, extra_features, valid_player_actions
 

@@ -1,4 +1,4 @@
-"""CNN-GRU backbone for Pac-Man with temporal memory."""
+"""CNN-GRU backbone v2 — Dual-Tower, numerically stable for AMP."""
 
 from __future__ import annotations
 
@@ -22,53 +22,110 @@ class ResBlock(nn.Module):
         return self.relu(out + x)
 
 
+class SEBlock(nn.Module):
+    """Channel attention — lets the CNN learn 'ghost channels matter now'."""
+    def __init__(self, channels: int, reduction: int = 4) -> None:
+        super().__init__()
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channels // reduction, channels, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        b, c, _, _ = x.shape
+        w = self.pool(x).view(b, c)
+        w = self.fc(w).view(b, c, 1, 1)
+        return x * w
+
+
 class PacmanCNNBackbone(nn.Module):
-    """Spatial CNN encoder + GRU temporal memory."""
+    """Spatial CNN + Scalar MLP, fused equally.  No gating (kept it simple
+    and stable).  Scalars are 50% of the fusion input — 75× louder than
+    the old 0.66%."""
 
     def __init__(
         self,
         dropout_prob: float = 0.1,
         extra_feature_count: int = EXTRA_FEATURE_COUNT,
+        gru_hidden_size: int = 384,
+        gru_num_layers: int = 2,
     ) -> None:
         super().__init__()
 
-        # ── CNN: per-frame spatial encoder (identical to your current one) ──
+        self.gru_hidden_size = gru_hidden_size
+        self.gru_num_layers = gru_num_layers
+
+        # ── Spatial tower (dense map information) ──
         self.cnn = nn.Sequential(
-            nn.Conv2d(CNN_CHANNEL_COUNT, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            ResBlock(32, dilation=1),
-            ResBlock(32, dilation=2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=4, dilation=4),
-            nn.ReLU(),
-            ResBlock(64, dilation=4),
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(CNN_CHANNEL_COUNT, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             ResBlock(64, dilation=1),
-            nn.Conv2d(64, 32, kernel_size=1),
+            ResBlock(64, dilation=2),
+            SEBlock(64),
+            nn.Conv2d(64, 64, kernel_size=3, padding=4, dilation=4),
+            nn.ReLU(),
+            ResBlock(64, dilation=4),
+            SEBlock(64),
+            nn.Conv2d(64, 32, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            ResBlock(32, dilation=1),
+        )
+
+        # Two-stage compression: less brutal than 10,400 → 256 in one shot
+        self.spatial_compress = nn.Sequential(
+            nn.Linear(32 * 25 * 13, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
             nn.ReLU(),
         )
 
-        flat_dim = 32 * 25 * 13  # 10,400
-        total_dim = flat_dim + extra_feature_count  # 10,445
-
-        # ── Projection to GRU input size ──
-        self.proj = nn.Sequential(
-            nn.Linear(total_dim, 128),
-            nn.ReLU(),
-        )
-
-        # ── GRU: the memory cell ──
-        # input_size = 128 (from proj)
-        # hidden_size = 128 (memory capacity)
-        # batch_first = True because we feed (batch, seq=1, features)
-        self.gru = nn.GRU(128, 128, batch_first=True)
-
-        # ── Output head ──
-        self.out = nn.Sequential(
+        # ── Scalar tower (exact coordinates, danger flags, deltas) ──
+        # LeakyReLU preserves sign (negative = left / moving away) but is
+        # piecewise-linear, so it cannot overflow in float16 like GELU.
+        self.scalar_encoder = nn.Sequential(
+            nn.LayerNorm(extra_feature_count),
+            nn.Linear(extra_feature_count, 128),
+            nn.LeakyReLU(0.1),
             nn.Linear(128, 128),
+            nn.LeakyReLU(0.1),
+        )
+
+        # ── Fusion: 128 (spatial) + 128 (scalar) = 256 ──
+        self.fusion = nn.Sequential(
+            nn.Linear(128 + 128, 256),
+            nn.ReLU(),
+            nn.Dropout(dropout_prob),
+            nn.Linear(256, gru_hidden_size),
+            nn.ReLU(),
+        )
+
+        # ── GRU memory ──
+        self.gru = nn.GRU(
+            gru_hidden_size, gru_hidden_size,
+            num_layers=gru_num_layers, batch_first=True
+        )
+
+        self.out = nn.Sequential(
+            nn.Linear(gru_hidden_size, 256),
             nn.ReLU(),
             nn.Dropout(dropout_prob),
         )
+
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        """Xavier init is safer than Kaiming when activations are mixed
+        (ReLU + LeakyReLU)."""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
 
     def forward(
         self,
@@ -77,58 +134,64 @@ class PacmanCNNBackbone(nn.Module):
         hidden: Tensor | None = None,
         dones: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
-        """
-        Args:
-            grid: (batch, 7, 25, 50) or (batch, seq_len, 7, 25, 50)
-            extra_features: (batch, extra_feature_count) or (batch, seq_len, extra_feature_count)
-            hidden: (1, batch, 128) or None
-            dones: (batch, seq_len) or (batch, seq_len, 1) or None — 1.0 if step is after reset
-
-        Returns:
-            latent: (batch, 128) or (batch, seq_len, 128)
-            hidden: (1, batch, 128)
-        """
+        # ═══════════════════════════════════════════════════════════════
+        #  Sequence chunk mode: (batch, seq_len, C, H, W)
+        # ═══════════════════════════════════════════════════════════════
         if grid.ndim == 5:
-            # Sequence chunk mode: (batch, seq_len, channels, height, width)
             b, l, c, h, w = grid.shape
             grid_flat = grid.reshape(b * l, c, h, w)
             extra_flat = extra_features.reshape(b * l, -1)
 
-            x = self.cnn(grid_flat)
-            x = torch.flatten(x, start_dim=1)
-            x = torch.cat((x, extra_flat), dim=1)
-            x = self.proj(x)  # (b * l, 128)
+            # Spatial path
+            x_s = self.cnn(grid_flat)
+            x_s = torch.flatten(x_s, start_dim=1)
+            x_s = self.spatial_compress(x_s)          # [B*L, 128]
 
-            x = x.view(b, l, 128)  # (batch, seq_len, 128)
+            # Scalar path
+            x_sc = self.scalar_encoder(extra_flat)     # [B*L, 128]
 
+            # Equal-weight fusion: scalars are 50% of the input
+            x_f = torch.cat([x_s, x_sc], dim=-1)      # [B*L, 256]
+            x_f = self.fusion(x_f)                     # [B*L, gru_hidden_size]
+            x_f = x_f.view(b, l, self.gru_hidden_size)
+
+            # GRU with reset-safe masking
             if dones is not None:
-                dones_tensor = dones.view(b, l, 1).to(device=grid.device, dtype=x.dtype)
+                dones_t = dones.view(b, l, 1).to(device=grid.device, dtype=x_f.dtype)
                 h = (
                     hidden
                     if hidden is not None
-                    else torch.zeros(1, b, 128, device=grid.device, dtype=x.dtype)
+                    else torch.zeros(
+                        self.gru_num_layers, b, self.gru_hidden_size,
+                        device=grid.device, dtype=x_f.dtype,
+                    )
                 )
                 outs: list[Tensor] = []
                 for t in range(l):
-                    mask = dones_tensor[:, t : t + 1].permute(1, 0, 2)  # (1, b, 1)
+                    mask = dones_t[:, t : t + 1].permute(1, 0, 2)  # (1, b, 1)
                     h = h * (1.0 - mask)
-                    out_t, h = self.gru(x[:, t : t + 1], h)
+                    out_t, h = self.gru(x_f[:, t : t + 1], h)
                     outs.append(out_t)
                 out = torch.cat(outs, dim=1)
                 hidden = h
             else:
-                out, hidden = self.gru(x, hidden)  # out: (batch, seq_len, 128)
+                out, hidden = self.gru(x_f, hidden)
 
             return self.out(out), hidden
 
-        # Single step mode: (batch, channels, height, width)
-        x = self.cnn(grid)
-        x = torch.flatten(x, start_dim=1)
-        x = torch.cat((x, extra_features), dim=1)
-        x = self.proj(x)  # (batch, 128)
+        # ═══════════════════════════════════════════════════════════════
+        #  Single step mode: (batch, C, H, W)
+        # ═══════════════════════════════════════════════════════════════
+        x_s = self.cnn(grid)
+        x_s = torch.flatten(x_s, start_dim=1)
+        x_s = self.spatial_compress(x_s)
 
-        x = x.unsqueeze(1)  # (batch, 1, 128)
-        out, hidden = self.gru(x, hidden)
-        out = out.squeeze(1)  # (batch, 128)
+        x_sc = self.scalar_encoder(extra_features)
+
+        x_f = torch.cat([x_s, x_sc], dim=-1)
+        x_f = self.fusion(x_f).unsqueeze(1)
+
+        out, hidden = self.gru(x_f, hidden)
+        out = out.squeeze(1)
 
         return self.out(out), hidden

@@ -599,6 +599,7 @@ class PacmanTrainer:
         self.current_ep_steps += 1
         return next_obs, reward, done, info
 
+
     def _handle_step_outcome(
         self,
         done: bool,
@@ -611,9 +612,9 @@ class PacmanTrainer:
             self.policy_hidden = None
             if done:
                 self.obs = self.env.reset()
-                ep_record = self._build_episode_record(info)
+                ep_record = self._build_episode_record(info)  # ← assign to variable
                 buf.finished_episodes.append(ep_record)
-                self.recent_episodes.append(ep_record)  # ← add this line
+                self.recent_episodes.append(ep_record)  # ← now it's defined
                 self.current_ep_reward = 0.0
                 self.current_ep_steps = 0
                 self.total_completed_episodes += 1

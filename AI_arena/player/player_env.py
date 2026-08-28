@@ -199,10 +199,10 @@ class PacmanPlayerEnv:
         self._reward_calc.reset()
         # self.reward_calculator.reset()
         # ← NEW: curriculum-friendly sizing
-        mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
-        mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
-        mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
-        mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
+        # mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
+        # mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
+        # mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
+        # mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
 
         # maze_w = self.rng.randint(mw_min, mw_max)
         # maze_h = self.rng.randint(mh_min, mh_max)
@@ -210,7 +210,8 @@ class PacmanPlayerEnv:
 
         maze_w = 25
         maze_h = 20
-        current_seed = 20
+        fixed_seeds = [20, 77, 1337]
+        current_seed = fixed_seeds[self.rng.randint(0, len(fixed_seeds) - 1)]
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze

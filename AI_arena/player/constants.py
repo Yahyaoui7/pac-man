@@ -28,7 +28,7 @@ DEATH_REWARD = -50.0
 OSCILLATION_REWARD = -10.0
 COMPLETION_REWARD = 1000.0
 EAT_GHOST_REWARD = 150.0
-PELLET_REWARD = 1.5
+PELLET_REWARD = 3.0
 SUPER_PELLET_REWARD = 5.0
 
 SURVIVAL_TRUNCATION_BASE = 10.0
@@ -58,8 +58,9 @@ ESCAPE_CONFIRM_STEPS = 8
 # Milestones
 # ═══════════════════════════════════════════════════════════════════
 MILESTONE_REWARDS = {
-    0.50: 20.0,
-    0.75: 50.0,
-    0.85: 100.0,
-    0.95: 200.0,
+    0.25: 15.0,  # NEW — first quarter, reachable with 8 pellets
+    0.40: 30.0,  # NEW
+    0.60: 60.0,  # was 0.50: 20.0
+    0.75: 100.0,  # was 0.75: 50.0
+    0.90: 200.0,  # was 0.95: 200.0
 }

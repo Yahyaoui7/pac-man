@@ -1,0 +1,41 @@
+{
+    "description": "Configuration containing 5 standard mazes with odd dimensions for proper maze generation",
+    "lives": 20,
+    "points_per_pacgum": 10,
+    "points_per_super_pacgum": 50,
+    "points_per_ghost": 200,
+    "time_bonus_multiplier": 10,
+    "highscore_filename": "highscores.json",
+    "levels": [
+        {
+            "width": 21,
+            "height": 21,
+            "seed": 42,
+            "level_max_time": 180
+        },
+        {
+            "width": 23,
+            "height": 21,
+            "seed": 100,
+            "level_max_time": 200
+        },
+        {
+            "width": 25,
+            "height": 23,
+            "seed": 250,
+            "level_max_time": 220
+        },
+        {
+            "width": 25,
+            "height": 25,
+            "seed": 500,
+            "level_max_time": 240
+        },
+        {
+            "width": 21,
+            "height": 25,
+            "seed": 999,
+            "level_max_time": 200
+        }
+    ]
+}

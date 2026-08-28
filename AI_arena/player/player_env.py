@@ -1,5 +1,7 @@
 from collections import deque
+import json
 import os
+from pathlib import Path
 import random
 from typing import Any
 
@@ -63,6 +65,10 @@ class PacmanPlayerEnv:
         self.step_count = 0
         self.seed = seed
         self.rng = random.Random(seed)
+
+        config_path = Path(__file__).parent.parent.parent / "standard_mazes_config.json"
+        with open(config_path, "r") as f:
+            self.standard_levels = json.load(f)["levels"]
 
         self.maze: list[list[int]] | None = None
         self.movement: MovementSystem | None = None
@@ -198,16 +204,28 @@ class PacmanPlayerEnv:
 
         self._reward_calc.reset()
         # self.reward_calculator.reset()
-        # ← NEW: curriculum-friendly sizing
-        mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
-        mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
-        mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
-        mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
-
-        maze_w = self.rng.randint(mw_min, mw_max)
-        maze_h = self.rng.randint(mh_min, mh_max)
-        current_seed = self.rng.randint(1, 44444)
-
+        # Check if we are using the new random sizes
+        if self._maze_w_min is not None and self._maze_w_max is not None:
+            # Pick a random odd number for width and height
+            maze_w = self.rng.randrange(
+                self._maze_w_min, self._maze_w_max + 1, 2
+            )
+            maze_h = self.rng.randrange(
+                self._maze_h_min, self._maze_h_max + 1, 2
+            )
+            # Create a random seed
+            current_seed = (
+                self.seed
+                if self.seed is not None
+                else self.rng.randint(0, 999999)
+            )
+        else:
+            # Fall back to the 5 standard mazes
+            level_choice = self.rng.choice(self.standard_levels)
+            maze_w = level_choice["width"]
+            maze_h = level_choice["height"]
+            current_seed = level_choice["seed"]
+            
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
         self.movement = MovementSystem(self.maze)

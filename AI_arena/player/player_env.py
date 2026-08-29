@@ -204,6 +204,7 @@ class PacmanPlayerEnv:
 
         self._reward_calc.reset()
         # self.reward_calculator.reset()
+
         # Check if we are using the new random sizes
         if self._maze_w_min is not None and self._maze_w_max is not None:
             # Pick a random odd number for width and height
@@ -225,6 +226,7 @@ class PacmanPlayerEnv:
             maze_w = level_choice["width"]
             maze_h = level_choice["height"]
             current_seed = level_choice["seed"]
+
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze

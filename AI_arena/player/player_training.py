@@ -559,9 +559,9 @@ class PacmanTrainer:
                 features.to(self.device),
                 self.policy_hidden,
             )
-            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e4)
+            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e8)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
             )
 
             if self.cfg.rollout_epsilon > 0:
@@ -601,7 +601,6 @@ class PacmanTrainer:
         self.current_ep_reward += reward
         self.current_ep_steps += 1
         return next_obs, reward, done, info
-
 
     def _handle_step_outcome(
         self,
@@ -772,9 +771,9 @@ class PacmanTrainer:
             logits, values, _ = self.policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            masked_logits = logits.masked_fill(~mb_valid, -1e4)
+            masked_logits = logits.masked_fill(~mb_valid, -1e8)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
             )
             dist = Categorical(logits=masked_logits)
 
@@ -822,9 +821,9 @@ class PacmanTrainer:
             ref_logits, _, _ = self.ref_policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
+            ref_masked = ref_logits.masked_fill(~mb_valid, -1e8)
             ref_masked = torch.nan_to_num(
-                ref_masked, nan=-1e4, posinf=10.0, neginf=-1e4
+                ref_masked, nan=-1e8, posinf=10.0, neginf=-1e8
             )
             ref_probs = F.softmax(ref_masked, dim=-1)
             ref_log_p = F.log_softmax(ref_masked, dim=-1)

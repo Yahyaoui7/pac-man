@@ -114,7 +114,6 @@ class ObservationFormatter:
 
         # Channel 0: Raw Maze Bitmask Topology (maze[y][x] / 15.0)
         grid[0, 0, :height, :width] = maze_tensor.float() / 15.0
-
         # Channel 1: Normal pellets
         grid[0, 1, :height, :width] = (pellets_tensor == 1).float()
 
@@ -130,6 +129,8 @@ class ObservationFormatter:
         # Channel 4: Signed Ghost positions (Positive = dangerous, Negative = edible)
         for idx in range(min(GHOST_COUNT, len(ghost_states))):
             gst = ghost_states[idx]
+            if gst.get("in_prison", False):
+                continue
             gx, gy = gst["grid_x"], gst["grid_y"]
             gy = max(0, min(CNN_HEIGHT - 1, gy))
             gx = max(0, min(CNN_WIDTH - 1, gx))
@@ -137,6 +138,9 @@ class ObservationFormatter:
             ObservationFormatter._paint_signed_ghost_patch(
                 grid[0, 4], gy, gx, height, width, is_edible=is_edible
             )
+
+        # Channel 5: Walkable Path & Active Map Mask (1.0 = Walkable cell inside active maze, 0.0 = Wall or Padded region)
+        grid[0, 5, :height, :width] = (maze_tensor != 15).float()
 
         # Build Extra Features
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]

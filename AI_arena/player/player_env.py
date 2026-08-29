@@ -99,7 +99,7 @@ class PacmanPlayerEnv:
         self.episode_telemetry: dict[str, float] = {}
         self._in_corner_threat = False
         self._open_escape_deadline = -1
-        self.ghost_confusion_prob = 0.30  # REMOVE
+        self.ghost_confusion_prob = 0.01 # REMOVE
         self.death_count = 0
 
         # ← NEW: spatial / temporal memory state
@@ -216,22 +216,33 @@ class PacmanPlayerEnv:
         self.movement.rng.seed(current_seed)
         self._ghost_ctrl.movement = self.movement
 
-        # Dynamic max steps based on maze size
-        maze_size = maze_w * maze_h
-        if self.user_max_steps is None:
-            self.max_steps = int(maze_size * MAZE_STEP_MULTIPLIER)
-        else:
-            self.max_steps = self.user_max_steps
-
         # Create Player and Ghosts
         self.player = EntityFactory.create_player(self.maze)
         self.ghosts = EntityFactory.create_ghosts(self.maze, GHOST_SPECS)
+        if self.stage == 1:
+            for g in self.ghosts:
+                g.in_prison = True
+                g.is_edible = False
 
         # Create Pellets
         n_pellets = None
         if self.start_pellets:
             n_pellets = int(self.rng.choice(list(self.start_pellets)))
         self._create_pellets(n_pellets)
+
+        # Dynamic max steps based on maze size and actual pellet count
+        maze_size = maze_w * maze_h
+        if self.user_max_steps is None:
+            base_steps = int(maze_size * MAZE_STEP_MULTIPLIER)
+            if self.start_pellets is not None:
+                # Curriculum mode: cap proportionally to actual pellets spawned so episodes end fast if agent gets lost
+                n_actual = len(self.pellets) if self.pellets else (max(self.start_pellets) if self.start_pellets else 8)
+                tight_budget = n_actual * 65 + (maze_w + maze_h) * 4
+                self.max_steps = min(base_steps, max(150, tight_budget))
+            else:
+                self.max_steps = base_steps
+        else:
+            self.max_steps = self.user_max_steps
 
         # ── BFS potential shaping ──
         if self.use_bfs_shaping:

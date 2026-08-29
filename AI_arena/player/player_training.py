@@ -113,14 +113,14 @@ class TrainingConfig:
 
     # ── Core loop ──
     stage: int = 2
-    num_updates: int = 1000
+    num_updates: int = 1500
     rollout_steps: int = 3000
-    seq_len: int = 16
-    minibatch_seqs: int = 16
+    seq_len: int = 32
+    minibatch_seqs: int = 8
     ppo_epochs: int = 1
 
     # ── Optimization ──
-    learning_rate: float = 1e-4
+    learning_rate: float = 3e-4
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_eps: float = 0.2
@@ -147,6 +147,11 @@ class TrainingConfig:
     eval_device: str = "cpu"
     eval_stall_patience: int = 5
     eval_min_improvement: float = 2.0
+
+    # ── Auto-curriculum ──
+    auto_curriculum: bool = True
+    stage1_grad_threshold: float = 0.80  # eval completion rate to graduate stage 1 → 2
+    stage1_grad_evals: int = 2           # consecutive evals above threshold to graduate
 
     # ── Paths ──
     model_dir: Path = field(
@@ -201,6 +206,9 @@ class TrainingConfig:
             start_pellets=_parse_pellets(args.start_pellets),
             use_bfs_shaping=not args.no_bfs_shaping,
             eval_episodes=args.eval_episodes,
+            auto_curriculum=args.auto_curriculum,
+            stage1_grad_threshold=args.grad_threshold,
+            stage1_grad_evals=args.grad_evals,
         )
 
         # Paths: only override if the user explicitly passed them.
@@ -223,23 +231,23 @@ class TrainingConfig:
         )
 
         # ── Core loop ──
-        p.add_argument("--stage", type=int, default=2, help="training stage (1 or 2)")
+        p.add_argument("--stage", type=int, default=1, help="training stage (1=ghost-free, 2=full ghosts)")
         p.add_argument(
             "--updates", type=int, default=1000, help="number of PPO updates"
         )
         p.add_argument(
             "--rollout-steps", type=int, default=3000, help="env steps per rollout"
         )
-        p.add_argument("--seq-len", type=int, default=16, help="BPTT sequence length")
+        p.add_argument("--seq-len", type=int, default=32, help="BPTT sequence length")
         p.add_argument(
-            "--minibatch-seqs", type=int, default=16, help="sequences per minibatch"
+            "--minibatch-seqs", type=int, default=8, help="sequences per minibatch"
         )
         p.add_argument(
             "--ppo-epochs", type=int, default=1, help="PPO epochs per rollout"
         )
 
         # ── Optimization ──
-        p.add_argument("--lr", type=float, default=1e-4, help="learning rate")
+        p.add_argument("--lr", type=float, default=3e-4, help="learning rate")
         p.add_argument(
             "--entropy", type=float, default=0.04, help="entropy coefficient"
         )
@@ -284,6 +292,27 @@ class TrainingConfig:
         # ── Evaluation ──
         p.add_argument(
             "--eval-episodes", type=int, default=20, help="episodes per eval run"
+        )
+
+        # ── Auto-curriculum ──
+        p.add_argument(
+            "--no-auto-curriculum",
+            action="store_false",
+            dest="auto_curriculum",
+            help="disable automatic stage 1 → 2 graduation",
+        )
+        p.set_defaults(auto_curriculum=True)
+        p.add_argument(
+            "--grad-threshold",
+            type=float,
+            default=0.80,
+            help="eval completion rate needed to graduate stage 1 → 2 (default: 0.80)",
+        )
+        p.add_argument(
+            "--grad-evals",
+            type=int,
+            default=2,
+            help="consecutive evals above threshold required to graduate (default: 2)",
         )
 
         # ── Paths ──
@@ -359,12 +388,9 @@ class PacmanTrainer:
 
         # Paths
         self.cfg.model_dir.mkdir(parents=True, exist_ok=True)
-        self.checkpoint_path = (
-            self.cfg.model_dir / f"player_rl_stage{self.cfg.stage}.pt"
-        )
-        self.best_checkpoint_path = (
-            self.cfg.model_dir / f"player_rl_stage{self.cfg.stage}_best.pt"
-        )
+        # Single unified checkpoint — same weights used across all curriculum stages
+        self.checkpoint_path = self.cfg.model_dir / "player_rl.pt"
+        self.best_checkpoint_path = self.cfg.model_dir / "player_rl_best.pt"
 
         self.env = self._build_env()
         self.policy = PlayerActorCritic().to(self.device)
@@ -403,6 +429,8 @@ class PacmanTrainer:
 
         # Quit listener (started in train())
         self.quit_listener = QuitListener()
+        # Auto-curriculum graduation counter
+        self._grad_consec: int = 0
 
     # ───────────────────────────────────────────────────────────────────────
     # Setup helpers
@@ -559,9 +587,9 @@ class PacmanTrainer:
                 features.to(self.device),
                 self.policy_hidden,
             )
-            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e8)
+            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e4)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
             )
 
             if self.cfg.rollout_epsilon > 0:
@@ -771,9 +799,9 @@ class PacmanTrainer:
             logits, values, _ = self.policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            masked_logits = logits.masked_fill(~mb_valid, -1e8)
+            masked_logits = logits.masked_fill(~mb_valid, -1e4)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
             )
             dist = Categorical(logits=masked_logits)
 
@@ -784,7 +812,13 @@ class PacmanTrainer:
             surr1 = ratio * mb_adv
             surr2 = torch.clamp(ratio, 1.0 - cfg.clip_eps, 1.0 + cfg.clip_eps) * mb_adv
             policy_loss = -torch.min(surr1, surr2).mean()
-            value_loss = F.smooth_l1_loss(values.reshape(-1), mb_returns.reshape(-1))
+
+            # Sanitize values and returns for value loss calculation
+            values_clean = torch.nan_to_num(values.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0)
+            returns_clean = torch.nan_to_num(mb_returns.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0)
+            value_loss = F.smooth_l1_loss(values_clean, returns_clean)
+            if torch.isnan(value_loss):
+                value_loss = torch.tensor(0.0, device=self.device)
 
             kl_loss = self._compute_kl_loss(
                 mb_grid, mb_features, mb_hidden, mb_resets, mb_valid, masked_logits
@@ -821,9 +855,9 @@ class PacmanTrainer:
             ref_logits, _, _ = self.ref_policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            ref_masked = ref_logits.masked_fill(~mb_valid, -1e8)
+            ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
             ref_masked = torch.nan_to_num(
-                ref_masked, nan=-1e8, posinf=10.0, neginf=-1e8
+                ref_masked, nan=-1e4, posinf=10.0, neginf=-1e4
             )
             ref_probs = F.softmax(ref_masked, dim=-1)
             ref_log_p = F.log_softmax(ref_masked, dim=-1)
@@ -953,6 +987,9 @@ class PacmanTrainer:
             self.eval_env = PacmanPlayerEnv(
                 seed=cfg.eval_seed_base, stage=cfg.stage, device="cpu"
             )
+            self.eval_env.start_pellets = cfg.start_pellets
+        else:
+            self.eval_env.start_pellets = cfg.start_pellets
 
         t_eval = time.time()
         eval_result = run_evaluation(
@@ -969,6 +1006,7 @@ class PacmanTrainer:
 
         self._log_eval_result(eval_result, update, t_eval)
         self._update_eval_tracking(eval_result, update)
+        self._check_curriculum_graduation(eval_result, update)
         self.prev_eval = eval_result
 
     def _log_eval_result(self, eval_result: dict, update: int, t_start: float) -> None:
@@ -1047,6 +1085,58 @@ class PacmanTrainer:
         )
         self.logger.log("!" * 60)
         self.last_stall_warn_update = update
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Auto-curriculum
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _check_curriculum_graduation(self, eval_result: dict, update: int) -> None:
+        """After each stage-1 eval, check if completion threshold met N times in a row."""
+        if not self.cfg.auto_curriculum or self.cfg.stage != 1:
+            return
+        comp = float(eval_result.get("completion_rate", 0.0))
+        if comp >= self.cfg.stage1_grad_threshold:
+            self._grad_consec += 1
+            self.logger.log(
+                f"  CURRICULUM: stage-1 completion {comp:.1%} ≥ "
+                f"{self.cfg.stage1_grad_threshold:.0%} "
+                f"({self._grad_consec}/{self.cfg.stage1_grad_evals} needed to graduate)"
+            )
+        else:
+            if self._grad_consec > 0:
+                self.logger.log(
+                    f"  CURRICULUM: reset streak — completion {comp:.1%} "
+                    f"fell below {self.cfg.stage1_grad_threshold:.0%}"
+                )
+            self._grad_consec = 0
+
+        if self._grad_consec >= self.cfg.stage1_grad_evals:
+            self._graduate_to_stage2(update)
+
+    def _graduate_to_stage2(self, update: int) -> None:
+        """Promote model from ghost-free stage 1 to full-ghost stage 2. Same weights, same file."""
+        cfg = self.cfg
+        self.logger.log("=" * 60)
+        self.logger.log(
+            f"  CURRICULUM GRADUATE @upd {update}: stage 1 → 2"
+        )
+        self.logger.log(
+            f"  Completion ≥ {cfg.stage1_grad_threshold:.0%} for "
+            f"{cfg.stage1_grad_evals} consecutive evals. Adding ghosts now."
+        )
+        self.logger.log("  Same model weights, same checkpoint file (player_rl.pt).")
+        self.logger.log("=" * 60)
+        cfg.stage = 2
+        self.env = self._build_env()
+        self.obs = self.env.reset()
+        self.policy_hidden = None
+        self.eval_env = None          # rebuilt on next eval
+        self._grad_consec = 0
+        # Reset eval tracking so stage-2 evals start fresh
+        self.best_eval_score = float("-inf")
+        self.best_eval_update = -1
+        self.prev_eval = None
+        self.last_meaningful_improve_upd = -1
 
     # ───────────────────────────────────────────────────────────────────────
     # Cleanup

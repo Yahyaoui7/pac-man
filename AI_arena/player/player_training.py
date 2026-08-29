@@ -32,7 +32,7 @@ from AI_arena.player.utils.evaluate import append_history, run_evaluation
 # ═══════════════════════════════════════════════════════════════════════════════
 
 STAGE = 2
-NUM_UPDATES = 1000
+NUM_UPDATES = 500
 ROLLOUT_STEPS = 3000
 SEQ_LEN = 16  # Temporal sequence chunk length for GRU BPTT
 NUM_SEQUENCES = ROLLOUT_STEPS // SEQ_LEN  # Sequence chunks per rollout

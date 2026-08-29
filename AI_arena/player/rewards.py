@@ -6,11 +6,16 @@ from AI_arena.player.constants import (
     COMPLETION_REWARD,
     DEATH_REWARD,
     EAT_GHOST_REWARD,
+    EVASION_ESCAPE_BASE,
     MILESTONE_REWARDS,
     OSCILLATION_REWARD,
     PELLET_REWARD,
+    PREDICTIVE_THREAT_NEAR,
+    SURVIVAL_TRUNCATION_BONUS,
     STEP_REWARD,
     SUPER_PELLET_REWARD,
+    THREAT_MASTERY_SURVIVE,
+    DENSE_SURVIVAL_REWARD,
 )
 
 
@@ -255,16 +260,17 @@ class RewardCalculator:
             px, py, ghosts, maze
         )
         if not powered and threatening > 0 and min_threat_dist > 0:
+            scale = PREDICTIVE_THREAT_NEAR
             if min_threat_dist >= 5:
-                breakdown["predictive_threat"] += 0.30
+                breakdown["predictive_threat"] += 0.15 * scale
             elif min_threat_dist == 4:
-                breakdown["predictive_threat"] += 0.15
+                breakdown["predictive_threat"] += 0.05 * scale
             elif min_threat_dist == 3:
-                breakdown["predictive_threat"] -= 0.5
+                breakdown["predictive_threat"] -= 0.5 * scale
             elif min_threat_dist == 2:
-                breakdown["predictive_threat"] -= 1.5
+                breakdown["predictive_threat"] -= 1.5 * scale
             elif min_threat_dist == 1:
-                breakdown["predictive_threat"] -= 4.0
+                breakdown["predictive_threat"] -= 4.0 * scale
 
     def _evasion_skill_reward(
         self,
@@ -278,14 +284,18 @@ class RewardCalculator:
             and self.last_min_ghost_dist <= 4
         ):
             escape_quality = min_ghost_dist_after - self.last_min_ghost_dist
+            base = EVASION_ESCAPE_BASE
             if self.last_min_ghost_dist == 1:
-                breakdown["evasion_skill"] += 1.0 * escape_quality
+                breakdown["evasion_skill"] += base * 1.0 * escape_quality
             elif self.last_min_ghost_dist == 2:
-                breakdown["evasion_skill"] += 0.5 * escape_quality
+                breakdown["evasion_skill"] += base * 0.5 * escape_quality
             elif self.last_min_ghost_dist == 3:
-                breakdown["evasion_skill"] += 0.2 * escape_quality
+                breakdown["evasion_skill"] += base * 0.2 * escape_quality
             elif self.last_min_ghost_dist == 4:
-                breakdown["evasion_skill"] += 0.1 * escape_quality
+                breakdown["evasion_skill"] += base * 0.1 * escape_quality
+            # Cap to prevent farming
+            if breakdown["evasion_skill"] > 5.0:
+                breakdown["evasion_skill"] = 5.0
 
     def _zone_control_reward(
         self,
@@ -318,11 +328,12 @@ class RewardCalculator:
     ) -> None:
         if not powered and threatening > 0 and min_threat_dist in (2, 3):
             self.consecutive_threat_steps += 1
-            if self.consecutive_threat_steps <= 5:
-                breakdown["threat_mastery"] += 0.3
-            elif self.consecutive_threat_steps <= 10:
-                breakdown["threat_mastery"] += 0.1
-            if min_ghost_dist_after > 3 and self.consecutive_threat_steps >= 3:
+            survive_reward = THREAT_MASTERY_SURVIVE
+            if self.consecutive_threat_steps <= 8:
+                breakdown["threat_mastery"] += survive_reward
+            elif self.consecutive_threat_steps <= 12:
+                breakdown["threat_mastery"] += survive_reward * 0.5
+            if min_ghost_dist_after > 3 and self.consecutive_threat_steps >= 5:
                 breakdown["threat_mastery"] += 3.0
                 self.consecutive_threat_steps = 0
         else:
@@ -352,7 +363,7 @@ class RewardCalculator:
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
         if events.get("truncated", False):
-            survival_bonus = 200.0
+            survival_bonus = SURVIVAL_TRUNCATION_BONUS
             pellet_bonus = frac * 50.0
             breakdown["survival_truncation"] = survival_bonus + pellet_bonus
 
@@ -365,11 +376,11 @@ class RewardCalculator:
     ) -> None:
         if not powered and threatening > 0:
             if min_threat_dist >= 5:
-                breakdown["survival_truncation"] += 0.5
+                breakdown["dense_survival"] += DENSE_SURVIVAL_REWARD
             elif min_threat_dist >= 3:
-                breakdown["survival_truncation"] += 0.1
+                breakdown["dense_survival"] += DENSE_SURVIVAL_REWARD * 0.33
         else:
-            breakdown["survival_truncation"] += 0.2
+            breakdown["dense_survival"] += DENSE_SURVIVAL_REWARD * 0.66
 
     # ═══════════════════════════════════════════════════════════════════
     #  HELPERS
@@ -467,6 +478,7 @@ class RewardCalculator:
             "threat_mastery": 0.0,
             "ghost_lure": 0.0,
             "survival_truncation": 0.0,
+            "dense_survival": 0.0,
             "exploration": 0.0,
             "zone_stagnation": 0.0,
         }
@@ -481,13 +493,7 @@ class RewardCalculator:
         threatening, edible_nearby, min_threat_dist, min_edible_dist = (
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
-        #         # ── MINIMAL SIGNAL MODE: alive + pellets + completion, no wiggle.
-        # Three quiet supports stay on (they shape the target, not noise):
-        #   bfs shaping  → dense gradient toward pellets (sparse-cliff guard)
-        #   zone stagnation → anti-camping (parking must not be free)
-        #   oscillation  → unconditional on policy steps
-        # Everything else (step tax, hunger, predictive threat, proximity,
-        # zone control, truncation bonus) intentionally OFF.
+
         self._death_penalty(events, breakdown)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
@@ -500,8 +506,7 @@ class RewardCalculator:
         self._zone_stagnation_penalty(px, py, breakdown)
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
 
-        # ── SURVIVAL TEACHER (re-enabled Aug 26 via ladder contingency B:
-        # Death% plateaued ~88% > 100 upd against full-power ghosts) ──
+        # ── SURVIVAL SHAPERS (enabled Aug 28) ──
         if self.stage > 1:
             self._ghost_proximity_penalty(
                 min_ghost_dist_after,
@@ -510,8 +515,19 @@ class RewardCalculator:
                 powered,
                 breakdown,
             )
-            self.last_min_ghost_dist = (
-                min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist
+            self._predictive_threat_reward(
+                px, py, ghosts, maze, powered, breakdown
             )
+            self._evasion_skill_reward(min_ghost_dist_after, breakdown)
+            self._threat_mastery_reward(
+                threatening, min_threat_dist, min_ghost_dist_after, powered, breakdown
+            )
+            self._dense_survival_reward(threatening, min_threat_dist, powered, breakdown)
+            self._survival_truncation_reward(events, frac, breakdown)
+
+        # ALWAYS track last_min_ghost_dist for evasion/lure (not gated by stage)
+        self.last_min_ghost_dist = (
+            min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist
+        )
 
         return sum(breakdown.values()), breakdown

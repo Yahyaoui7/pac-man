@@ -225,7 +225,7 @@ class PacmanPlayerEnv:
             maze_w = level_choice["width"]
             maze_h = level_choice["height"]
             current_seed = level_choice["seed"]
-            
+
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
         self.movement = MovementSystem(self.maze)

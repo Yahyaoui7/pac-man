@@ -45,6 +45,21 @@ BAIT_SUPER_PELLET_RADIUS = 4
 CORNERED_MIN_MOVES = 4
 NEAR_GHOST_DIST = 2
 
+# ═══════════════════════════════════════════════════════════════════
+# Survival shaper magnitudes (re-enabled + tuned Aug 28)
+# ═══════════════════════════════════════════════════════════════════
+
+# Per-step alive bonus near threats — small so it doesn't overwhelm pellet signal.
+DENSE_SURVIVAL_REWARD = 0.3
+# Scaling for escape credit after a close call.
+EVASION_ESCAPE_BASE = 1.0
+# Scale for near-threat prediction penalty.
+PREDICTIVE_THREAT_NEAR = 1.0
+# Per-step reward for surviving near a threat at safe distance (2-3).
+THREAT_MASTERY_SURVIVE = 0.3
+# Large reward for surviving to the episode timeout.
+SURVIVAL_TRUNCATION_BONUS = 150.0
+
 LIVES = 2
 
 # ═══════════════════════════════════════════════════════════════════

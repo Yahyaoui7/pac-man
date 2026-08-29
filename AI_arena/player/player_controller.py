@@ -16,9 +16,9 @@ from src.graphics.entitys.player import Player
 
 from AI_arena.player.data.observation import format_player_observation
 
-BEST_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage2_best.pt"
+BEST_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_best.pt"
 
-DEFAULT_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_stage2.pt"
+DEFAULT_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
 
@@ -34,8 +34,7 @@ class CNNPlayerController:
                 path = BEST_STAGE_PATH
             elif DEFAULT_STAGE_PATH.exists():
                 path = DEFAULT_STAGE_PATH
-            else:
-                path = Path(__file__).parent.parent / "models" / "player_sl_best.pt"
+
         else:
             path = Path(model_path)
 
@@ -77,9 +76,9 @@ class CNNPlayerController:
             logits, value, self._hidden = self.model(grid, extra_features, self._hidden)
             logits = logits.float()
             value = value.float()
-            masked_logits = logits.masked_fill(~valid_actions, -1e4)
+            masked_logits = logits.masked_fill(~valid_actions, -1e8)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
             )
             probs = torch.softmax(masked_logits, dim=-1)[0]
             probs = torch.nan_to_num(probs, nan=0.0, posinf=1.0, neginf=0.0)

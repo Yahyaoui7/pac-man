@@ -122,7 +122,7 @@ class RewardCalculator:
     def _hunger_penalty(
         self, steps_since_pellet: int, breakdown: dict[str, float]
     ) -> None:
-        grace = 30
+        grace = 25
         if steps_since_pellet > grace:
             breakdown["hunger"] = -0.3
 
@@ -130,8 +130,7 @@ class RewardCalculator:
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
         if events.get("pellet_eaten", False):
-            # Immediate progressive completion bonus (+20.0) so eating each pellet gives strong positive feedback
-            breakdown["pellet"] = PELLET_REWARD + 20.0 + 5.0 * frac
+            breakdown["pellet"] = PELLET_REWARD + 2.0 * frac
 
     def _super_pellet_reward(
         self,
@@ -156,7 +155,6 @@ class RewardCalculator:
             if frac >= threshold and threshold not in self.milestones_hit:
                 self.milestones_hit.add(threshold)
                 breakdown["milestone"] += reward
-
 
     def _bfs_shaping(self, bfs_shaping: float, breakdown: dict[str, float]) -> None:
         """Potential-based shaping: γ·Φ(s′) − Φ(s). Boosted to 3.0× for clear spatial pathing signal."""
@@ -517,8 +515,6 @@ class RewardCalculator:
             breakdown,
         )
         self._evasion_skill_reward(min_ghost_dist_after, breakdown)
-        self._dense_survival_reward(threatening, min_threat_dist, powered, breakdown)
-        self._survival_truncation_reward(events, frac, breakdown)
         self._incomplete_penalty(events, frac, breakdown)
 
         # self._zone_stagnation_penalty(px, py, breakdown)  # leave off — too noisy

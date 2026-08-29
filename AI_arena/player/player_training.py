@@ -151,7 +151,7 @@ class TrainingConfig:
     # ── Auto-curriculum ──
     auto_curriculum: bool = True
     stage1_grad_threshold: float = 0.80  # eval completion rate to graduate stage 1 → 2
-    stage1_grad_evals: int = 2           # consecutive evals above threshold to graduate
+    stage1_grad_evals: int = 2  # consecutive evals above threshold to graduate
 
     # ── Paths ──
     model_dir: Path = field(
@@ -231,7 +231,12 @@ class TrainingConfig:
         )
 
         # ── Core loop ──
-        p.add_argument("--stage", type=int, default=1, help="training stage (1=ghost-free, 2=full ghosts)")
+        p.add_argument(
+            "--stage",
+            type=int,
+            default=2,
+            help="training stage (1=ghost-free, 2=full ghosts)",
+        )
         p.add_argument(
             "--updates", type=int, default=1000, help="number of PPO updates"
         )
@@ -587,9 +592,9 @@ class PacmanTrainer:
                 features.to(self.device),
                 self.policy_hidden,
             )
-            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e4)
+            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e8)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
             )
 
             if self.cfg.rollout_epsilon > 0:
@@ -799,9 +804,9 @@ class PacmanTrainer:
             logits, values, _ = self.policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            masked_logits = logits.masked_fill(~mb_valid, -1e4)
+            masked_logits = logits.masked_fill(~mb_valid, -1e8)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
             )
             dist = Categorical(logits=masked_logits)
 
@@ -814,8 +819,12 @@ class PacmanTrainer:
             policy_loss = -torch.min(surr1, surr2).mean()
 
             # Sanitize values and returns for value loss calculation
-            values_clean = torch.nan_to_num(values.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0)
-            returns_clean = torch.nan_to_num(mb_returns.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0)
+            values_clean = torch.nan_to_num(
+                values.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0
+            )
+            returns_clean = torch.nan_to_num(
+                mb_returns.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0
+            )
             value_loss = F.smooth_l1_loss(values_clean, returns_clean)
             if torch.isnan(value_loss):
                 value_loss = torch.tensor(0.0, device=self.device)
@@ -855,9 +864,9 @@ class PacmanTrainer:
             ref_logits, _, _ = self.ref_policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
+            ref_masked = ref_logits.masked_fill(~mb_valid, -1e8)
             ref_masked = torch.nan_to_num(
-                ref_masked, nan=-1e4, posinf=10.0, neginf=-1e4
+                ref_masked, nan=-1e8, posinf=10.0, neginf=-1e8
             )
             ref_probs = F.softmax(ref_masked, dim=-1)
             ref_log_p = F.log_softmax(ref_masked, dim=-1)
@@ -1117,9 +1126,7 @@ class PacmanTrainer:
         """Promote model from ghost-free stage 1 to full-ghost stage 2. Same weights, same file."""
         cfg = self.cfg
         self.logger.log("=" * 60)
-        self.logger.log(
-            f"  CURRICULUM GRADUATE @upd {update}: stage 1 → 2"
-        )
+        self.logger.log(f"  CURRICULUM GRADUATE @upd {update}: stage 1 → 2")
         self.logger.log(
             f"  Completion ≥ {cfg.stage1_grad_threshold:.0%} for "
             f"{cfg.stage1_grad_evals} consecutive evals. Adding ghosts now."
@@ -1130,7 +1137,7 @@ class PacmanTrainer:
         self.env = self._build_env()
         self.obs = self.env.reset()
         self.policy_hidden = None
-        self.eval_env = None          # rebuilt on next eval
+        self.eval_env = None  # rebuilt on next eval
         self._grad_consec = 0
         # Reset eval tracking so stage-2 evals start fresh
         self.best_eval_score = float("-inf")

@@ -99,7 +99,7 @@ class PacmanPlayerEnv:
         self.episode_telemetry: dict[str, float] = {}
         self._in_corner_threat = False
         self._open_escape_deadline = -1
-        self.ghost_confusion_prob = 0.01 # REMOVE
+        self.ghost_confusion_prob = 0.01  # REMOVE
         self.death_count = 0
 
         # ← NEW: spatial / temporal memory state
@@ -236,7 +236,11 @@ class PacmanPlayerEnv:
             base_steps = int(maze_size * MAZE_STEP_MULTIPLIER)
             if self.start_pellets is not None:
                 # Curriculum mode: cap proportionally to actual pellets spawned so episodes end fast if agent gets lost
-                n_actual = len(self.pellets) if self.pellets else (max(self.start_pellets) if self.start_pellets else 8)
+                n_actual = (
+                    len(self.pellets)
+                    if self.pellets
+                    else (max(self.start_pellets) if self.start_pellets else 8)
+                )
                 tight_budget = n_actual * 65 + (maze_w + maze_h) * 4
                 self.max_steps = min(base_steps, max(150, tight_budget))
             else:

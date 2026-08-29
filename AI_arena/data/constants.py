@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-CNN_CHANNEL_COUNT = 5
+CNN_CHANNEL_COUNT = 6
 EXTRA_FEATURE_COUNT = 50
 GHOST_COUNT = 4
 ACTION_COUNT = 4

@@ -122,18 +122,16 @@ class RewardCalculator:
     def _hunger_penalty(
         self, steps_since_pellet: int, breakdown: dict[str, float]
     ) -> None:
-        grace = 40
+        grace = 30
         if steps_since_pellet > grace:
-            breakdown["hunger"] = -0.2
+            breakdown["hunger"] = -0.3
 
     def _pellet_reward(
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
-        additional = 0
         if events.get("pellet_eaten", False):
-            if frac > 0.75:
-                additional = 2.0
-            breakdown["pellet"] = PELLET_REWARD + 1.0 * frac + additional
+            # Immediate progressive completion bonus (+20.0) so eating each pellet gives strong positive feedback
+            breakdown["pellet"] = PELLET_REWARD + 20.0 + 5.0 * frac
 
     def _super_pellet_reward(
         self,
@@ -149,16 +147,20 @@ class RewardCalculator:
             breakdown["super_bait"] = threat_bonus
 
     def _milestone_reward(self, frac: float, breakdown: dict[str, float]) -> None:
+        """Progress milestones — only meaningful on full maps (stage 2+).
+        In curriculum mode with 3-8 pellets, reaching 60% means eating 3 pellets;
+        the threshold fires as a near-free bonus. Completion reward handles stage 1."""
+        if self.stage < 2:
+            return
         for threshold, reward in MILESTONE_REWARDS.items():
             if frac >= threshold and threshold not in self.milestones_hit:
                 self.milestones_hit.add(threshold)
                 breakdown["milestone"] += reward
 
+
     def _bfs_shaping(self, bfs_shaping: float, breakdown: dict[str, float]) -> None:
-        """Potential-based shaping: γ·Φ(s′) − Φ(s). Was 3.0× (too dominant),
-        now 2.0× — strong enough to pull the agent toward pellets, not so
-        strong it drowns the pellet reward itself."""
-        breakdown["bfs"] = 2.0 * bfs_shaping
+        """Potential-based shaping: γ·Φ(s′) − Φ(s). Boosted to 3.0× for clear spatial pathing signal."""
+        breakdown["bfs"] = 3.0 * bfs_shaping
 
     def _oscillation_penalty(
         self,
@@ -236,10 +238,11 @@ class RewardCalculator:
             breakdown["backtrack"] = -1.0
 
     def _incomplete_penalty(
-        self, events: dict[str, bool], breakdown: dict[str, float]
+        self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
         if events.get("truncated", False):
-            breakdown["incomplete"] = -50.0
+            uncollected = max(0.0, 1.0 - frac)
+            breakdown["incomplete"] = -30.0 - 50.0 * uncollected
 
     def _predictive_threat_reward(
         self,
@@ -350,8 +353,9 @@ class RewardCalculator:
     def _survival_truncation_reward(
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
-        if events.get("truncated", False):
-            survival_bonus = 200.0
+        # Only in stage 2+ when ghosts exist, and ONLY if agent cleared >75% of the map
+        if self.stage >= 2 and events.get("truncated", False) and frac > 0.75:
+            survival_bonus = 50.0
             pellet_bonus = frac * 50.0
             breakdown["survival_truncation"] = survival_bonus + pellet_bonus
 
@@ -362,6 +366,10 @@ class RewardCalculator:
         powered: bool,
         breakdown: dict[str, float],
     ) -> None:
+        """Per-step survival signal — only meaningful when ghosts are present (stage 2+).
+        In stage 1 there are no ghosts, so this would just reward camping the spawn."""
+        if self.stage < 2:
+            return  # no ghosts → no survival signal → must earn reward by moving to pellets
         if not powered and threatening > 0:
             breakdown["survival_truncation"] += (
                 0.25
@@ -488,18 +496,18 @@ class RewardCalculator:
         threatening, edible_nearby, min_threat_dist, min_edible_dist = (
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
-
+        self._step_reward(events, breakdown)
         self._death_penalty(events, breakdown, frac)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
         self._super_pellet_reward(events, powered, threatening, breakdown)
         self._ghost_eat_reward(events, breakdown)
-        self._exploration_reward(px, py, breakdown)
+        # self._exploration_reward(px, py, breakdown)
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
 
         # ── Re-enabled dense shaping (was all commented out) ──
         self._bfs_shaping(bfs_shaping, breakdown)
-        # self._milestone_reward(frac, breakdown)
+        self._milestone_reward(frac, breakdown)
         self._hunger_penalty(steps_since_pellet, breakdown)
         self._ghost_proximity_penalty(
             min_ghost_dist_after,
@@ -510,6 +518,8 @@ class RewardCalculator:
         )
         self._evasion_skill_reward(min_ghost_dist_after, breakdown)
         self._dense_survival_reward(threatening, min_threat_dist, powered, breakdown)
+        self._survival_truncation_reward(events, frac, breakdown)
+        self._incomplete_penalty(events, frac, breakdown)
 
         # self._zone_stagnation_penalty(px, py, breakdown)  # leave off — too noisy
 

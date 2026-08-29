@@ -12,6 +12,23 @@ PLAYER_EXTRA_FEATURE_COUNT = 50
 POWER_TIMER_MAX = 30.0
 
 
+def encode_player_direction(dir_val: Any) -> list[float]:
+    """Encode player direction to 4-dim one-hot [UP, DOWN, LEFT, RIGHT]."""
+    vec = [0.0, 0.0, 0.0, 0.0]
+    if dir_val is None:
+        return vec
+    val_str = str(dir_val).upper()
+    if dir_val == 1 or "NORTH" in val_str or "UP" in val_str:
+        vec[0] = 1.0
+    elif dir_val == 4 or "SOUTH" in val_str or "DOWN" in val_str:
+        vec[1] = 1.0
+    elif dir_val == 8 or "WEST" in val_str or "LEFT" in val_str:
+        vec[2] = 1.0
+    elif dir_val == 2 or "EAST" in val_str or "RIGHT" in val_str:
+        vec[3] = 1.0
+    return vec
+
+
 def format_player_observation(
     *,
     maze: list[list[int]],
@@ -32,13 +49,18 @@ def format_player_observation(
     region_completion_frac: float = 0.0,
     region_is_dirty: float = 0.0,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Return grid [1, 5, 25, 50], player features [1, 50], and mask [1, 4]."""
+    """Return grid [1, 6, 25, 50], player features [1, 50], and mask [1, 4]."""
+    effective_dir = getattr(player, "next_direction", None) or player.direction
+    if effective_dir is None and hasattr(player, "facing"):
+        effective_dir = player.facing
+
     ghost_states = [
         {
             "grid_x": ghost.grid_x,
             "grid_y": ghost.grid_y,
-            "is_edible": ghost.is_edible,
-            "direction": ghost.direction,
+            "is_edible": getattr(ghost, "is_edible", False),
+            "in_prison": getattr(ghost, "in_prison", False),
+            "direction": getattr(ghost, "direction", None),
         }
         for ghost in ghosts
     ]
@@ -46,7 +68,7 @@ def format_player_observation(
         maze=maze,
         pellets=pellets,
         player_pos=(player.grid_x, player.grid_y),
-        player_direction=player.direction,
+        player_direction=effective_dir,
         ghost_states=ghost_states,
         movement=movement,
         device=device,
@@ -59,7 +81,7 @@ def format_player_observation(
     px, py = player.grid_x, player.grid_y
 
     # 1. Player Direction (4: UP, DOWN, LEFT, RIGHT)
-    player_direction = [float(player.direction == d) for d in DIRECTIONS]
+    player_direction = encode_player_direction(effective_dir)
 
     # 2. Ghost Edible Flags (4: -1.0 = dangerous non-edible, +1.0 = edible)
     edible = [1.0 if getattr(ghost, "is_edible", False) else -1.0 for ghost in ghosts]
@@ -93,10 +115,43 @@ def format_player_observation(
         else [0] * (width * height)
     )
 
-    # 6. Ghost BFS Distances (4: normalized by width+height, capped at 1.0, or -1.0 if unreachable)
+    # Multi-source BFS distance map from ALL remaining pellets for 4-directional lookahead
+    pellet_sources = [
+        gy * width + gx
+        for gy in range(height)
+        for gx in range(width)
+        if pellets[gy][gx] in (1, 2)
+    ]
+    pellet_bfs_dist = [-1] * (width * height)
+    if movement is not None and pellet_sources:
+        q = []
+        for s in pellet_sources:
+            pellet_bfs_dist[s] = 0
+            q.append(s)
+        q_idx = 0
+        dir_offsets = {"UP": (-1, 0), "DOWN": (1, 0), "LEFT": (0, -1), "RIGHT": (0, 1)}
+        while q_idx < len(q):
+            curr = q[q_idx]
+            q_idx += 1
+            cy, cx = curr // width, curr % width
+            d = pellet_bfs_dist[curr]
+            for d_name in DIRECTIONS:
+                if movement.can_move(cy, cx, d_name):
+                    dy_o, dx_o = dir_offsets[d_name]
+                    ny_c, nx_c = cy + dy_o, cx + dx_o
+                    n_idx = ny_c * width + nx_c
+                    if 0 <= n_idx < len(pellet_bfs_dist) and pellet_bfs_dist[n_idx] == -1:
+                        pellet_bfs_dist[n_idx] = d + 1
+                        q.append(n_idx)
+
+    # 6. Ghost BFS Distances (4: normalized by width+height, capped at 1.0, or -1.0 if unreachable/in_prison)
     ghost_distances_raw = []
     ghost_distances = []
     for ghost in ghosts:
+        if getattr(ghost, "in_prison", False):
+            ghost_distances_raw.append(-1)
+            ghost_distances.append(-1.0)
+            continue
         gx, gy = ghost.grid_x, ghost.grid_y
         cell_idx = gy * width + gx
         dist = bfs_dist[cell_idx] if (0 <= cell_idx < len(bfs_dist)) else -1
@@ -135,13 +190,20 @@ def format_player_observation(
         min(1.0, (nearest_np_dist + 1) / norm_denom) if nearest_np_dist >= 0 else -1.0
     )
 
-    # 8. Local Adjacent Pellets (4: UP, DOWN, LEFT, RIGHT)
-    local_pellet = [0.0, 0.0, 0.0, 0.0]
-    dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    for i, (dy, dx) in enumerate(dirs):
-        ny, nx = py + dy, px + dx
-        if 0 <= ny < height and 0 <= nx < width and pellets[ny][nx] in (1, 2):
-            local_pellet[i] = 1.0
+    # 8. Directional BFS Pellet Lookahead Distances (4: UP, DOWN, LEFT, RIGHT)
+    dir_offsets_list = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    directional_pellet_lookahead = [1.0, 1.0, 1.0, 1.0]
+    for i, d_name in enumerate(DIRECTIONS):
+        if movement is not None and movement.can_move(py, px, d_name):
+            dy_o, dx_o = dir_offsets_list[i]
+            ny, nx = py + dy_o, px + dx_o
+            n_idx = ny * width + nx
+            if 0 <= n_idx < len(pellet_bfs_dist):
+                d_p = pellet_bfs_dist[n_idx]
+                if d_p >= 0:
+                    directional_pellet_lookahead[i] = min(1.0, (d_p + 1) / norm_denom)
+        else:
+            directional_pellet_lookahead[i] = -1.0
 
     # 9. Local Adjacent Danger (4: UP, DOWN, LEFT, RIGHT)
     local_danger = [0.0, 0.0, 0.0, 0.0]
@@ -151,7 +213,7 @@ def format_player_observation(
             for g in ghosts
             if not getattr(g, "in_prison", False) and not getattr(g, "is_edible", False)
         ]
-        for i, (dy, dx) in enumerate(dirs):
+        for i, (dy, dx) in enumerate(dir_offsets_list):
             ny, nx = py + dy, px + dx
             if (ny, nx) in active_ghost_cells:
                 local_danger[i] = 1.0
@@ -179,7 +241,7 @@ def format_player_observation(
     steps_since_pellet_norm = min(steps_since_pellet, 100) / 100.0
     same_action_norm = min(same_action_count, 20) / 20.0
 
-    # 12. NEW: Ghost Relative Coordinates (8: 4 ghosts x 2 axes [dx, dy] in [-1.0, 1.0])
+    # 12. Ghost Relative Coordinates (8: 4 ghosts x 2 axes [dx, dy] in [-1.0, 1.0])
     ghost_rel_coords = []
     for g in ghosts:
         if not getattr(g, "in_prison", False):
@@ -189,7 +251,7 @@ def format_player_observation(
         else:
             ghost_rel_coords.extend([-1.0, -1.0])
 
-    # 13. NEW: Surrounded Danger Counters (2: within Manhattan dist 3 and 5)
+    # 13. Surrounded Danger Counters (2: within Manhattan dist 3 and 5)
     active_dangerous_ghosts = [
         g for g in ghosts
         if not getattr(g, "in_prison", False) and not getattr(g, "is_edible", False)
@@ -205,7 +267,7 @@ def format_player_observation(
     surrounded_d3_norm = ghost_count_d3 / 4.0
     surrounded_d5_norm = ghost_count_d5 / 4.0
 
-    # 14. NEW: Topology Flags (2: dead-end flag, junction flag)
+    # 14. Topology Flags (2: dead-end flag, junction flag)
     num_valid_actions = sum(1 for v in action_features if v > 0.5)
     dead_end_flag = 1.0 if num_valid_actions == 1 else 0.0
     junction_flag = 1.0 if num_valid_actions >= 3 else 0.0
@@ -220,7 +282,7 @@ def format_player_observation(
         *ghost_distances,          # 4
         nearest_pp_dist_norm,      # 1
         nearest_np_dist_norm,      # 1
-        *local_pellet,             # 4
+        *directional_pellet_lookahead, # 4
         *local_danger,             # 4
         delta_pellet,              # 1
         delta_ghost,               # 1

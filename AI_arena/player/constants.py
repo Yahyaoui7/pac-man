@@ -12,9 +12,9 @@ GHOST_SPECS = [
 ]
 
 MAZE_WIDTH_MIN = 10
-MAZE_WIDTH_MAX = 20
+MAZE_WIDTH_MAX = 43
 MAZE_HEIGHT_MIN = 10
-MAZE_HEIGHT_MAX = 15
+MAZE_HEIGHT_MAX = 23
 MAX_PHYSICS_TICKS = 40
 GHOST_RESPAWN_TICKS = 2
 MAZE_STEP_MULTIPLIER = 12.0
@@ -24,12 +24,12 @@ MAZE_STEP_MULTIPLIER = 12.0
 # ═══════════════════════════════════════════════════════════════════
 
 STEP_REWARD = -0.1
-DEATH_REWARD = -200.0
-OSCILLATION_REWARD = -10.0
-COMPLETION_REWARD = 1500.0
-EAT_GHOST_REWARD = 150.0
-PELLET_REWARD = 1.5
-SUPER_PELLET_REWARD = 3.0
+DEATH_REWARD = -50.0  # was -350.0
+OSCILLATION_REWARD = -5.0  # was -10.0
+COMPLETION_REWARD = 500.0  # was 1000.0
+EAT_GHOST_REWARD = 35.0
+PELLET_REWARD = 2.0  # was 1.5 — make eating the dominant positive
+SUPER_PELLET_REWARD = 8.0  # was 5.0
 
 SURVIVAL_TRUNCATION_BASE = 10.0
 SURVIVAL_TRUNCATION_PELLET_BONUS = 20.0
@@ -57,8 +57,9 @@ ESCAPE_CONFIRM_STEPS = 8
 # ═══════════════════════════════════════════════════════════════════
 # Milestones
 # ═══════════════════════════════════════════════════════════════════
+
 MILESTONE_REWARDS = {
-    0.25: 15.0,  # NEW — first quarter, reachable with 8 pellets
+    0.25: 15.0,  # NEW — reachable with 8-pellet curriculum
     0.40: 30.0,  # NEW
     0.60: 60.0,  # was 0.50: 20.0
     0.75: 100.0,  # was 0.75: 50.0

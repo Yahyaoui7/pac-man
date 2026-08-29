@@ -61,13 +61,6 @@ class RewardCalculator:
     #  ACTIVE REWARD METHODS
     # ═══════════════════════════════════════════════════════════════════
 
-    def _death_penalty(
-        self, events: dict[str, bool], breakdown: dict[str, float]
-    ) -> None:
-        """Penalty for dying."""
-        if events.get("pacman_died", False):
-            breakdown["death"] = DEATH_REWARD
-
     def _zone_stagnation_penalty(
         self, px: int, py: int, breakdown: dict[str, float]
     ) -> None:
@@ -131,7 +124,7 @@ class RewardCalculator:
     ) -> None:
         grace = 40
         if steps_since_pellet > grace:
-            breakdown["hunger"] = -0.3
+            breakdown["hunger"] = -0.2
 
     def _pellet_reward(
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
@@ -162,21 +155,32 @@ class RewardCalculator:
                 breakdown["milestone"] += reward
 
     def _bfs_shaping(self, bfs_shaping: float, breakdown: dict[str, float]) -> None:
-        breakdown["bfs"] = 1.0 * bfs_shaping
+        """Potential-based shaping: γ·Φ(s′) − Φ(s). Was 3.0× (too dominant),
+        now 2.0× — strong enough to pull the agent toward pellets, not so
+        strong it drowns the pellet reward itself."""
+        breakdown["bfs"] = 2.0 * bfs_shaping
 
-    def _oscillation_penalty(self, events, threat_dist, breakdown, explore_step=False):
+    def _oscillation_penalty(
+        self,
+        events: dict[str, bool],
+        threat_dist: float,
+        breakdown: dict[str, float],
+        explore_step: bool = False,
+    ) -> None:
+        """Penalize policy-driven oscillation, but only when NOT actively dodging
+        a ghost. Oscillating to evade is good behavior. Cap at streak 2 (was 3)
+        so habitual wiggle is -10, -20, -20 instead of -10, -20, -30."""
         if explore_step:
             return
         if events.get("oscillating", False) and not (
             events.get("pellet_eaten", False) or events.get("super_pellet_eaten", False)
         ):
+            # Skip penalty if we're actively dodging a nearby ghost
             if threat_dist < 4:
                 self.osc_streak = 0
                 return
             self.osc_streak += 1
-            # Immediate & progressive penalty (-2.0, -4.0, -6.0, -8.0)
-            penalty = -2.0 * min(self.osc_streak, 4)
-            breakdown["oscillation"] = penalty
+            breakdown["oscillation"] = OSCILLATION_REWARD * min(self.osc_streak, 2)
         else:
             self.osc_streak = 0
 
@@ -391,6 +395,13 @@ class RewardCalculator:
                 exits += 1
         return exits <= 1
 
+    def _death_penalty(self, events, breakdown, frac=0.0):
+        """Death penalty that scales with lost progress."""
+        if events.get("pacman_died", False):
+            # progress_penalty = frac * 200.0
+            progress_penalty = 0
+            breakdown["death"] = DEATH_REWARD - progress_penalty
+
     def _count_threatening_ghosts(
         self, px: int, py: int, ghosts: list, maze: list[list[int]] | None
     ) -> tuple[int, int, int, int]:
@@ -478,19 +489,18 @@ class RewardCalculator:
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
 
-        self._death_penalty(events, breakdown)
+        self._death_penalty(events, breakdown, frac)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
         self._super_pellet_reward(events, powered, threatening, breakdown)
         self._ghost_eat_reward(events, breakdown)
+        self._exploration_reward(px, py, breakdown)
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
-        self._zone_stagnation_penalty(px, py, breakdown)
 
-        # Dense navigation guidance — use the BFS work you're already paying for
-        if bfs_shaping != 0.0:
-            self._bfs_shaping(bfs_shaping, breakdown)
+        # ── Re-enabled dense shaping (was all commented out) ──
+        self._bfs_shaping(bfs_shaping, breakdown)
+        # self._milestone_reward(frac, breakdown)
         self._hunger_penalty(steps_since_pellet, breakdown)
-        # Gradual ghost-avoidance gradient — THE most important missing signal
         self._ghost_proximity_penalty(
             min_ghost_dist_after,
             min_ghost_dist_before,
@@ -498,26 +508,13 @@ class RewardCalculator:
             powered,
             breakdown,
         )
-
-        # Credit for escaping a close ghost
         self._evasion_skill_reward(min_ghost_dist_after, breakdown)
+        self._dense_survival_reward(threatening, min_threat_dist, powered, breakdown)
 
-        # Mild corner penalty (anti-trap)
-        self._zone_control_reward(
-            px,
-            py,
-            maze,
-            threatening,
-            powered,
-            breakdown,
-        )
-
-        # Milestones — break the +1000 completion into reachable chunks
-        # self._milestone_reward(frac, breakdown)
-
-        # Survival bonus — give the value function a positive terminal to aim for
+        # self._zone_stagnation_penalty(px, py, breakdown)  # leave off — too noisy
 
         self.last_min_ghost_dist = (
             min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist
         )
+
         return sum(breakdown.values()), breakdown

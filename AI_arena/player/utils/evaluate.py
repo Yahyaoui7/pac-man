@@ -37,7 +37,9 @@ EVAL_SCORE_DEATH_W = 30.0  # weight of death rate (in [0,1])
 HISTORY_PATH = Path(__file__).parents[2] / "evals" / "eval_history.json"
 
 
-def eval_score(avg_pellet_pct: float, completion_rate: float, death_rate: float) -> float:
+def eval_score(
+    avg_pellet_pct: float, completion_rate: float, death_rate: float
+) -> float:
     """Composite benchmark score — higher is better.
 
     score = avg_pellet_pct + 40 * completion_rate − 30 * death_rate
@@ -86,12 +88,10 @@ def run_evaluation(
         done = False
         while not done:
             grid, features, valid_actions = obs
-            logits, _, hidden = policy(
-                grid.to(device_t), features.to(device_t), hidden
-            )
-            masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e4)
+            logits, _, hidden = policy(grid.to(device_t), features.to(device_t), hidden)
+            masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e8)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
             )
             if greedy:
                 action = int(torch.argmax(masked_logits, dim=-1).item())
@@ -188,7 +188,9 @@ def print_comparison(history: list[dict[str, Any]], last: int = 12) -> None:
     print("-" * len(header))
     for r in rows:
         s = r.get("survival", {})
-        esc = f"{s['escape_rate'] * 100:.0f}" if s.get("escape_rate", -1) >= 0 else "n/a"
+        esc = (
+            f"{s['escape_rate'] * 100:.0f}" if s.get("escape_rate", -1) >= 0 else "n/a"
+        )
         print(
             f"{r.get('timestamp', '?'):<17} "
             f"{r.get('checkpoint', '?'):<28} "
@@ -226,7 +228,9 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--seed-base", type=int, default=DEFAULT_SEED_BASE)
     parser.add_argument("--device", default="cpu")
-    parser.add_argument("--sample", action="store_true", help="Sample instead of argmax")
+    parser.add_argument(
+        "--sample", action="store_true", help="Sample instead of argmax"
+    )
     parser.add_argument(
         "--compare", action="store_true", help="Print history table after evaluating"
     )
@@ -237,12 +241,16 @@ def main() -> None:
 
     ckpt_path = _resolve_checkpoint(args.stage, args.checkpoint)
     policy = PlayerActorCritic().to(args.device)
-    if not load_checkpoint_into_policy(policy, ckpt_path, device=torch.device(args.device)):
+    if not load_checkpoint_into_policy(
+        policy, ckpt_path, device=torch.device(args.device)
+    ):
         raise SystemExit(f"ERROR: could not load weights from {ckpt_path}")
 
-    print(f"Evaluating {ckpt_path.name} | stage {args.stage} | "
-          f"{args.episodes} eps @ seeds {args.seed_base}..{args.seed_base + args.episodes - 1} "
-          f"({'sample' if args.sample else 'greedy'})")
+    print(
+        f"Evaluating {ckpt_path.name} | stage {args.stage} | "
+        f"{args.episodes} eps @ seeds {args.seed_base}..{args.seed_base + args.episodes - 1} "
+        f"({'sample' if args.sample else 'greedy'})"
+    )
     t0 = time.time()
     result = run_evaluation(
         policy,
@@ -255,8 +263,10 @@ def main() -> None:
     result["checkpoint"] = ckpt_path.name
 
     print(f"\nDone in {time.time() - t0:.1f}s")
-    print(f"  eval_score : {result['eval_score']:.1f}   "
-          "(pellet% + 40*comp_rate - 30*death_rate)")
+    print(
+        f"  eval_score : {result['eval_score']:.1f}   "
+        "(pellet% + 40*comp_rate - 30*death_rate)"
+    )
     print(f"  pellet     : {result['avg_pellet_pct']:.1f}%")
     print(f"  completed  : {result['completion_rate'] * 100:.1f}%")
     print(f"  died       : {result['death_rate'] * 100:.1f}%")
@@ -269,12 +279,18 @@ def main() -> None:
         else f"{s['avg_steps_lived']:.0f} moves"
     )
     print(f"  survived   : {life}")
-    print(f"  cornered   : {s['cornered_steps_per_ep']:.2f} steps/ep "
-          f"(entries {s['entries_per_ep']:.2f}/ep)")
+    print(
+        f"  cornered   : {s['cornered_steps_per_ep']:.2f} steps/ep "
+        f"(entries {s['entries_per_ep']:.2f}/ep)"
+    )
     print(f"  escapes    : {esc} over {s['escape_samples']} attempts")
-    print(f"  corner deaths: {s['cornered_deaths']:.0f} "
-          f"({s['cornered_death_share'] * 100 if s['cornered_death_share'] >= 0 else 0:.0f}% of deaths)")
-    print(f"  min ghost dist: {s['avg_min_ghost_dist']:.2f} | approach: {s['approach_pct']:.1f}% of steps")
+    print(
+        f"  corner deaths: {s['cornered_deaths']:.0f} "
+        f"({s['cornered_death_share'] * 100 if s['cornered_death_share'] >= 0 else 0:.0f}% of deaths)"
+    )
+    print(
+        f"  min ghost dist: {s['avg_min_ghost_dist']:.2f} | approach: {s['approach_pct']:.1f}% of steps"
+    )
 
     if not args.no_save:
         out = append_history(result)

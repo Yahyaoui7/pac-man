@@ -23,9 +23,9 @@ MAZE_STEP_MULTIPLIER = 12.0
 # STAGE 2 BALANCED REWARDS (Survival + Completion)
 # ═══════════════════════════════════════════════════════════════════
 
-STEP_REWARD = -0.3  # was -0.1 — stronger pressure to finish fast
-DEATH_REWARD = -50.0   # Phase A: gentle — ramp to -150 once avg life > 100mv, then -350
-OSCILLATION_REWARD = -1.0  # keep — direction-flip penalty stays soft
+STEP_REWARD = -0.01  # was -0.1 — stronger pressure to finish fast
+DEATH_REWARD = -50.0  # Phase A: gentle — ramp to -150 once avg life > 100mv, then -350
+OSCILLATION_REWARD = -3.0  # keep — direction-flip penalty stays soft
 COMPLETION_REWARD = 500.0  # was 1000.0
 EAT_GHOST_REWARD = 35.0
 PELLET_REWARD = 1.5  # was 2.0 — balance against survival signal
@@ -45,7 +45,7 @@ BAIT_SUPER_PELLET_RADIUS = 4
 CORNERED_MIN_MOVES = 4
 NEAR_GHOST_DIST = 2
 
-LIVES = 2
+LIVES = 4
 
 # ═══════════════════════════════════════════════════════════════════
 # Telemetry (leading indicators for trap-avoidance learning)

@@ -24,9 +24,9 @@ MAZE_STEP_MULTIPLIER = 12.0
 # ═══════════════════════════════════════════════════════════════════
 
 STEP_REWARD = -0.01  # was -0.1 — stronger pressure to finish fast
-DEATH_REWARD = -50.0  # Phase A: gentle — ramp to -150 once avg life > 100mv, then -350
+DEATH_REWARD = -30.0  # Phase A: gentle — ramp to -150 once avg life > 100mv, then -350
 OSCILLATION_REWARD = -3.0  # keep — direction-flip penalty stays soft
-COMPLETION_REWARD = 500.0  # was 1000.0
+COMPLETION_REWARD = 200.0  # was 1000.0
 EAT_GHOST_REWARD = 35.0
 PELLET_REWARD = 1.5  # was 2.0 — balance against survival signal
 SUPER_PELLET_REWARD = 8.0  # was 5.0

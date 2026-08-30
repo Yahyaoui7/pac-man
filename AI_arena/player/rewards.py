@@ -62,28 +62,47 @@ class RewardCalculator:
     # ═══════════════════════════════════════════════════════════════════
 
     def _zone_stagnation_penalty(
-        self, px: int, py: int, breakdown: dict[str, float]
+        self,
+        px: int,
+        py: int,
+        events: dict[str, bool],
+        bfs_shaping: float,
+        threat_dist: float,
+        breakdown: dict[str, float],
     ) -> None:
-        """Gentle flat penalty for lingering in the same 3×3 block too long."""
+        """Penalize lingering in the same 3×3 block too long.
+
+        Smart exemptions:
+        - Skip if eating a pellet this step (progress)
+        - Skip if BFS gradient is strong (actively approaching a pellet)
+        - Skip if a ghost is nearby (dodging is legitimate)
+
+        Escalating: -3.0 at step 8, then -0.5/step after.
+        """
+        # Exemption 1: ate a pellet this step — progress, don't punish
+        if events.get("pellet_eaten") or events.get("super_pellet_eaten"):
+            self.steps_in_block = 0
+            self.current_block = (py // 3, px // 3)
+            return
+
+        # Exemption 2: strong BFS gradient — agent is approaching a pellet
+        if bfs_shaping > 0.15:
+            return
+
+        # Exemption 3: ghost nearby — camping to dodge is legitimate
+        if threat_dist < 4:
+            return
+
         block = (py // 3, px // 3)
         if block == self.current_block:
             self.steps_in_block += 1
-            if self.steps_in_block == 12:
-                breakdown["zone_stagnation"] = -5.0
-            elif self.steps_in_block > 12:
+            if self.steps_in_block == 8:
+                breakdown["zone_stagnation"] = -3.0
+            elif self.steps_in_block > 8:
                 breakdown["zone_stagnation"] = -0.5
         else:
             self.current_block = block
             self.steps_in_block = 1
-
-    def _exploration_reward(
-        self, px: int, py: int, breakdown: dict[str, float]
-    ) -> None:
-        """Reward for visiting a brand-new tile this episode."""
-        cell = (py, px)
-        if cell not in self.visited_this_episode:
-            self.visited_this_episode.add(cell)
-            breakdown["exploration"] = 0.1
 
     def _ghost_eat_reward(
         self, events: dict[str, bool], breakdown: dict[str, float]
@@ -157,8 +176,7 @@ class RewardCalculator:
                 breakdown["milestone"] += reward
 
     def _bfs_shaping(self, bfs_shaping: float, breakdown: dict[str, float]) -> None:
-        """Potential-based shaping: γ·Φ(s′) − Φ(s). Boosted to 3.0× for clear spatial pathing signal."""
-        breakdown["bfs"] = 3.0 * bfs_shaping
+        breakdown["bfs"] = 5.0 * bfs_shaping
 
     def _oscillation_penalty(
         self,
@@ -494,30 +512,39 @@ class RewardCalculator:
         threatening, edible_nearby, min_threat_dist, min_edible_dist = (
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
-        self._step_reward(events, breakdown)
-        self._death_penalty(events, breakdown, frac)
+        self._death_penalty(events, breakdown)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
-        self._super_pellet_reward(events, powered, threatening, breakdown)
-        self._ghost_eat_reward(events, breakdown)
-        # self._exploration_reward(px, py, breakdown)
-        self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
-
-        # ── Re-enabled dense shaping (was all commented out) ──
         self._bfs_shaping(bfs_shaping, breakdown)
-        self._milestone_reward(frac, breakdown)
-        self._hunger_penalty(steps_since_pellet, breakdown)
         self._ghost_proximity_penalty(
-            min_ghost_dist_after,
-            min_ghost_dist_before,
-            events,
-            powered,
-            breakdown,
+            min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
         )
-        self._evasion_skill_reward(min_ghost_dist_after, breakdown)
-        self._incomplete_penalty(events, frac, breakdown)
 
-        # self._zone_stagnation_penalty(px, py, breakdown)  # leave off — too noisy
+        # self._step_reward(events, breakdown)
+        # self._death_penalty(events, breakdown, frac)
+        # self._completion_reward(events, step_count, max_steps, breakdown)
+        # self._pellet_reward(events, frac, breakdown)
+        # self._super_pellet_reward(events, powered, threatening, breakdown)
+        # self._ghost_eat_reward(events, breakdown)
+        # self._exploration_reward(px, py, breakdown)
+        # self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
+
+        # ── Re-enabled dense shaping (was all commented out) ──\
+        # self._zone_stagnation_penalty(
+        #     px, py, events, bfs_shaping, threat_dist, breakdown
+        # )
+        # self._bfs_shaping(bfs_shaping, breakdown)
+        # self._milestone_reward(frac, breakdown)
+        # self._hunger_penalty(steps_since_pellet, breakdown)
+        # self._ghost_proximity_penalty(
+        #     min_ghost_dist_after,
+        #     min_ghost_dist_before,
+        #     events,
+        #     powered,
+        #     breakdown,
+        # )
+        # self._evasion_skill_reward(min_ghost_dist_after, breakdown)
+        # self._incomplete_penalty(events, frac, breakdown)
 
         self.last_min_ghost_dist = (
             min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist

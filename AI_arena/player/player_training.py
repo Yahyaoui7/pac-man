@@ -257,7 +257,7 @@ class TrainingConfig:
             "--entropy", type=float, default=0.04, help="entropy coefficient"
         )
         p.add_argument(
-            "--epsilon", type=float, default=0.05, help="rollout ε-exploration"
+            "--epsilon", type=float, default=0.15, help="rollout ε-exploration"
         )
 
         # ── Execution ──

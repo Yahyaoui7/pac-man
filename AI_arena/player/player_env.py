@@ -99,7 +99,7 @@ class PacmanPlayerEnv:
         self.episode_telemetry: dict[str, float] = {}
         self._in_corner_threat = False
         self._open_escape_deadline = -1
-        self.ghost_confusion_prob = 0.01  # REMOVE
+        self.ghost_confusion_prob = 0.8  # REMOVE
         self.death_count = 0
 
         # ← NEW: spatial / temporal memory state
@@ -199,18 +199,20 @@ class PacmanPlayerEnv:
         self._reward_calc.reset()
         # self.reward_calculator.reset()
         # ← NEW: curriculum-friendly sizing
-        # mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
-        # mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
-        # mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
-        # mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
+        mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
+        mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
+        mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
+        mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
 
-        # maze_w = self.rng.randint(mw_min, mw_max)
-        # maze_h = self.rng.randint(mh_min, mh_max)
-        # current_seed = self.rng.randint(1, 44444)
-        maze_w = 25
-        maze_h = 20
-        fixed_seeds = [20, 77, 1337, 42, 100]
-        current_seed = fixed_seeds[self.rng.randint(0, len(fixed_seeds) - 1)]
+        maze_w = self.rng.randint(mw_min, mw_max)
+        maze_h = self.rng.randint(mh_min, mh_max)
+        current_seed = self.rng.randint(1, 44444)
+
+        # maze_w = 25
+        # maze_h = 20
+        # fixed_seeds = [20, 77, 1337, 42, 100]
+        # current_seed = fixed_seeds[self.rng.randint(0, len(fixed_seeds) - 1)]
+
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
         self.movement = MovementSystem(self.maze)

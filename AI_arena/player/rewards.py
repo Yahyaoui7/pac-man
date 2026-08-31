@@ -97,7 +97,7 @@ class RewardCalculator:
         if block == self.current_block:
             self.steps_in_block += 1
             if self.steps_in_block == 8:
-                breakdown["zone_stagnation"] = -3.0
+                breakdown["zone_stagnation"] = -10.0
             elif self.steps_in_block > 8:
                 breakdown["zone_stagnation"] = -0.5
         else:
@@ -149,7 +149,7 @@ class RewardCalculator:
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
         if events.get("pellet_eaten", False):
-            breakdown["pellet"] = PELLET_REWARD + 2.0 * frac
+            breakdown["pellet"] = PELLET_REWARD + 5.0 * frac
 
     def _super_pellet_reward(
         self,
@@ -297,13 +297,13 @@ class RewardCalculator:
         ):
             escape_quality = min_ghost_dist_after - self.last_min_ghost_dist
             if self.last_min_ghost_dist == 1:
-                breakdown["evasion_skill"] += 1.0 * escape_quality
+                breakdown["evasion_skill"] += 2.0 * escape_quality
             elif self.last_min_ghost_dist == 2:
-                breakdown["evasion_skill"] += 0.5 * escape_quality
+                breakdown["evasion_skill"] += 1.0 * escape_quality
             elif self.last_min_ghost_dist == 3:
-                breakdown["evasion_skill"] += 0.2 * escape_quality
+                breakdown["evasion_skill"] += 0.5 * escape_quality
             elif self.last_min_ghost_dist == 4:
-                breakdown["evasion_skill"] += 0.1 * escape_quality
+                breakdown["evasion_skill"] += 0.2 * escape_quality
 
     def _zone_control_reward(
         self,
@@ -516,26 +516,26 @@ class RewardCalculator:
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
         self._bfs_shaping(bfs_shaping, breakdown)
-        self._ghost_proximity_penalty(
-            min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
+        self._milestone_reward(frac, breakdown)
+        self._ghost_eat_reward(events, breakdown)
+        self._evasion_skill_reward(min_ghost_dist_after, breakdown)
+        # self._ghost_proximity_penalty(
+        #     min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
+        # )
+        self._zone_stagnation_penalty(
+            px, py, events, bfs_shaping, threat_dist, breakdown
         )
 
+        # self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
         # self._step_reward(events, breakdown)
         # self._death_penalty(events, breakdown, frac)
         # self._completion_reward(events, step_count, max_steps, breakdown)
         # self._pellet_reward(events, frac, breakdown)
         # self._super_pellet_reward(events, powered, threatening, breakdown)
-        # self._ghost_eat_reward(events, breakdown)
         # self._exploration_reward(px, py, breakdown)
-        # self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
+        # self._hunger_penalty(steps_since_pellet, breakdown)
 
         # ── Re-enabled dense shaping (was all commented out) ──\
-        # self._zone_stagnation_penalty(
-        #     px, py, events, bfs_shaping, threat_dist, breakdown
-        # )
-        # self._bfs_shaping(bfs_shaping, breakdown)
-        # self._milestone_reward(frac, breakdown)
-        # self._hunger_penalty(steps_since_pellet, breakdown)
         # self._ghost_proximity_penalty(
         #     min_ghost_dist_after,
         #     min_ghost_dist_before,
@@ -543,7 +543,6 @@ class RewardCalculator:
         #     powered,
         #     breakdown,
         # )
-        # self._evasion_skill_reward(min_ghost_dist_after, breakdown)
         # self._incomplete_penalty(events, frac, breakdown)
 
         self.last_min_ghost_dist = (

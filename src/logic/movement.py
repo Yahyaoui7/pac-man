@@ -382,6 +382,42 @@ class MovementSystem:
         self.pattern_42 = None
         self._navigate_bfs(ghost, player.grid_y, player.grid_x)
 
+    def _predict_player_pos(self, player: Any, steps: int) -> tuple[int, int]:
+        """Walk player forward `steps` cells in their current direction.
+
+        Stops early if a wall blocks the path. Returns the furthest
+        reachable (grid_y, grid_x) cell.
+        """
+        DIRECTION_DELTA: dict[str, tuple[int, int]] = {
+            "UP": (-1, 0),
+            "DOWN": (1, 0),
+            "LEFT": (0, -1),
+            "RIGHT": (0, 1),
+        }
+        direction = getattr(player, "next_direction", None) or player.direction
+        delta = DIRECTION_DELTA.get(direction, (0, 0))
+        dy, dx = delta
+        y, x = player.grid_y, player.grid_x
+        for _ in range(steps):
+            if self.can_move(y, x, direction):
+                y, x = y + dy, x + dx
+            else:
+                break
+        return y, x
+
+    def update_predictive_ghost(
+        self, ghost: Any, player: Any, lookahead: int
+    ) -> None:
+        """BFS toward predicted player position `lookahead` steps ahead.
+
+        With lookahead=0 this is identical to update_bfs_ghost.
+        Higher values make the ghost intercept instead of chase.
+        """
+        self.pattern_42 = None
+        target_y, target_x = self._predict_player_pos(player, lookahead)
+        self._navigate_bfs(ghost, target_y, target_x)
+
+
     def update_cnn_ghost(
         self,
         ghost: Any,

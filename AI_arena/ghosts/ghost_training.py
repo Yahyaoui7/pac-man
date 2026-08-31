@@ -26,8 +26,34 @@ def masked_cross_entropy(
     valid_actions: Tensor,
     labels: Tensor,
 ) -> Tensor:
-    """Calculate action loss after excluding movements blocked by walls."""
-    masked_logits = logits.masked_fill(~valid_actions, float("-inf"))
+    """Calculate action loss after excluding movements blocked by walls.
+
+    Two guards against inf loss:
+
+    1. All-masked rows: if every direction is invalid for a ghost (e.g.
+       prison ghosts recorded with a fallback label), allow all actions so
+       softmax does not receive an all-inf row.
+
+    2. Label masked out: the expert label must never be masked to -inf,
+       otherwise cross_entropy = -log(0) = inf.  This happens when the
+       formatter marks an action as illegal that the expert still chose
+       (e.g. prison-ghost fallback label vs. formatter valid_actions mismatch).
+       We always force the label action to be unmasked.
+    """
+    safe_mask = valid_actions.clone()
+
+    # Guard 1: fully-masked ghost rows
+    all_masked = ~safe_mask.any(dim=-1, keepdim=True)
+    safe_mask = safe_mask | all_masked
+
+    # Guard 2: ensure the label action is never masked
+    # labels shape: (batch, GHOST_COUNT) — scatter into (batch, GHOST_COUNT, ACTION_COUNT)
+    label_one_hot = torch.zeros_like(safe_mask).scatter_(
+        -1, labels.unsqueeze(-1).clamp(0, ACTION_COUNT - 1), True
+    )
+    safe_mask = safe_mask | label_one_hot
+
+    masked_logits = logits.masked_fill(~safe_mask, float("-inf"))
     return nn.functional.cross_entropy(
         masked_logits.reshape(-1, ACTION_COUNT),
         labels.reshape(-1),
@@ -77,67 +103,87 @@ def train(
         shuffle=False,
     )
     model = GhostCNN().to(device)
+    if Path(model_path).exists():
+        print(f"Resuming training from {model_path}")
+        model.load_state_dict(
+            torch.load(model_path, map_location=device, weights_only=True)
+        )
+    else:
+        print("No saved model found — training from scratch.")
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     best_validation_accuracy = -1.0
     best_weights = copy.deepcopy(model.state_dict())
     best_epoch = 0
     epochs_without_improvement = 0
 
-    for epoch in range(1, epochs + 1):
-        model.train()
-        total_loss = 0.0
-        sample_count = 0
-        correct = 0
-        prediction_count = 0
+    try:
+        for epoch in range(1, epochs + 1):
+            model.train()
+            total_loss = 0.0
+            sample_count = 0
+            correct = 0
+            prediction_count = 0
 
-        for grid, extra_features, valid_actions, labels in train_loader:
-            grid = grid.to(device)
-            extra_features = extra_features.to(device)
-            valid_actions = valid_actions.to(device)
-            labels = labels.to(device)
+            for grid, extra_features, valid_actions, labels in train_loader:
+                grid = grid.to(device)
+                extra_features = extra_features.to(device)
+                valid_actions = valid_actions.to(device)
+                labels = labels.to(device)
 
-            optimizer.zero_grad()
-            logits = model(grid, extra_features)
-            loss = masked_cross_entropy(logits, valid_actions, labels)
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                logits = model(grid, extra_features)
+                loss = masked_cross_entropy(logits, valid_actions, labels)
+                loss.backward()
+                optimizer.step()
 
-            current_batch_size = grid.shape[0]
-            total_loss += loss.item() * current_batch_size
-            sample_count += current_batch_size
-            predictions = logits.masked_fill(
-                ~valid_actions,
-                float("-inf"),
-            ).argmax(dim=-1)
-            correct += (predictions == labels).sum().item()
-            prediction_count += labels.numel()
+                current_batch_size = grid.shape[0]
+                total_loss += loss.item() * current_batch_size
+                sample_count += current_batch_size
+                predictions = logits.masked_fill(
+                    ~valid_actions,
+                    float("-inf"),
+                ).argmax(dim=-1)
+                correct += (predictions == labels).sum().item()
+                prediction_count += labels.numel()
 
-        average_loss = total_loss / sample_count
-        train_accuracy = correct / prediction_count
-        validation_loss, validation_accuracy = evaluate(
-            model,
-            validation_loader,
-            device,
-        )
-        if validation_accuracy > best_validation_accuracy:
-            best_validation_accuracy = validation_accuracy
-            best_weights = copy.deepcopy(model.state_dict())
-            best_epoch = epoch
-            epochs_without_improvement = 0
-        else:
-            epochs_without_improvement += 1
-        print(
-            f"Epoch {epoch:03d}/{epochs:03d} - "
-            f"train loss: {average_loss:.6f} acc: {train_accuracy:.2%} - "
-            f"val loss: {validation_loss:.6f} "
-            f"acc: {validation_accuracy:.2%}"
-        )
-        if epochs_without_improvement >= patience:
-            print(
-                f"Early stopping after {epoch} epochs; validation accuracy "
-                f"has not improved for {patience} epochs."
+            average_loss = total_loss / sample_count
+            train_accuracy = correct / prediction_count
+            validation_loss, validation_accuracy = evaluate(
+                model,
+                validation_loader,
+                device,
             )
-            break
+            if validation_accuracy > best_validation_accuracy:
+                best_validation_accuracy = validation_accuracy
+                best_weights = copy.deepcopy(model.state_dict())
+                best_epoch = epoch
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+            print(
+                f"Epoch {epoch:03d}/{epochs:03d} - "
+                f"train loss: {average_loss:.6f} acc: {train_accuracy:.2%} - "
+                f"val loss: {validation_loss:.6f} "
+                f"acc: {validation_accuracy:.2%}"
+            , flush=True)
+            if epochs_without_improvement >= patience:
+                print(
+                    f"Early stopping after {epoch} epochs; validation accuracy "
+                    f"has not improved for {patience} epochs."
+                , flush=True)
+                break
+
+    except KeyboardInterrupt:
+        print(
+            f"\nTraining interrupted! Saving best weights so far "
+            f"(epoch {best_epoch}, val acc: {best_validation_accuracy:.2%}, flush=True)..."
+        )
+        model.load_state_dict(best_weights)
+        destination = Path(model_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), destination)
+        print(f"Checkpoint saved to {destination}", flush=True)
+        return model
 
     model.load_state_dict(best_weights)
     destination = Path(model_path)
@@ -146,7 +192,7 @@ def train(
     print(
         f"Saved best model weights to {destination} "
         f"(epoch {best_epoch}, validation accuracy: "
-        f"{best_validation_accuracy:.2%})"
+        f"{best_validation_accuracy:.2%}, flush=True)"
     )
     return model
 

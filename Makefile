@@ -11,10 +11,10 @@ debug:
 	uv run python -m pdb -m pac_man.py config.json
 
 collect:
-	uv run python -m AI_arena.data_collector.main_loop 
+	uv run python -m AI_arena.ghosts.ghost_collector --samples 50000 --stage 2
 
 train:
-	uv run python -m AI_arena.ghosts.ghost_training --epochs 30 --patience 5
+	uv run python -m AI_arena.ghosts.ghost_training --epochs 30 --patience 20
 
 collect-player:
 	uv run python -m AI_arena.player.player_collector --samples 10000 --stage 2

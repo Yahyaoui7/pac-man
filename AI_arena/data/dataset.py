@@ -37,6 +37,8 @@ class CNNJSONLDataset(Dataset[CNNSample]):
         if not self.path.is_file():
             raise FileNotFoundError(f"CNN dataset does not exist: {self.path}")
 
+        file_size = self.path.stat().st_size
+        print(f"Indexing dataset ({file_size / 1e6:.0f} MB) ...", flush=True)
         offsets: list[int] = []
         with self.path.open("rb") as fh:
             while True:
@@ -46,6 +48,7 @@ class CNNJSONLDataset(Dataset[CNNSample]):
                     break
                 if line.strip():
                     offsets.append(offset)
+        print(f"Indexed {len(offsets):,} records. Starting training...", flush=True)
         return offsets
 
     def __len__(self) -> int:

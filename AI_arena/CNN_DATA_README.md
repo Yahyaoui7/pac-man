@@ -8,12 +8,14 @@ The collector produces this structure:
 
 ```python
 {
-    "grid": grid,                     # Model input: [12, 50, 25]
-    "maze_width": maze_width,         # Original unpadded width
-    "maze_height": maze_height,       # Original unpadded height
-    "extra_features": extra_features, # Model input: [9]
-    "valid_actions": valid_actions,   # Output mask: [4, 4]
-    "labels": labels,                 # Training targets: [4]
+    "grid":           grid,           # Model input:    [6, 25, 50]
+    "maze_width":     maze_width,     # Original unpadded width
+    "maze_height":    maze_height,    # Original unpadded height
+    "extra_features": extra_features, # Model input:    [45]
+    "valid_actions":  valid_actions,  # Output mask:    [4, 4]
+    "labels":         labels,         # Training targets:[4]
+    "episode_id":     episode_id,     # Episode index
+    "episode_step":   episode_step,   # Step within episode
 }
 ```
 
@@ -35,149 +37,185 @@ The ghost order is also fixed:
 | 2 | Inky |
 | 3 | Clyde |
 
+---
+
 ## `grid`: spatial model input
 
-`grid` has the fixed shape `[12, 50, 25]`. It is similar to a 12-channel image:
-every channel describes one kind of information at every maze cell. Smaller
-mazes are placed at the top-left and zero-padded. The `valid_cell` channel
-distinguishes maze cells from padding.
+`grid` has the fixed shape `[6, 25, 50]` — 6 channels, height 25, width 50.
+It is produced by `ObservationFormatter.format_observation()` in
+`AI_arena/data/formatter.py`. Smaller mazes are placed at the top-left corner
+and zero-padded. Channel 5 (`walkable`) distinguishes active maze cells from
+padding.
 
-`maze_width` and `maze_height` store the original unpadded dimensions. The
-dataset validator checks that they fit inside the fixed tensor and that every
-grid value outside those dimensions is zero. They are metadata and are not
-passed to the model.
+`maze_width` and `maze_height` store the original unpadded dimensions. They are
+metadata only and are not passed to the model.
 
-| Channel | Name | Meaning of value `1` |
+| Channel | Name | How it is encoded |
 |---:|---|---|
-| 0 | `wall_up` | The cell has a wall on its upper side |
-| 1 | `wall_down` | The cell has a wall on its lower side |
-| 2 | `wall_left` | The cell has a wall on its left side |
-| 3 | `wall_right` | The cell has a wall on its right side |
-| 4 | `normal_pellet` | A normal pellet is in the cell |
-| 5 | `super_pellet` | A power pellet is in the cell |
-| 6 | `player` | The player is in the cell |
-| 7 | `blinky` | Blinky is in the cell |
-| 8 | `pinky` | Pinky is in the cell |
-| 9 | `inky` | Inky is in the cell |
-| 10 | `clyde` | Clyde is in the cell |
-| 11 | `valid_cell` | The cell is walkable rather than a blocked pattern cell |
+| 0 | `maze_bitmask` | `maze[y][x] / 15.0` — raw wall bitmask normalized to [0, 1] |
+| 1 | `normal_pellet` | `1.0` if a normal pellet occupies the cell, else `0.0` |
+| 2 | `power_pellet` | `1.0` if a power pellet occupies the cell, else `0.0` |
+| 3 | `player` | 3×3 heat map centered on the player (center=1.0, orthogonal=0.5, diagonal=0.25) |
+| 4 | `ghosts_signed` | 3×3 heat map per ghost: **positive** (+1.0) when dangerous, **negative** (−1.0) when edible; overlapping patches use max/min |
+| 5 | `walkable` | `1.0` for every non-wall cell inside the active maze, `0.0` for walls and padding |
 
-For example, this player channel describes a player at `(x=1, y=0)` in a
-3-by-3 maze:
+> **Note on channel 0 — maze bitmask**
+> Each cell value is a 4-bit bitmask encoding which sides are open (passable):
+> `bit 0 = NORTH`, `bit 1 = EAST`, `bit 2 = SOUTH`, `bit 3 = WEST`.
+> A solid wall cell has value `15` (all bits set → all sides blocked).
+> Dividing by 15.0 normalizes the range to [0, 1].
 
-```python
-grid[6] = [
-    [0, 1, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-]
-```
+> **Note on channel 4 — signed ghost heat map**
+> A non-edible (dangerous) ghost contributes **positive** values to the
+> 3×3 patch around its position. An edible (frightened) ghost contributes
+> **negative** values. This lets the model distinguish threat from opportunity
+> in a single channel.
 
-The grid and its channels are passed to the CNN after conversion to a floating
-point tensor.
+---
 
 ## `extra_features`: non-spatial model input
 
-`extra_features` contains nine non-spatial values:
+`extra_features` is a flat vector of **45 floats** produced by
+`ObservationFormatter.format_observation()`. The table below lists every entry
+in order:
 
-```text
-[
-    player_up,
-    player_down,
-    player_left,
-    player_right,
-    player_powered,
-    blinky_frightened,
-    pinky_frightened,
-    inky_frightened,
-    clyde_frightened,
-]
-```
+| Index | Name | Description |
+|---:|---|---|
+| 0 | `player_dir_up` | 1.0 if player is moving UP |
+| 1 | `player_dir_down` | 1.0 if player is moving DOWN |
+| 2 | `player_dir_left` | 1.0 if player is moving LEFT |
+| 3 | `player_dir_right` | 1.0 if player is moving RIGHT |
+| 4 | `last_action_up` | 1.0 if the last action taken was UP |
+| 5 | `last_action_down` | 1.0 if the last action taken was DOWN |
+| 6 | `last_action_left` | 1.0 if the last action taken was LEFT |
+| 7 | `last_action_right` | 1.0 if the last action taken was RIGHT |
+| 8 | `player_powered` | 1.0 if any ghost is currently edible (player ate a power pellet) |
+| 9 | `blinky_edible` | 1.0 if Blinky is edible |
+| 10 | `pinky_edible` | 1.0 if Pinky is edible |
+| 11 | `inky_edible` | 1.0 if Inky is edible |
+| 12 | `clyde_edible` | 1.0 if Clyde is edible |
+| 13 | `maze_width_norm` | `maze_width / 50.0` |
+| 14 | `maze_height_norm` | `maze_height / 25.0` |
+| 15 | `maze_area_norm` | `(maze_width × maze_height − 1) / 1000.0` |
+| 16 | `blinky_dx` | `(player_x − blinky_x) / max_dim` |
+| 17 | `blinky_dy` | `(player_y − blinky_y) / max_dim` |
+| 18 | `blinky_bfs_dist` | BFS distance from player to Blinky, `(dist + 1) / max_dim` |
+| 19 | `pinky_dx` | `(player_x − pinky_x) / max_dim` |
+| 20 | `pinky_dy` | `(player_y − pinky_y) / max_dim` |
+| 21 | `pinky_bfs_dist` | BFS distance from player to Pinky |
+| 22 | `inky_dx` | `(player_x − inky_x) / max_dim` |
+| 23 | `inky_dy` | `(player_y − inky_y) / max_dim` |
+| 24 | `inky_bfs_dist` | BFS distance from player to Inky |
+| 25 | `clyde_dx` | `(player_x − clyde_x) / max_dim` |
+| 26 | `clyde_dy` | `(player_y − clyde_y) / max_dim` |
+| 27 | `clyde_bfs_dist` | BFS distance from player to Clyde |
+| 28 | `blinky_dir_up` | 1.0 if Blinky is moving UP |
+| 29 | `blinky_dir_down` | 1.0 if Blinky is moving DOWN |
+| 30 | `blinky_dir_left` | 1.0 if Blinky is moving LEFT |
+| 31 | `blinky_dir_right` | 1.0 if Blinky is moving RIGHT |
+| 32 | `pinky_dir_up` | 1.0 if Pinky is moving UP |
+| 33 | `pinky_dir_down` | 1.0 if Pinky is moving DOWN |
+| 34 | `pinky_dir_left` | 1.0 if Pinky is moving LEFT |
+| 35 | `pinky_dir_right` | 1.0 if Pinky is moving RIGHT |
+| 36 | `inky_dir_up` | 1.0 if Inky is moving UP |
+| 37 | `inky_dir_down` | 1.0 if Inky is moving DOWN |
+| 38 | `inky_dir_left` | 1.0 if Inky is moving LEFT |
+| 39 | `inky_dir_right` | 1.0 if Inky is moving RIGHT |
+| 40 | `clyde_dir_up` | 1.0 if Clyde is moving UP |
+| 41 | `clyde_dir_down` | 1.0 if Clyde is moving DOWN |
+| 42 | `clyde_dir_left` | 1.0 if Clyde is moving LEFT |
+| 43 | `clyde_dir_right` | 1.0 if Clyde is moving RIGHT |
+| 44 | `nearest_power_pellet_dist` | BFS distance from player to nearest power pellet, `(dist + 1) / max_dim`; `0.0` if none remain |
 
-The first four entries encode the player's direction. The remaining entries
-encode the global powered state and the frightened state of each ghost.
+> `max_dim = max(maze_width, maze_height)` — used to normalize all distances.
 
-These values are model inputs. A typical model processes `grid` with
-convolutional layers, processes or concatenates `extra_features` after the
-convolutional layers, and outputs four action scores for each ghost.
+---
 
 ## `valid_actions`: hard output mask
 
 `valid_actions` has shape `[4, 4]`: one row per ghost and one column per
-direction. A `1` means that the ghost can move in that direction; a `0` means
-that the direction is blocked.
+direction. `True` means the ghost can move in that direction; `False` means
+the direction is blocked by a wall.
 
 ```python
 valid_actions = [
-    [1, 0, 1, 0],  # Blinky can move UP or LEFT
-    [0, 1, 0, 1],  # Pinky can move DOWN or RIGHT
-    [1, 1, 0, 0],  # Inky can move UP or DOWN
-    [0, 0, 1, 1],  # Clyde can move LEFT or RIGHT
+    [True,  False, True,  False],  # Blinky can move UP or LEFT
+    [False, True,  False, True ],  # Pinky  can move DOWN or RIGHT
+    [True,  True,  False, False],  # Inky   can move UP or DOWN
+    [False, False, True,  True ],  # Clyde  can move LEFT or RIGHT
 ]
 ```
 
-This is not a normal model input. Apply it as a hard mask to the four output
-scores so that the model can never select a movement through a wall. The mask
-must be applied both during training and during inference.
+Apply this mask to logits as a **hard mask** — the model must never select a
+movement through a wall. Apply the same mask during training, validation, and
+inference.
+
+---
 
 ## `labels`: correct training actions
 
-`labels` contains one correct direction index for every ghost. These answers
-are produced from the first direction in the BFS path and are used to calculate
-the supervised training loss.
+`labels` contains one correct direction index for every ghost, produced by the
+BFS-based ghost expert:
+
+- Ghost **not edible** → label = first step of the BFS shortest path **toward** the player.
+- Ghost **edible** (frightened) → label = direction that **maximises** BFS distance from the player.
 
 ```python
 labels = [0, 3, 1, 2]
 ```
 
-This means:
-
-| Ghost | Label | Correct movement |
+| Ghost | Label | Direction |
 |---|---:|---|
 | Blinky | 0 | UP |
 | Pinky | 3 | RIGHT |
 | Inky | 1 | DOWN |
 | Clyde | 2 | LEFT |
 
-Every label should point to an allowed entry in the corresponding action mask.
-For example, Blinky's label is `0`, so `valid_actions[0][0]` must equal `1`.
-Labels are used only during training; they do not exist when the trained model
-is controlling ghosts in the game.
+Every label must point to an allowed entry in the corresponding action mask —
+`valid_actions[ghost_index][label]` must be `True`. Labels are used only during
+training; they do not exist when the trained model controls ghosts in the game.
+
+---
 
 ## Complete simplified example
 
-The real `grid` contains all 12 matrices. It is abbreviated below to keep the
-example readable:
-
 ```python
 sample = {
-    "grid": "12 matrices, each with shape [50, 25]",
-    "extra_features": [0, 0, 0, 1, 1, 1, 1, 0, 0],
-    "valid_actions": [
-        [1, 0, 1, 0],
-        [0, 1, 0, 1],
-        [1, 1, 0, 0],
-        [0, 0, 1, 1],
+    "grid":           # shape [6, 25, 50] — 6 channels described above
+    "extra_features": [0, 0, 0, 1,   # player moving RIGHT
+                       0, 0, 0, 1,   # last action was RIGHT
+                       1,            # player is powered
+                       1, 1, 0, 0,   # Blinky & Pinky edible
+                       0.4, 1.0, 9.999,   # maze dims
+                       # ... 29 more spatial/direction values ...
+                      ],
+    "valid_actions":  [
+        [True,  False, True,  False],
+        [False, True,  False, True ],
+        [True,  True,  False, False],
+        [False, False, True,  True ],
     ],
-    "labels": [0, 3, 1, 2],
+    "labels":         [0, 3, 1, 2],
+    "episode_id":     0,
+    "episode_step":   42,
+    "maze_width":     20,
+    "maze_height":    25,
 }
 ```
 
-The sample says the player is moving right and is powered; Blinky and Pinky
-are frightened. The teacher wants Blinky to move up, Pinky right, Inky down,
-and Clyde left; all four target actions are permitted by their masks.
+---
 
 ## How to use a batch in PyTorch
 
-The model should return logits with shape `[batch_size, 4, 4]`.
+The model returns logits with shape `[batch_size, 4, 4]`.
 
 ```python
-logits = model(grid, extra_features)
-masked_logits = logits.masked_fill(valid_actions == 0, -1e9)
+logits = model(grid, extra_features)                         # [B, 4, 4]
+masked_logits = logits.masked_fill(~valid_actions, -1e9)    # [B, 4, 4]
 
 loss = criterion(
-    masked_logits.reshape(-1, 4),
-    labels.reshape(-1),
+    masked_logits.reshape(-1, 4),   # [B*4, 4]
+    labels.reshape(-1),             # [B*4]
 )
 ```
 
@@ -185,34 +223,31 @@ At inference time, omit `labels` and select the best permitted direction:
 
 ```python
 logits = model(grid, extra_features)
-masked_logits = logits.masked_fill(valid_actions == 0, -1e9)
-predicted_actions = masked_logits.argmax(dim=-1)
+masked_logits = logits.masked_fill(~valid_actions, -1e9)
+predicted_actions = masked_logits.argmax(dim=-1)  # [batch_size, 4]
 ```
+
+---
 
 ## Training in batches
 
-The collector pads all mazes to the same dimensions, so the data loader can
-stack multiple samples directly:
+The collector pads all mazes to the same fixed dimensions, so the DataLoader
+can stack multiple samples directly:
 
 ```text
-grid:           [batch_size, 12, 50, 25]
-extra_features: [batch_size, 9]
+grid:           [batch_size, 6, 25, 50]
+extra_features: [batch_size, 45]
 valid_actions:  [batch_size, 4, 4]
 labels:         [batch_size, 4]
 ```
 
-Adaptive pooling may still be used, but is not required to handle varying
-input dimensions.
-
 ### Validate each sample
 
-Check every record before training:
-
 ```python
-assert len(grid) == 12
-assert 1 <= maze_width <= 25
-assert 1 <= maze_height <= 50
-assert len(extra_features) == 9
+assert len(grid) == 6
+assert 1 <= maze_width  <= 50
+assert 1 <= maze_height <= 25
+assert len(extra_features) == 45
 assert len(valid_actions) == 4
 assert all(len(mask) == 4 for mask in valid_actions)
 assert len(labels) == 4
@@ -222,94 +257,32 @@ for ghost_index, label in enumerate(labels):
     assert valid_actions[ghost_index][label] == 1
 ```
 
-Invalid records should be fixed or excluded instead of silently accepted.
-
 ### Convert JSON data to tensors
 
-Read one JSONL record and convert its lists to tensors:
-
-| Value | Tensor type | Shape passed to training |
+| Value | Tensor type | Shape |
 |---|---|---|
-| `grid` | `torch.float32` | `[1, 12, 50, 25]` |
-| `extra_features` | `torch.float32` | `[1, 9]` |
+| `grid` | `torch.float32` | `[1, 6, 25, 50]` |
+| `extra_features` | `torch.float32` | `[1, 45]` |
 | `valid_actions` | `torch.bool` | `[1, 4, 4]` |
 | `labels` | `torch.long` | `[1, 4]` |
-
-Pass only `grid` and `extra_features` into the model. Apply `valid_actions` to
-the output and use `labels` to calculate training loss:
-
-```python
-criterion = torch.nn.CrossEntropyLoss()
-
-logits = model(grid, extra_features)
-masked_logits = logits.masked_fill(~valid_actions, -1e9)
-
-loss = criterion(
-    masked_logits.reshape(-1, 4),
-    labels.reshape(-1),
-)
-```
-
-Use the same mask during training, validation, testing, and gameplay. It
-guarantees that the selected movement is not blocked by a wall.
-
-## Passing JSONL Data to the Model
-
-Use `CNN_DATA.jsonl` as the training-data source, but do not pass JSON objects
-directly to the CNN. The dataset loader must read one line with `json.loads()`
-and convert each field to a PyTorch tensor:
-
-- `grid` becomes `torch.float32`.
-- `extra_features` becomes `torch.float32`.
-- `valid_actions` becomes `torch.bool`.
-- `labels` becomes `torch.long`.
-
-Pass only `grid` and `extra_features` into the model. Use `valid_actions` to
-mask blocked directions and use `labels` to calculate the training loss:
 
 ```python
 record = json.loads(line)
 
-grid = torch.tensor(record["grid"], dtype=torch.float32).unsqueeze(0)
-extra = torch.tensor(
-    record["extra_features"], dtype=torch.float32
-).unsqueeze(0)
-valid_actions = torch.tensor(
-    record["valid_actions"], dtype=torch.bool
-).unsqueeze(0)
-labels = torch.tensor(
-    record["labels"], dtype=torch.long
-).unsqueeze(0)
+grid         = torch.tensor(record["grid"],           dtype=torch.float32).unsqueeze(0)
+extra        = torch.tensor(record["extra_features"], dtype=torch.float32).unsqueeze(0)
+valid_actions= torch.tensor(record["valid_actions"],  dtype=torch.bool).unsqueeze(0)
+labels       = torch.tensor(record["labels"],         dtype=torch.long).unsqueeze(0)
 
-logits = model(grid, extra)
+logits        = model(grid, extra)
 masked_logits = logits.masked_fill(~valid_actions, -1e9)
-
-loss = criterion(
-    masked_logits.reshape(-1, 4),
-    labels.reshape(-1),
-)
-```
-
-For one sample, the tensor shapes are:
-
-```text
-grid:           [1, 12, 50, 25]
-extra:          [1, 9]
-model output:   [1, 4, 4]
-valid_actions:  [1, 4, 4]
-labels:         [1, 4]
+loss          = criterion(masked_logits.reshape(-1, 4), labels.reshape(-1))
 ```
 
 ### Example training loop
 
-Generate and save the dataset before training. The data loader should shuffle
-the training records and return them gradually; do not load or pass the entire
-dataset to the model at once. Increase or decrease the batch size based on
-available memory.
-
 ```python
-from AI_arena.cnn_dataset import create_cnn_dataloader
-
+from AI_arena.data.dataset import create_cnn_dataloader
 
 train_loader = create_cnn_dataloader(
     "AI_arena/data/CNN_DATA.jsonl",
@@ -320,135 +293,60 @@ criterion = torch.nn.CrossEntropyLoss()
 
 for epoch in range(num_epochs):
     model.train()
-
     for grid, extra_features, valid_actions, labels in train_loader:
         optimizer.zero_grad()
-
-        # Only numeric grid and extra-feature tensors enter the CNN.
-        logits = model(grid, extra_features)
-
-        # Prevent the loss from selecting directions blocked by walls.
+        logits        = model(grid, extra_features)
         masked_logits = logits.masked_fill(~valid_actions, -1e9)
-        loss = criterion(
+        loss          = criterion(
             masked_logits.reshape(-1, 4),
             labels.reshape(-1),
         )
-
         loss.backward()
         optimizer.step()
 ```
 
-After the last sample, the next epoch reads the shuffled training dataset
-again. Validation and test records must remain separate and must not be used
-by `optimizer.step()`.
+---
 
-## Recommended CNN architecture
+## Model architecture (actual implementation)
 
-The following architecture is a practical starting point for the fixed input
-shape `[batch_size, 12, 50, 25]`:
+The project uses `GhostCNN` in [`AI_arena/models/cnn_ghost.py`](AI_arena/models/cnn_ghost.py),
+built on top of `PacmanCNNBackbone` in [`AI_arena/models/cnn_backbone.py`](AI_arena/models/cnn_backbone.py).
 
-```text
-Grid input: 12 x 50 x 25
+```
+Grid input:  [B, 6, 25, 50]
+Scalar input:[B, 45]
     |
-Conv2d: 12 -> 32 filters, 3x3 kernel, padding 1
-ReLU
-MaxPool2d: 2x2
+PacmanCNNBackbone:
+  ├── Spatial tower:  CNN (ResBlocks + SEBlocks) → 128-dim
+  ├── Scalar tower:   LayerNorm → MLP → 128-dim
+  ├── Fusion:         concat(256) → MLP → GRU-hidden
+  └── GRU (2-layer) + LayerNorm → Linear → ReLU → Dropout → 256-dim
     |
-Conv2d: 32 -> 64 filters, 3x3 kernel, padding 1
-ReLU
-MaxPool2d: 2x2
-    |
-Conv2d: 64 -> 128 filters, 3x3 kernel, padding 1
-ReLU
-AdaptiveAvgPool2d: 4x4
-    |
-Flatten and concatenate the 9 extra features
-    |
-Linear: 2057 -> 256
-ReLU
-Dropout: 0.3
-    |
-Linear: 256 -> 128
-ReLU
-    |
-Linear: 128 -> 16
-    |
-Reshape: [batch_size, 4 ghosts, 4 actions]
+GhostCNN head:
+  Linear(256 → 16) → reshape → [B, 4 ghosts, 4 actions]
 ```
 
-The first fully connected layer has 2,057 inputs:
-
-```text
-(128 channels * 4 * 4) + 9 extra features = 2057
-```
-
-An example PyTorch implementation is:
-
-```python
-import torch
-from torch import nn
-
-
-class GhostCNN(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.cnn = nn.Sequential(
-            nn.Conv2d(12, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d((4, 4)),
-        )
-
-        self.head = nn.Sequential(
-            nn.Linear(128 * 4 * 4 + 9, 256),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 16),
-        )
-
-    def forward(self, grid, extra_features):
-        spatial_features = self.cnn(grid)
-        spatial_features = torch.flatten(spatial_features, start_dim=1)
-        combined_features = torch.cat(
-            (spatial_features, extra_features), dim=1
-        )
-        logits = self.head(combined_features)
-        return logits.view(-1, 4, 4)
-```
-
-The filter counts `32`, `64`, and `128` are initial recommendations. They can
-be adjusted later by comparing training and validation performance.
-
-The project implementation is in `AI_arena/cnn_model.py`. Train it with:
+Train with:
 
 ```bash
-uv run python -m AI_arena.cnn_training
+uv run python -m AI_arena.ghosts.ghost_training --epochs 30
 ```
 
-By default, training reads `AI_arena/data/CNN_DATA.jsonl`, runs for 20 epochs,
-and saves the weights to `AI_arena/models/ghost_ai.pt`. Use `--help` to see
-options for changing the dataset, output path, epochs, batch size, and learning
-rate.
+By default, training reads `AI_arena/data/CNN_DATA.jsonl` and saves the best
+weights to `AI_arena/models/ghost_ai.pt`.
 
-## Next Steps
+---
 
-1. Generate a larger CNN dataset instead of the current single sample.
-2. Create a PyTorch JSONL dataset loader.
-3. Validate every record's dimensions, labels, and valid-action masks.
-4. Convert fields to tensors with the documented types.
-5. Build a CNN that:
-   - Accepts 12 spatial channels.
-   - Accepts 9 extra features.
-   - Produces four direction logits for each of the four ghosts.
-6. Select a batch size that fits the available CPU or GPU memory.
-7. Mask blocked actions before calculating cross-entropy loss.
-8. Add validation and testing, and save the best model.
-9. Integrate model predictions into ghost gameplay.
+## Collecting the dataset
+
+Use the ghost data collector to generate `CNN_DATA.jsonl`:
+
+```bash
+uv run python -m AI_arena.ghosts.ghost_collector --samples 50000
+```
+
+The collector:
+1. Runs `PacmanPlayerEnv` episodes with the `PacmanExpert` controlling the player.
+2. At each step, calls `ObservationFormatter.format_observation()` to build `grid` and `extra_features`.
+3. Calls `GhostExpert` to compute the BFS-optimal label for each ghost.
+4. Writes one JSONL record per step to `CNN_DATA.jsonl`.

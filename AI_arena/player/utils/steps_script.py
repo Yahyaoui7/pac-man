@@ -42,12 +42,12 @@ def render_grid_exact_floats(matrix: np.ndarray, col_width: int = 6, decimals: i
     """Render a 2D numpy tensor matrix with exact float numbers across all rows and columns."""
     lines = []
     h, w = matrix.shape
-    
+
     # Header row with column indices
     col_hdr = "     " + "".join(f"{col:^{col_width}d}" for col in range(w))
     lines.append(col_hdr)
     lines.append("     " + "-" * (w * col_width))
-    
+
     for r in range(h):
         row_str = f"{r:2d} | "
         for c in range(w):
@@ -61,7 +61,7 @@ def run_dump():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     env = PacmanPlayerEnv(stage=1, start_pellets=(5,), seed=42)
     obs = env.reset()
-    
+
     model = PlayerActorCritic().to(device)
     model_path = "/home/mouad/Desktop/WeCode/1337/old_pacman/AI_arena/models/player_rl.pt"
     if os.path.exists(model_path):
@@ -74,14 +74,14 @@ def run_dump():
             state_dict["backbone.cnn.0.weight"] = new_w
         model.load_state_dict(state_dict, strict=False)
     model.eval()
-    
+
     gru_state = None
     output_lines = []
-    
+
     output_lines.append("========================================================================================================================")
     output_lines.append("                PAC-MAN RL MODEL: 5-STEP FULL TENSOR GRID DUMP (WITH ZERO-PADDING [25x50])")
     output_lines.append("========================================================================================================================\n")
-    
+
     maze_h = len(env.maze)
     maze_w = len(env.maze[0])
     output_lines.append(f"Active Maze Size : {maze_w}x{maze_h} (Width x Height)")
@@ -94,7 +94,7 @@ def run_dump():
         grid_cuda = grid.to(device)
         extra_cuda = extra.to(device)
         valid_mask_cuda = valid_mask.to(device)
-        
+
         with torch.no_grad():
             logits, value, gru_state = model(grid_cuda, extra_cuda, hidden=gru_state)
             masked_logits = logits.masked_fill(~valid_mask_cuda, -1e4)
@@ -160,8 +160,8 @@ def run_dump():
             output_lines.append("Episode Terminated.")
             break
 
-    out_file1 = "/home/mouad/Desktop/WeCode/1337/old_pacman/5step_full_grids_dump.txt"
-    out_file2 = "/home/mouad/Desktop/WeCode/1337/old_pacman/steps_dump.txt"
+    out_file1 = "5step_full_grids_dump.txt"
+    out_file2 = "steps_dump.txt"
     content = "\n".join(output_lines)
     with open(out_file1, "w") as f:
         f.write(content)

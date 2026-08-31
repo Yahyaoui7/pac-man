@@ -19,12 +19,14 @@ class GhostCNN(nn.Module):
 
     def __init__(self) -> None:
         super().__init__()
+        # backbone.out produces 256-dim vectors (Linear(gru_hidden) → ReLU → Dropout → 256)
         self.backbone = PacmanCNNBackbone(dropout_prob=0.3)
-        self.head = nn.Linear(128, GHOST_COUNT * ACTION_COUNT)
+        self.head = nn.Linear(256, GHOST_COUNT * ACTION_COUNT)
 
     def forward(self, grid: Tensor, extra_features: Tensor) -> Tensor:
         """Return logits shaped as [batch, GHOST_COUNT, ACTION_COUNT]."""
-        latent = self.backbone.extract_features(grid, extra_features)
+        # backbone.forward() returns (out, hidden); we only need the output tensor
+        latent, _ = self.backbone(grid, extra_features)
         logits = self.head(latent)
         return logits.view(-1, GHOST_COUNT, ACTION_COUNT)
 

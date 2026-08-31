@@ -12,7 +12,6 @@
 # from AI_arena.data.dataset import CNNJSONLDataset, create_cnn_dataloader
 from AI_arena.ghosts.ghost_controller import CNNGhostController
 from AI_arena.ghosts.ghost_env import PacmanGhostEnv
-from AI_arena.ghosts.ghost_training import train as train_ghost_cnn
 from AI_arena.models.cnn_backbone import PacmanCNNBackbone
 from AI_arena.models.cnn_ghost import GhostCNN
 from AI_arena.models.cnn_player import PlayerActorCritic, PlayerImitationCNN
@@ -37,5 +36,4 @@ __all__ = [
     "CNNPlayerController",
     "PacmanGhostEnv",
     "CNNGhostController",
-    "train_ghost_cnn",
 ]

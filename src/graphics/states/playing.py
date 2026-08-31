@@ -22,6 +22,15 @@ from src.logic.config import (
     WEST,
 )
 
+# Lookahead (cells) each ghost predicts the player will travel.
+# Blinky=0 (current pos), Pinky=1, Inky=3, Clyde=5
+GHOST_LOOKAHEAD: dict[str, int] = {
+    "Blinky": 0,
+    "Pinky": 1,
+    "Inky": 3,
+    "Clyde": 5,
+}
+
 
 class PlayingState(State):
     """The active gameplay state handling movements, collisions, timers."""
@@ -64,7 +73,7 @@ class PlayingState(State):
 
         curr_idx = self.game.level_manager.current_level_index
         self.movement = MovementSystem(self.maze)
-        self.use_cnn_ghosts = False
+        self.use_cnn_ghosts = True
         if self.use_cnn_ghosts:
             try:
                 self.ghost_controller = CNNGhostController()
@@ -112,7 +121,10 @@ class PlayingState(State):
             return
 
         for event in events:
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_p, pygame.K_a):
+            if event.type == pygame.KEYDOWN and event.key in (
+                pygame.K_p,
+                pygame.K_a,
+            ):
                 self.use_ai_player = not self.use_ai_player
 
         self._handle_input(input_state)
@@ -142,6 +154,8 @@ class PlayingState(State):
             self._toggle_cheat("speed boost")
         elif input_state.ghost_freez:
             self._toggle_cheat("ghost freeze")
+        elif input_state.ghost_hunter_mode:
+            self._toggle_cheat("ghost hunter")
 
         if input_state.action_pressed:
             player.use_ability()
@@ -159,7 +173,9 @@ class PlayingState(State):
             self.player_invincible_until = 999999999999 if turning_on else 0
         elif name == "speed boost":
             player = self.game.entity_manager.player
-            player.speed = self.player_speed * 2 if turning_on else self.player_speed
+            player.speed = (
+                self.player_speed * 2 if turning_on else self.player_speed
+            )
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
@@ -274,7 +290,10 @@ class PlayingState(State):
 
                 else:
                     predicted_direction = self.ghost_predictions.get(gst.name)
-                    if controller is not None and predicted_direction is not None:
+                    if (
+                        controller is not None
+                        and predicted_direction is not None
+                    ):
                         self.ghost_decision_sources[gst.name] = "CNN"
                         if gst.name in decision_names:
                             self.movement.update_cnn_ghost(
@@ -287,8 +306,17 @@ class PlayingState(State):
                         self.ghost_decision_sources[gst.name] = "RUNAWAY"
                         self.movement.update_runaway_ghost(gst, em.player)
                     else:
-                        self.ghost_decision_sources[gst.name] = "BFS"
-                        self.movement.update_bfs_ghost(gst, em.player)
+                        if "ghost hunter" in self.active_cheats:
+                            lookahead = GHOST_LOOKAHEAD.get(gst.name, 0)
+                            self.ghost_decision_sources[gst.name] = (
+                                f"HUNTER+{lookahead}"
+                            )
+                            self.movement.update_predictive_ghost(
+                                gst, em.player, lookahead
+                            )
+                        else:
+                            self.ghost_decision_sources[gst.name] = "BFS"
+                            self.movement.update_bfs_ghost(gst, em.player)
         self.check_collision(em.player, em.ghosts)
         em.update(self.maze, 1 / 60.0)
 
@@ -354,7 +382,9 @@ class PlayingState(State):
                 (player.grid_x, player.grid_y),
             )
             bfs_direction = (
-                bfs_result[0][0] if bfs_result is not None and bfs_result[0] else None
+                bfs_result[0][0]
+                if bfs_result is not None and bfs_result[0]
+                else None
             )
             ghosts.append(
                 {
@@ -738,14 +768,18 @@ class PlayingState(State):
         h = surf1.get_height() + surf2.get_height() + 10
         cx = screen.get_width() // 2
         bottom_y = (
-            screen.get_height() - 26 if self.active_cheats else screen.get_height() - 8
+            screen.get_height() - 26
+            if self.active_cheats
+            else screen.get_height() - 8
         )
 
         bubble_rect = pygame.Rect(0, 0, w, h)
         bubble_rect.midbottom = (cx, bottom_y)
 
         bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
-        pygame.draw.rect(bubble, (0, 0, 0, 200), bubble.get_rect(), border_radius=8)
+        pygame.draw.rect(
+            bubble, (0, 0, 0, 200), bubble.get_rect(), border_radius=8
+        )
         pygame.draw.rect(
             bubble,
             (*ui.COLOR_NEON_CYAN, 220),
@@ -757,7 +791,10 @@ class PlayingState(State):
         screen.blit(bubble, bubble_rect.topleft)
         screen.blit(surf1, surf1.get_rect(midtop=(cx, bubble_rect.top + 4)))
         screen.blit(
-            surf2, surf2.get_rect(midtop=(cx, bubble_rect.top + 4 + surf1.get_height()))
+            surf2,
+            surf2.get_rect(
+                midtop=(cx, bubble_rect.top + 4 + surf1.get_height())
+            ),
         )
 
     def give_target(self, ghost: Any) -> None:

@@ -31,6 +31,7 @@ class InputState:
     speed_boost: bool = False
     extra_life: bool = False
     skip_level: bool = False
+    ghost_hunter_mode: bool = False
 
 
 class InputManager:
@@ -66,6 +67,7 @@ class InputManager:
         self.state.speed_boost = False
         self.state.extra_life = False
         self.state.skip_level = False
+        self.state.ghost_hunter_mode = False
 
         for event in events:
 
@@ -104,6 +106,8 @@ class InputManager:
                     self.state.speed_boost = True
                 elif event.key == pygame.K_i:
                     self.state.invinciblity = True
+                elif event.key == pygame.K_h:
+                    self.state.ghost_hunter_mode = True
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.state.mouse_clicked = True

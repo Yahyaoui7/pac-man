@@ -17,6 +17,13 @@ class ExpertDecision:
     action: int
     scores: tuple[float, float, float, float]
 
+# 🍒 gets pellets
+# 👻 avoids dangerous ghosts
+# 🔵 uses opportunities when ghosts are edible
+# 🛣️ avoids dead ends
+# ➡️ prefers continuing in the same direction a little
+
+# Then it returns the best action as a label for the Pac-Man SL model.
 
 class PacmanExpert:
     """Short-horizon search using BFS ghost-arrival maps and food rewards."""
@@ -119,7 +126,11 @@ class PacmanExpert:
                         float(getattr(player, "powered_timer", 0.0)) / 5.0
                     )
                     if edible_distance <= max(0.0, timer_cells - arrival):
-                        value += 7.0 / (edible_distance + 1.0)
+                        if edible_distance == 0:
+                            value += 80.0  # Big reward for actually intercepting / eating the ghost
+                        else:
+                            value += 40.0 / (edible_distance + 1.0)  # Strong pull towards the edible ghost
+
                     if exits <= 1 and dangerous_maps:
                         value -= 25.0
                     if direction == previous:

@@ -143,14 +143,11 @@ class Player(Entity):
         game: Any | None,
         maze: list[list[int]],
     ) -> bool:
-        # The graphical game exposes dimensions through curr_level; the
-        # headless RL environment only provides the maze itself.
-        if game is None or not getattr(game, "curr_level", None):
-            height = len(maze)
-            width = len(maze[0])
-        else:
-            height = game.curr_level.height
-            width = game.curr_level.width
+        # Always derive dimensions from the actual maze so that level
+        # transitions (where game.curr_level may lag behind) cannot cause
+        # out-of-range row/col access.
+        height = len(maze)
+        width = len(maze[0]) if maze else 0
 
         middle_row = height // 2
         middle_col = width // 2

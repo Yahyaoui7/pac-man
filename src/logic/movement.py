@@ -20,7 +20,6 @@ class MovementSystem:
         """Clear precomputed distance cache if maze structure changes."""
         self._dist_cache.clear()
 
-
     def set_direction(self, entity: Entity, direction: str) -> None:
         """Set entity direction and convert it to grid_y/grid_x movement."""
         entity.direction = direction
@@ -174,9 +173,7 @@ class MovementSystem:
 
         return neighbors
 
-    def bfs_distances_uncached(
-        self, source: tuple[int, int]
-    ) -> list[int]:
+    def bfs_distances_uncached(self, source: tuple[int, int]) -> list[int]:
         """Single BFS from source returning flat distance array (uncached fallback)."""
         h = len(self.maze)
         w = len(self.maze[0])
@@ -194,20 +191,14 @@ class MovementSystem:
             cell = self.maze[cy][cx]
             for i, (dy, dx) in enumerate(directions):
                 ny, nx = cy + dy, cx + dx
-                if (
-                    0 <= ny < h
-                    and 0 <= nx < w
-                    and not (cell & wall_bits[i])
-                ):
+                if 0 <= ny < h and 0 <= nx < w and not (cell & wall_bits[i]):
                     idx = ny * w + nx
                     if dist[idx] == -1:
                         dist[idx] = cd + 1
                         queue.append((ny, nx))
         return dist
 
-    def bfs_distances(
-        self, source: tuple[int, int]
-    ) -> list[int]:
+    def bfs_distances(self, source: tuple[int, int]) -> list[int]:
         """Return flat distance array from source to all cells (O(1) cached)."""
         if self.pattern_42 is not None:
             return self.bfs_distances_uncached(source)
@@ -342,7 +333,9 @@ class MovementSystem:
                     path = self.bfs_path(start, target)
                     if len(path) >= 2:
                         next_cell = path[1]
-                        direction = self.direction_to_next_cell(start, next_cell)
+                        direction = self.direction_to_next_cell(
+                            start, next_cell
+                        )
                         if direction is not None:
                             self.set_direction(ghost, direction)
                 else:
@@ -358,7 +351,9 @@ class MovementSystem:
                                 best_dist = d
                                 best_nbr = nbr
                         if best_nbr is not None:
-                            direction = self.direction_to_next_cell(start, best_nbr)
+                            direction = self.direction_to_next_cell(
+                                start, best_nbr
+                            )
                             if direction is not None:
                                 self.set_direction(ghost, direction)
 
@@ -382,41 +377,104 @@ class MovementSystem:
         self.pattern_42 = None
         self._navigate_bfs(ghost, player.grid_y, player.grid_x)
 
-    def _predict_player_pos(self, player: Any, steps: int) -> tuple[int, int]:
-        """Walk player forward `steps` cells in their current direction.
+    def update_predictive_ghost(
+        self,
+        ghost: Any,
+        player: Any,
+        lookahead: int,
+        maze: Optional[Any] = None,
+        pellets: Optional[Any] = None,
+        ghosts: Optional[Any] = None,
+    ) -> None:
+        """BFS toward an expert-predicted player position.
 
-        Stops early if a wall blocks the path. Returns the furthest
-        reachable (grid_y, grid_x) cell.
+        Strategy
+        --------
+        1. Commit to one step in player.next_direction (certain).
+        2. From that cell, call PacmanExpert (same system used during ghost
+           data collection) to pick the most likely direction for the
+           remaining (lookahead - 1) steps.
+        3. Walk those remaining steps in the expert direction, stopping at
+           walls so the target is always a reachable cell.
+
+        Falls back to straight-line prediction when maze/pellets/ghosts are
+        not provided or when the expert raises an exception.
         """
+        self.pattern_42 = None
+
         DIRECTION_DELTA: dict[str, tuple[int, int]] = {
             "UP": (-1, 0),
             "DOWN": (1, 0),
             "LEFT": (0, -1),
             "RIGHT": (0, 1),
         }
+
+        # Step 1: commit to one cell in next_direction (certain)
         direction = getattr(player, "next_direction", None) or player.direction
-        delta = DIRECTION_DELTA.get(direction, (0, 0))
-        dy, dx = delta
+        dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
         y, x = player.grid_y, player.grid_x
-        for _ in range(steps):
-            if self.can_move(y, x, direction):
-                y, x = y + dy, x + dx
-            else:
-                break
-        return y, x
 
-    def update_predictive_ghost(
-        self, ghost: Any, player: Any, lookahead: int
-    ) -> None:
-        """BFS toward predicted player position `lookahead` steps ahead.
+        if lookahead > 0 and self.can_move(y, x, direction):
+            y, x = y + dy, x + dx
+            remaining = lookahead - 1
+        else:
+            remaining = lookahead
 
-        With lookahead=0 this is identical to update_bfs_ghost.
-        Higher values make the ghost intercept instead of chase.
-        """
-        self.pattern_42 = None
-        target_y, target_x = self._predict_player_pos(player, lookahead)
-        self._navigate_bfs(ghost, target_y, target_x)
+        # Step 2: expert-guided prediction for remaining steps
+        if (
+            remaining > 0
+            and maze is not None
+            and pellets is not None
+            and ghosts is not None
+        ):
+            try:
+                from src.logic.expert import PacmanExpert
 
+                class _FakePlayer:
+                    pass
+
+                class _FakeEnv:
+                    pass
+
+                fake_player = _FakePlayer()
+                fake_player.grid_y = y
+                fake_player.grid_x = x
+                fake_player.direction = direction
+                fake_player.next_direction = direction
+                fake_player.powered_timer = float(
+                    getattr(player, "powered_timer", 0.0)
+                )
+
+                fake_env = _FakeEnv()
+                fake_env.movement = self
+                fake_env.player = fake_player
+                fake_env.maze = maze
+                fake_env.pellets = pellets
+                fake_env.ghosts = ghosts
+
+                expert = PacmanExpert(horizon=remaining)
+                decision = expert.choose_action(fake_env)
+                predicted_dir = ("UP", "DOWN", "LEFT", "RIGHT")[
+                    decision.action
+                ]
+
+                ed_dy, ed_dx = DIRECTION_DELTA.get(predicted_dir, (0, 0))
+                for _ in range(remaining):
+                    if self.can_move(y, x, predicted_dir):
+                        y, x = y + ed_dy, x + ed_dx
+                    else:
+                        break
+
+            except Exception:
+                # Fallback: straight-line from 1-step-ahead cell
+                ed_dy, ed_dx = DIRECTION_DELTA.get(direction, (0, 0))
+                for _ in range(remaining):
+                    if self.can_move(y, x, direction):
+                        y, x = y + ed_dy, x + ed_dx
+                    else:
+                        break
+
+        self._navigate_bfs(ghost, y, x)
 
     def update_cnn_ghost(
         self,

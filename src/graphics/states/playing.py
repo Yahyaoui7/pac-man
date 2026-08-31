@@ -73,7 +73,7 @@ class PlayingState(State):
 
         curr_idx = self.game.level_manager.current_level_index
         self.movement = MovementSystem(self.maze)
-        self.use_cnn_ghosts = True
+        self.use_cnn_ghosts = False 
         if self.use_cnn_ghosts:
             try:
                 self.ghost_controller = CNNGhostController()
@@ -312,7 +312,8 @@ class PlayingState(State):
                                 f"HUNTER+{lookahead}"
                             )
                             self.movement.update_predictive_ghost(
-                                gst, em.player, lookahead
+                                gst, em.player, lookahead,
+                                self.maze, em.pellets, em.ghosts
                             )
                         else:
                             self.ghost_decision_sources[gst.name] = "BFS"

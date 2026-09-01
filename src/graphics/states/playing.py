@@ -313,7 +313,7 @@ class PlayingState(State):
                             self.ghost_decision_sources[gst.name] = (
                                 f"HUNTER+{lookahead}"
                             )
-                            gst.speed = 1.8
+                            gst.speed = 1.9
                             self.movement.update_predictive_ghost(
                                 gst, em.player, lookahead,
                                 self.maze, em.pellets, em.ghosts

@@ -429,7 +429,7 @@ class MovementSystem:
             try:
                 from src.logic.expert import PacmanExpert
                 from AI_arena.data.formatter import DIRECTIONS
-
+                
                 for _ in range(remaining):
                     valid_directions = get_valid_directions(y, x, direction)
 

@@ -17,6 +17,7 @@ class ExpertDecision:
     action: int
     scores: tuple[float, float, float, float]
 
+
 # 🍒 gets pellets
 # 👻 avoids dangerous ghosts
 # 🔵 uses opportunities when ghosts are edible
@@ -24,6 +25,7 @@ class ExpertDecision:
 # ➡️ prefers continuing in the same direction a little
 
 # Then it returns the best action as a label for the Pac-Man SL model.
+
 
 class PacmanExpert:
     """Short-horizon search using BFS ghost-arrival maps and food rewards."""
@@ -33,6 +35,7 @@ class PacmanExpert:
             raise ValueError("horizon must be positive")
         self.horizon = horizon
         self.safety_margin = safety_margin
+        self.distance_cache: dict[tuple[int, int], list[int]] = {}
 
     def choose_action(self, env: Any) -> ExpertDecision:
         if (
@@ -49,12 +52,17 @@ class PacmanExpert:
         if not legal:
             raise RuntimeError("Pac-Man has no legal action")
 
-        dangerous_maps: list[list[int]] = []
-        edible_maps: list[list[int]] = []
+        def distances_from(cell: tuple[int, int]) -> list[int]:
+            if cell not in self.distance_cache:
+                self.distance_cache[cell] = movement.bfs_distances(cell)
+            return self.distance_cache[cell]
+
+        dangerous_maps: dict[str, list[int]] = {}
+        edible_maps: dict[str, list[int]] = {}
         for ghost in env.ghosts:
-            distances = movement.bfs_distances((ghost.grid_y, ghost.grid_x))
+            distances = distances_from((ghost.grid_y, ghost.grid_x))
             target_maps = edible_maps if ghost.is_edible else dangerous_maps
-            target_maps.append(distances)
+            target_maps[ghost.name] = distances
 
         width = len(env.maze[0])
         pellet_cells = {
@@ -64,15 +72,9 @@ class PacmanExpert:
             if value in (1, 2)
         }
         current_direction = player.direction
-        distance_cache: dict[tuple[int, int], list[int]] = {}
 
-        def distances_from(cell: tuple[int, int]) -> list[int]:
-            if cell not in distance_cache:
-                distance_cache[cell] = movement.bfs_distances(cell)
-            return distance_cache[cell]
-
-        def distance(maps: list[list[int]], cell: tuple[int, int]) -> int:
-            values = [m[cell[0] * width + cell[1]] for m in maps]
+        def distance(maps: dict[str, list[int]], cell: tuple[int, int]) -> int:
+            values = [m[cell[0] * width + cell[1]] for m in maps.values()]
             reachable = [value for value in values if value >= 0]
             return min(reachable, default=10**6)
 
@@ -118,8 +120,10 @@ class PacmanExpert:
                     pellet = pellet_cells.get(nxt, 0)
                     if pellet and nxt not in eaten:
                         new_eaten = eaten | {nxt}
-                        value += 18.0 if pellet == 1 else (
-                            35.0 if dangerous_maps else 12.0
+                        value += (
+                            18.0
+                            if pellet == 1
+                            else (35.0 if dangerous_maps else 12.0)
                         )
                     edible_distance = distance(edible_maps, nxt)
                     timer_cells = (
@@ -129,7 +133,9 @@ class PacmanExpert:
                         if edible_distance == 0:
                             value += 80.0  # Big reward for actually intercepting / eating the ghost
                         else:
-                            value += 40.0 / (edible_distance + 1.0)  # Strong pull towards the edible ghost
+                            value += 40.0 / (
+                                edible_distance + 1.0
+                            )  # Strong pull towards the edible ghost
 
                     if exits <= 1 and dangerous_maps:
                         value -= 25.0

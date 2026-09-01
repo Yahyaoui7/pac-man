@@ -49,6 +49,11 @@ class PacmanExpert:
 
         self.horizon = horizon
         self.safety_margin = safety_margin
+        
+        self.distance_cache: dict[
+            tuple[int, int],
+            list[int],
+        ] = {}
 
     def choose_action(self, env: Any) -> ExpertDecision:
         """Choose the best Pac-Man action for the current state."""
@@ -108,21 +113,16 @@ class PacmanExpert:
 
         current_direction = player.direction
 
-        # Cache BFS maps so we don't calculate the same BFS repeatedly.
-        distance_cache: dict[
-            tuple[int, int],
-            list[int],
-        ] = {}
-
+        # Use the cache initialized in __init__
         def distances_from(
             cell: tuple[int, int],
         ) -> list[int]:
             """Return BFS distances from a cell, using a cache."""
 
-            if cell not in distance_cache:
-                distance_cache[cell] = movement.bfs_distances(cell)
+            if cell not in self.distance_cache:
+                self.distance_cache[cell] = movement.bfs_distances(cell)
 
-            return distance_cache[cell]
+            return self.distance_cache[cell]
 
         def nearest_ghost_distance(
             cell: tuple[int, int],
@@ -136,7 +136,7 @@ class PacmanExpert:
 
             distances = [
                 ghost_map[index]
-                for ghost_map in dangerous_maps
+                for ghost_map in dangerous_maps.values()
             ]
 
             reachable = [

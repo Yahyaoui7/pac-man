@@ -53,6 +53,7 @@ _ABBR: dict[str, str] = {
     "zone_stagnation": "ZoneStag",
     "hunger": "Hunger",
     "approach_pellet": "AppPellet",
+    "bypassed_pellet": "BypassPellet",
 }
 
 # Minimum absolute magnitude for a channel to be considered "active" (shown in POS/NEG).

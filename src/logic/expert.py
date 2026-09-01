@@ -8,8 +8,18 @@ from typing import Any
 
 from AI_arena.data.formatter import DIRECTIONS
 
-DELTAS = {"UP": (-1, 0), "DOWN": (1, 0), "LEFT": (0, -1), "RIGHT": (0, 1)}
-ACTION_INDEX = {direction: index for index, direction in enumerate(DIRECTIONS)}
+
+DELTAS = {
+    "UP": (-1, 0),
+    "DOWN": (1, 0),
+    "LEFT": (0, -1),
+    "RIGHT": (0, 1),
+}
+
+ACTION_INDEX = {
+    direction: index
+    for index, direction in enumerate(DIRECTIONS)
+}
 
 
 @dataclass(frozen=True)
@@ -17,144 +27,332 @@ class ExpertDecision:
     action: int
     scores: tuple[float, float, float, float]
 
-# 🍒 gets pellets
-# 👻 avoids dangerous ghosts
-# 🔵 uses opportunities when ghosts are edible
-# 🛣️ avoids dead ends
-# ➡️ prefers continuing in the same direction a little
-
-# Then it returns the best action as a label for the Pac-Man SL model.
 
 class PacmanExpert:
-    """Short-horizon search using BFS ghost-arrival maps and food rewards."""
+    """Fast short-horizon teacher for Pac-Man imitation learning.
 
-    def __init__(self, horizon: int = 7, safety_margin: int = 0) -> None:
+    The expert:
+      - rewards pellets
+      - avoids dangerous ghosts
+      - avoids dead ends
+      - slightly prefers continuing in the same direction
+      - searches a few steps into the future
+    """
+
+    def __init__(
+        self,
+        horizon: int = 4,
+        safety_margin: int = 3,
+    ) -> None:
         if horizon < 1:
             raise ValueError("horizon must be positive")
+
         self.horizon = horizon
         self.safety_margin = safety_margin
 
     def choose_action(self, env: Any) -> ExpertDecision:
+        """Choose the best Pac-Man action for the current state."""
+
         if (
             env.movement is None
             or env.player is None
             or env.pellets is None
             or env.maze is None
         ):
-            raise RuntimeError("Environment must be reset before expert use")
+            raise RuntimeError(
+                "Environment must be reset before expert use"
+            )
+
         movement = env.movement
         player = env.player
+
         start = (player.grid_y, player.grid_x)
-        legal = [d for d in DIRECTIONS if movement.can_move(*start, d)]
+
+        # Find directions Pac-Man can actually move.
+        legal = [
+            direction
+            for direction in DIRECTIONS
+            if movement.can_move(*start, direction)
+        ]
+
         if not legal:
             raise RuntimeError("Pac-Man has no legal action")
 
+        # ---------------------------------------------------------
+        # Dangerous ghost BFS maps
+        # ---------------------------------------------------------
+
         dangerous_maps: list[list[int]] = []
-        edible_maps: list[list[int]] = []
+
         for ghost in env.ghosts:
-            distances = movement.bfs_distances((ghost.grid_y, ghost.grid_x))
-            target_maps = edible_maps if ghost.is_edible else dangerous_maps
-            target_maps.append(distances)
+            if ghost.is_edible:
+                continue
+
+            distances = movement.bfs_distances(
+                (ghost.grid_y, ghost.grid_x)
+            )
+            dangerous_maps.append(distances)
+
+        # ---------------------------------------------------------
+        # Pellet positions
+        # ---------------------------------------------------------
 
         width = len(env.maze[0])
+
         pellet_cells = {
             (y, x): value
             for y, row in enumerate(env.pellets)
             for x, value in enumerate(row)
             if value in (1, 2)
         }
-        current_direction = player.direction
-        distance_cache: dict[tuple[int, int], list[int]] = {}
 
-        def distances_from(cell: tuple[int, int]) -> list[int]:
+        current_direction = player.direction
+
+        # Cache BFS maps so we don't calculate the same BFS repeatedly.
+        distance_cache: dict[
+            tuple[int, int],
+            list[int],
+        ] = {}
+
+        def distances_from(
+            cell: tuple[int, int],
+        ) -> list[int]:
+            """Return BFS distances from a cell, using a cache."""
+
             if cell not in distance_cache:
                 distance_cache[cell] = movement.bfs_distances(cell)
+
             return distance_cache[cell]
 
-        def distance(maps: list[list[int]], cell: tuple[int, int]) -> int:
-            values = [m[cell[0] * width + cell[1]] for m in maps]
-            reachable = [value for value in values if value >= 0]
+        def nearest_ghost_distance(
+            cell: tuple[int, int],
+        ) -> int:
+            """Return the distance to the nearest dangerous ghost."""
+
+            if not dangerous_maps:
+                return 10**6
+
+            index = cell[0] * width + cell[1]
+
+            distances = [
+                ghost_map[index]
+                for ghost_map in dangerous_maps
+            ]
+
+            reachable = [
+                value
+                for value in distances
+                if value >= 0
+            ]
+
             return min(reachable, default=10**6)
 
         def search(
             cell: tuple[int, int],
             depth: int,
             eaten: frozenset[tuple[int, int]],
-            previous: str,
+            previous_direction: str,
         ) -> float:
+            """Search future moves and return the best future score."""
+
+            # -----------------------------------------------------
+            # Search finished
+            # -----------------------------------------------------
+
             if depth >= self.horizon:
-                remaining = [p for p in pellet_cells if p not in eaten]
-                if not remaining:
+                remaining_pellets = [
+                    pellet
+                    for pellet in pellet_cells
+                    if pellet not in eaten
+                ]
+
+                if not remaining_pellets:
                     return 100.0
+
                 distances = distances_from(cell)
-                nearest = min(
+
+                nearest_pellet = min(
                     (
                         distances[y * width + x]
-                        for y, x in remaining
+                        for y, x in remaining_pellets
                         if distances[y * width + x] >= 0
                     ),
                     default=50,
                 )
-                return -0.6 * nearest
 
-            best = -inf
-            moves = [d for d in DIRECTIONS if movement.can_move(*cell, d)]
+                return -0.6 * nearest_pellet
+
+            best_score = -inf
+
+            # Find possible moves from this cell.
+            moves = [
+                direction
+                for direction in DIRECTIONS
+                if movement.can_move(*cell, direction)
+            ]
+
             for direction in moves:
                 dy, dx = DELTAS[direction]
-                nxt = (cell[0] + dy, cell[1] + dx)
+
+                next_cell = (
+                    cell[0] + dy,
+                    cell[1] + dx,
+                )
+
                 arrival = depth + 1
-                danger_distance = distance(dangerous_maps, nxt)
-                if danger_distance <= arrival + self.safety_margin:
-                    value = -100000.0 - (self.horizon - depth) * 100.0
+
+                # -------------------------------------------------
+                # Ghost safety
+                # -------------------------------------------------
+
+                danger_distance = nearest_ghost_distance(
+                    next_cell
+                )
+
+                if danger_distance <= (
+                    arrival + self.safety_margin
+                ):
+                    value = (
+                        -100000.0
+                        - (self.horizon - depth) * 100.0
+                    )
                 else:
-                    exits = sum(movement.can_move(*nxt, d) for d in DIRECTIONS)
+                    # -------------------------------------------------
+                    # Basic position value
+                    # -------------------------------------------------
+
+                    exits = sum(
+                        movement.can_move(*next_cell, d)
+                        for d in DIRECTIONS
+                    )
+
                     value = 0.3 * exits
+
+                    # Prefer being farther from dangerous ghosts.
                     if danger_distance < 10**6:
                         safe_distance = min(
-                            float(danger_distance - arrival), 6.0
+                            float(danger_distance - arrival),
+                            6.0,
                         )
                         value += safe_distance * 1.5
+
+                    # -------------------------------------------------
+                    # Pellet reward
+                    # -------------------------------------------------
+
                     new_eaten = eaten
-                    pellet = pellet_cells.get(nxt, 0)
-                    if pellet and nxt not in eaten:
-                        new_eaten = eaten | {nxt}
-                        value += 18.0 if pellet == 1 else (
-                            35.0 if dangerous_maps else 12.0
-                        )
-                    edible_distance = distance(edible_maps, nxt)
-                    timer_cells = (
-                        float(getattr(player, "powered_timer", 0.0)) / 5.0
+
+                    pellet = pellet_cells.get(
+                        next_cell,
+                        0,
                     )
-                    if edible_distance <= max(0.0, timer_cells - arrival):
-                        if edible_distance == 0:
-                            value += 80.0  # Big reward for actually intercepting / eating the ghost
+
+                    if pellet and next_cell not in eaten:
+                        new_eaten = eaten | {next_cell}
+
+                        if pellet == 1:
+                            value += 18.0
                         else:
-                            value += 40.0 / (edible_distance + 1.0)  # Strong pull towards the edible ghost
+                            value += 35.0
+
+                    # -------------------------------------------------
+                    # Dead-end penalty
+                    # -------------------------------------------------
 
                     if exits <= 1 and dangerous_maps:
                         value -= 25.0
-                    if direction == previous:
+
+                    # -------------------------------------------------
+                    # Continue current direction
+                    # -------------------------------------------------
+
+                    if direction == previous_direction:
                         value += 0.2
-                    value += search(nxt, depth + 1, new_eaten, direction)
-                best = max(best, value)
-            return best
+
+                    # -------------------------------------------------
+                    # Continue searching
+                    # -------------------------------------------------
+
+                    value += search(
+                        next_cell,
+                        depth + 1,
+                        new_eaten,
+                        direction,
+                    )
+
+                best_score = max(
+                    best_score,
+                    value,
+                )
+
+            return best_score
+
+        # ---------------------------------------------------------
+        # Score the first action
+        # ---------------------------------------------------------
 
         scores = [-inf] * len(DIRECTIONS)
+
         for direction in legal:
             dy, dx = DELTAS[direction]
-            nxt = (start[0] + dy, start[1] + dx)
-            eaten = frozenset({nxt}) if nxt in pellet_cells else frozenset()
-            immediate = 0.2 if direction == current_direction else 0.0
-            pellet = pellet_cells.get(nxt, 0)
+
+            next_cell = (
+                start[0] + dy,
+                start[1] + dx,
+            )
+
+            eaten = (
+                frozenset({next_cell})
+                if next_cell in pellet_cells
+                else frozenset()
+            )
+
+            # Small bonus for continuing in the same direction.
+            immediate = (
+                10.0
+                if direction == current_direction
+                else 0.0
+            )
+
+            # Immediate pellet reward.
+            pellet = pellet_cells.get(
+                next_cell,
+                0,
+            )
+
             if pellet == 1:
                 immediate += 18.0
             elif pellet == 2:
-                immediate += 35.0 if dangerous_maps else 12.0
-            scores[ACTION_INDEX[direction]] = immediate + search(
-                nxt, 1, eaten, direction
+                immediate += 35.0
+
+            scores[ACTION_INDEX[direction]] = (
+                immediate
+                + search(
+                    next_cell,
+                    1,
+                    eaten,
+                    direction,
+                )
             )
 
-        # max() is deterministic: ties follow UP, DOWN, LEFT, RIGHT.
-        action = max(range(len(scores)), key=scores.__getitem__)
-        score_tuple = (scores[0], scores[1], scores[2], scores[3])
-        return ExpertDecision(action=action, scores=score_tuple)
+        # ---------------------------------------------------------
+        # Choose the highest-scoring action
+        # ---------------------------------------------------------
+
+        action = max(
+            range(len(scores)),
+            key=scores.__getitem__,
+        )
+
+        score_tuple = (
+            scores[0],
+            scores[1],
+            scores[2],
+            scores[3],
+        )
+
+        return ExpertDecision(
+            action=action,
+            scores=score_tuple,
+        )
+

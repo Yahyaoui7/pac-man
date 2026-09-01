@@ -32,3 +32,5 @@ class GameConfig:
     points_per_ghost: int = 200
     highscore_filename: str = "highscores.json"
     levels: list[LevelConfig] = field(default_factory=list)
+    ghost_hunter: bool = False  
+

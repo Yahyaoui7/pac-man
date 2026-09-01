@@ -104,6 +104,7 @@ class InstructionsState(State):
             ("B", "Speed Boost"),
             ("L", "Extra Life"),
             ("K", "Skip Level"),
+            ("H", "Ghost Hunter"),
         ]
 
         start_x = panel_left + 50

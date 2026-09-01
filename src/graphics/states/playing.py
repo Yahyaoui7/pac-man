@@ -73,7 +73,7 @@ class PlayingState(State):
 
         curr_idx = self.game.level_manager.current_level_index
         self.movement = MovementSystem(self.maze)
-        self.use_cnn_ghosts = False 
+        self.use_cnn_ghosts = False
         if self.use_cnn_ghosts:
             try:
                 self.ghost_controller = CNNGhostController()
@@ -154,6 +154,8 @@ class PlayingState(State):
             self._toggle_cheat("speed boost")
         elif input_state.ghost_freez:
             self._toggle_cheat("ghost freeze")
+        elif input_state.ghost_hunter:
+            self._toggle_cheat("ghost hunter")
         elif input_state.ghost_hunter_mode:
             self._toggle_cheat("ghost hunter")
 
@@ -311,6 +313,7 @@ class PlayingState(State):
                             self.ghost_decision_sources[gst.name] = (
                                 f"HUNTER+{lookahead}"
                             )
+                            gst.speed = 1.8
                             self.movement.update_predictive_ghost(
                                 gst, em.player, lookahead,
                                 self.maze, em.pellets, em.ghosts

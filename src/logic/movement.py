@@ -386,20 +386,7 @@ class MovementSystem:
         pellets: Optional[Any] = None,
         ghosts: Optional[Any] = None,
     ) -> None:
-        """BFS toward an expert-predicted player position.
-
-        Strategy
-        --------
-        1. Commit to one step in player.next_direction (certain).
-        2. From that cell, call PacmanExpert (same system used during ghost
-           data collection) to pick the most likely direction for the
-           remaining (lookahead - 1) steps.
-        3. Walk those remaining steps in the expert direction, stopping at
-           walls so the target is always a reachable cell.
-
-        Falls back to straight-line prediction when maze/pellets/ghosts are
-        not provided or when the expert raises an exception.
-        """
+        """Predict Pac-Man's future position and navigate the ghost toward it."""
         self.pattern_42 = None
 
         DIRECTION_DELTA: dict[str, tuple[int, int]] = {
@@ -409,18 +396,30 @@ class MovementSystem:
             "RIGHT": (0, 1),
         }
 
-        # Step 1: commit to one cell in next_direction (certain)
+        def get_valid_directions(
+            y: int, x: int, current_dir: str
+        ) -> list[str]:
+            valid = []
+
+            for d in DIRECTION_DELTA:
+                if self.can_move(y, x, d):
+                    valid.append(d)
+            return valid
+
         direction = getattr(player, "next_direction", None) or player.direction
-        dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
         y, x = player.grid_y, player.grid_x
 
-        if lookahead > 0 and self.can_move(y, x, direction):
-            y, x = y + dy, x + dx
-            remaining = lookahead - 1
+        if lookahead > 0:
+            if self.can_move(y, x, direction):
+                dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
+                y += dy
+                x += dx
+                remaining = lookahead - 1
+            else:
+                remaining = lookahead
         else:
-            remaining = lookahead
+            remaining = 0
 
-        # Step 2: expert-guided prediction for remaining steps
         if (
             remaining > 0
             and maze is not None
@@ -429,48 +428,62 @@ class MovementSystem:
         ):
             try:
                 from src.logic.expert import PacmanExpert
+                from AI_arena.data.formatter import DIRECTIONS
 
-                class _FakePlayer:
-                    pass
-
-                class _FakeEnv:
-                    pass
-
-                fake_player = _FakePlayer()
-                fake_player.grid_y = y
-                fake_player.grid_x = x
-                fake_player.direction = direction
-                fake_player.next_direction = direction
-                fake_player.powered_timer = float(
-                    getattr(player, "powered_timer", 0.0)
-                )
-
-                fake_env = _FakeEnv()
-                fake_env.movement = self
-                fake_env.player = fake_player
-                fake_env.maze = maze
-                fake_env.pellets = pellets
-                fake_env.ghosts = ghosts
-
-                expert = PacmanExpert(horizon=remaining)
-                decision = expert.choose_action(fake_env)
-                predicted_dir = ("UP", "DOWN", "LEFT", "RIGHT")[
-                    decision.action
-                ]
-
-                ed_dy, ed_dx = DIRECTION_DELTA.get(predicted_dir, (0, 0))
                 for _ in range(remaining):
+                    valid_directions = get_valid_directions(y, x, direction)
+
+                    if not valid_directions:
+                        break
+
+                    if len(valid_directions) == 1:
+                        predicted_dir = valid_directions[0]
+                    else:
+
+                        class _FakePlayer:
+                            pass
+
+                        class _FakeEnv:
+                            pass
+
+                        fake_player = _FakePlayer()
+                        fake_player.grid_y = y
+                        fake_player.grid_x = x
+                        fake_player.direction = direction
+                        fake_player.next_direction = direction
+                        fake_player.powered_timer = float(
+                            getattr(player, "powered_timer", 0.0)
+                        )
+
+                        fake_env = _FakeEnv()
+                        fake_env.movement = self
+                        fake_env.player = fake_player
+                        fake_env.maze = maze
+                        fake_env.pellets = pellets
+                        fake_env.ghosts = ghosts
+
+                        expert = PacmanExpert(horizon=remaining)
+                        decision = expert.choose_action(fake_env)
+
+                        predicted_dir = DIRECTIONS[decision.action]
+
+                        if predicted_dir not in valid_directions:
+                            predicted_dir = valid_directions[0]
+
+                    dy, dx = DIRECTION_DELTA.get(predicted_dir, (0, 0))
                     if self.can_move(y, x, predicted_dir):
-                        y, x = y + ed_dy, x + ed_dx
+                        y += dy
+                        x += dx
+                        direction = predicted_dir
                     else:
                         break
 
             except Exception:
-                # Fallback: straight-line from 1-step-ahead cell
-                ed_dy, ed_dx = DIRECTION_DELTA.get(direction, (0, 0))
+                dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
                 for _ in range(remaining):
                     if self.can_move(y, x, direction):
-                        y, x = y + ed_dy, x + ed_dx
+                        y += dy
+                        x += dx
                     else:
                         break
 

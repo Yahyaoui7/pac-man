@@ -61,6 +61,8 @@ def run_evaluation(
     seed_base: int = DEFAULT_SEED_BASE,
     greedy: bool = True,
     env: PacmanPlayerEnv | None = None,
+    ghost_speed_ratio: float = 0.35,
+    ghost_confusion_prob: float = 0.0,
 ) -> dict[str, Any]:
     """Run `episodes` deterministic episodes; returns aggregate metrics.
 
@@ -71,7 +73,13 @@ def run_evaluation(
     was_training = policy.training
     policy.eval()
     if env is None:
-        env = PacmanPlayerEnv(seed=seed_base, stage=stage, device="cpu")
+        env = PacmanPlayerEnv(
+            seed=seed_base,
+            stage=stage,
+            device="cpu",
+            ghost_speed_ratio=ghost_speed_ratio,
+            ghost_confusion_prob=ghost_confusion_prob,
+        )
 
     device_t = torch.device(device)
     episode_records: list[dict[str, Any]] = []
@@ -89,9 +97,9 @@ def run_evaluation(
         while not done:
             grid, features, valid_actions = obs
             logits, _, hidden = policy(grid.to(device_t), features.to(device_t), hidden)
-            masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e8)
+            masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e4)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
             )
             if greedy:
                 action = int(torch.argmax(masked_logits, dim=-1).item())

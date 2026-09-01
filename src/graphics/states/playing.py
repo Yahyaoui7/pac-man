@@ -184,7 +184,7 @@ class PlayingState(State):
                     em.player,
                     em.ghosts,
                     self.movement,
-                    sample=True,
+                    sample=False,
                 )
                 if action:
                     em.player.next_direction = action
@@ -820,6 +820,9 @@ class PlayingState(State):
                         # self.game.lives -= 1
                         self.player_invincible_until = after(1500)
                         player.reset_location()
+                        if self.player_controller is not None:
+                            self.player_controller.reset_state()
+                        self.ai_last_decision_cell = None
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0
                         for ghost in ghosts:

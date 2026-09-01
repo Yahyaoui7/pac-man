@@ -8,9 +8,10 @@ from AI_arena.player.constants import DIRECTIONS, GHOST_RESPAWN_TICKS
 class GhostController:
     """Encapsulates ghost update logic: respawn, frightened, confused, BFS."""
 
-    def __init__(self, movement, rng) -> None:
+    def __init__(self, movement, rng, ghost_speed_ratio: float = 0.35) -> None:
         self.movement = movement
         self.rng = rng
+        self.ghost_speed_ratio = ghost_speed_ratio
 
     def update(
         self,
@@ -19,7 +20,7 @@ class GhostController:
         player,
         stage: int,
         ghost_respawn_ticks: list[int],
-        ghost_confusion_prob: float,
+        ghost_confusion_prob: float = 0.0,
     ) -> None:
         """Update all ghosts for one physics tick."""
         if stage == 1:
@@ -45,17 +46,18 @@ class GhostController:
             ghost.runaway_target = None
 
     def _update_frightened(self, ghost, player) -> None:
-        ghost._tick_accumulator += 0.5
+        frightened_speed = min(0.5, self.ghost_speed_ratio)
+        ghost._tick_accumulator += frightened_speed
         if ghost._tick_accumulator >= 1.0:
             ghost._tick_accumulator -= 1.0
             self.movement.update_runaway_ghost(ghost, player)
 
     def _update_hunting(self, ghost, player, ghost_confusion_prob: float) -> None:
-        ghost._tick_accumulator += 0.75
+        ghost._tick_accumulator += self.ghost_speed_ratio
         if ghost._tick_accumulator >= 1.0:
             ghost._tick_accumulator -= 1.0
 
-            if self.rng.random() < ghost_confusion_prob:
+            if ghost_confusion_prob > 0.0 and self.rng.random() < ghost_confusion_prob:
                 valid_dirs = [
                     d
                     for d in DIRECTIONS

@@ -97,12 +97,32 @@ class RewardCalculator:
         if block == self.current_block:
             self.steps_in_block += 1
             if self.steps_in_block == 8:
-                breakdown["zone_stagnation"] = -3.0
+                breakdown["zone_stagnation"] = -10.0
             elif self.steps_in_block > 8:
                 breakdown["zone_stagnation"] = -0.5
         else:
             self.current_block = block
             self.steps_in_block = 1
+
+    def _bypassed_pellet_penalty(
+        self, events: dict[str, bool], threat_dist: float, breakdown: dict[str, float]
+    ) -> None:
+        """Soft penalty (-0.2) if Pac-Man turns away from an available adjacent pellet to enter an empty cell."""
+        if events.get("bypassed_pellet", False):
+            # Exempt if a dangerous non-edible ghost is threatening nearby (threat_dist < 3)
+            if threat_dist < 3:
+                return
+            breakdown["bypassed_pellet"] = -0.8
+
+    def _momentum_reward(
+        self,
+        events: dict[str, bool],
+        same_action_count: int,
+        breakdown: dict[str, float],
+    ) -> None:
+        """Small reward (+0.05) for maintaining direction without oscillating."""
+        if same_action_count > 0 and not events.get("oscillating", False):
+            breakdown["momentum"] = 0.05
 
     def _ghost_eat_reward(
         self, events: dict[str, bool], breakdown: dict[str, float]
@@ -132,11 +152,9 @@ class RewardCalculator:
     def _step_reward(
         self, events: dict[str, bool], breakdown: dict[str, float]
     ) -> None:
-        """No step tax on pellet/super steps — progress should feel good."""
-        if events.get("pellet_eaten") or events.get("super_pellet_eaten"):
-            breakdown["step"] = 0.0
-        else:
-            breakdown["step"] = STEP_REWARD  # keep at -0.1 or raise to -0.2
+        """Always apply a -0.1/step tax to discourage safe-zone camping.
+        Pellet steps are NOT exempt — progress is already rewarded via _pellet_reward."""
+        breakdown["step"] = STEP_REWARD
 
     def _hunger_penalty(
         self, steps_since_pellet: int, breakdown: dict[str, float]
@@ -149,7 +167,8 @@ class RewardCalculator:
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
         if events.get("pellet_eaten", False):
-            breakdown["pellet"] = PELLET_REWARD + 2.0 * frac
+            base_reward = 3.0 if self.stage == 1 else PELLET_REWARD
+            breakdown["pellet"] = base_reward + 5.0 * frac
 
     def _super_pellet_reward(
         self,
@@ -185,18 +204,13 @@ class RewardCalculator:
         breakdown: dict[str, float],
         explore_step: bool = False,
     ) -> None:
-        """Penalize policy-driven oscillation, but only when NOT actively dodging
-        a ghost. Oscillating to evade is good behavior. Cap at streak 2 (was 3)
-        so habitual wiggle is -10, -20, -20 instead of -10, -20, -30."""
+        """Penalize policy-driven oscillation across all contexts.
+        Cap streak penalty at 2 so habitual wiggle is -1, -2, -2..."""
         if explore_step:
             return
         if events.get("oscillating", False) and not (
             events.get("pellet_eaten", False) or events.get("super_pellet_eaten", False)
         ):
-            # Skip penalty if we're actively dodging a nearby ghost
-            if threat_dist < 4:
-                self.osc_streak = 0
-                return
             self.osc_streak += 1
             breakdown["oscillation"] = OSCILLATION_REWARD * min(self.osc_streak, 2)
         else:
@@ -210,30 +224,26 @@ class RewardCalculator:
         powered: bool,
         breakdown: dict[str, float],
     ) -> None:
-        """Repulsive proximity field using BFS distance. No escape bonus (handled by evasion_skill)."""
+        """Repulsive proximity field using BFS distance up to 8 tiles. No escape bonus (handled by evasion_skill)."""
         if powered or min_ghost_dist_after < 0:
             return
         d = min_ghost_dist_after
-        # Static repulsion: the closer, the stronger
+        # Static repulsion: only at immediate danger (dist <= 3)
         if d == 1:
-            breakdown["ghost_proximity"] -= 2.0
+            breakdown["ghost_proximity"] -= 1.2
         elif d == 2:
-            breakdown["ghost_proximity"] -= 0.75
+            breakdown["ghost_proximity"] -= 0.6
         elif d == 3:
-            breakdown["ghost_proximity"] -= 0.5
-        elif d == 4:
             breakdown["ghost_proximity"] -= 0.2
-        elif d == 5:
-            breakdown["ghost_proximity"] -= 0.05
 
-        # Directional approach penalty: moving closer to a ghost is bad
+        # Directional approach penalty: moving closer to a ghost when near (dist <= 4)
         if (
             min_ghost_dist_before > 0
             and d < min_ghost_dist_before
             and not events.get("super_pellet_eaten", False)
         ):
-            approach_strength = max(0, 6 - d)  # stronger when already very close
-            breakdown["ghost_proximity"] -= 0.4 * approach_strength
+            approach_strength = max(0, 5 - d)  # stronger when closer (1 to 4 tiles out)
+            breakdown["ghost_proximity"] -= 0.2 * approach_strength
 
     def _region_cleared_reward(
         self, events: dict[str, bool], breakdown: dict[str, float]
@@ -273,13 +283,13 @@ class RewardCalculator:
             px, py, ghosts, maze
         )
         if not powered and threatening > 0 and min_threat_dist > 0:
-            if min_threat_dist >= 5:
+            if min_threat_dist >= 8:
                 breakdown["predictive_threat"] += 0.30
-            elif min_threat_dist == 4:
+            elif min_threat_dist in (6, 7):
                 breakdown["predictive_threat"] += 0.15
-            elif min_threat_dist == 3:
+            elif min_threat_dist in (4, 5):
                 breakdown["predictive_threat"] -= 0.5
-            elif min_threat_dist == 2:
+            elif min_threat_dist in (2, 3):
                 breakdown["predictive_threat"] -= 1.5
             elif min_threat_dist == 1:
                 breakdown["predictive_threat"] -= 4.0
@@ -297,13 +307,13 @@ class RewardCalculator:
         ):
             escape_quality = min_ghost_dist_after - self.last_min_ghost_dist
             if self.last_min_ghost_dist == 1:
-                breakdown["evasion_skill"] += 1.0 * escape_quality
+                breakdown["evasion_skill"] += 2.0 * escape_quality
             elif self.last_min_ghost_dist == 2:
-                breakdown["evasion_skill"] += 0.5 * escape_quality
+                breakdown["evasion_skill"] += 1.0 * escape_quality
             elif self.last_min_ghost_dist == 3:
-                breakdown["evasion_skill"] += 0.2 * escape_quality
+                breakdown["evasion_skill"] += 0.5 * escape_quality
             elif self.last_min_ghost_dist == 4:
-                breakdown["evasion_skill"] += 0.1 * escape_quality
+                breakdown["evasion_skill"] += 0.2 * escape_quality
 
     def _zone_control_reward(
         self,
@@ -317,7 +327,7 @@ class RewardCalculator:
         is_corner = self._is_cornered(px, py, maze)
         if is_corner and not powered:
             if threatening > 0:
-                breakdown["zone_control"] -= 10.0
+                breakdown["zone_control"] -= 5.0
                 self.steps_in_corner += 1
                 if self.steps_in_corner > 1:
                     breakdown["zone_control"] -= 2.5 * (self.steps_in_corner - 1)
@@ -438,7 +448,7 @@ class RewardCalculator:
             if g.in_prison:
                 continue
             dist = abs(g.grid_x - px) + abs(g.grid_y - py)
-            if dist > 8:
+            if dist > 10:
                 continue
             if g.is_edible:
                 edible_nearby += 1
@@ -472,12 +482,14 @@ class RewardCalculator:
         threat_dist: float = float("inf"),
         min_ghost_dist_after: int = -1,
         min_ghost_dist_before: int = -1,
+        same_action_count: int = 0,
         explore_step: bool = False,
     ) -> tuple[float, dict[str, float]]:
         """Return (total_reward, breakdown_dict)."""
         breakdown = {
             "step": 0.0,
             "oscillation": 0.0,
+            "momentum": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
             "ghost": 0.0,
@@ -500,6 +512,7 @@ class RewardCalculator:
             "survival_truncation": 0.0,
             "exploration": 0.0,
             "zone_stagnation": 0.0,
+            "bypassed_pellet": 0.0,
         }
 
         px, py = player.grid_x, player.grid_y
@@ -512,39 +525,38 @@ class RewardCalculator:
         threatening, edible_nearby, min_threat_dist, min_edible_dist = (
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
+        # ── Core Navigation, Pellet Collection & Anti-Oscillation Rewards ──
+        self._step_reward(events, breakdown)
         self._death_penalty(events, breakdown)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
+        self._super_pellet_reward(events, powered, threatening, breakdown)
         self._bfs_shaping(bfs_shaping, breakdown)
+        self._ghost_eat_reward(events, breakdown)
         self._ghost_proximity_penalty(
             min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
         )
+        self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
+        self._bypassed_pellet_penalty(events, threat_dist, breakdown)
+        # self._momentum_reward(events, same_action_count, breakdown)
 
-        # self._step_reward(events, breakdown)
-        # self._death_penalty(events, breakdown, frac)
-        # self._completion_reward(events, step_count, max_steps, breakdown)
-        # self._pellet_reward(events, frac, breakdown)
-        # self._super_pellet_reward(events, powered, threatening, breakdown)
-        # self._ghost_eat_reward(events, breakdown)
-        # self._exploration_reward(px, py, breakdown)
-        # self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
-
-        # ── Re-enabled dense shaping (was all commented out) ──\
+        # ── Commented out noisy auxiliary channels to focus purely on navigation & oscillation ──
+        self._milestone_reward(frac, breakdown)
+        self._evasion_skill_reward(min_ghost_dist_after, breakdown)
+        # self._threat_mastery_reward(
+        #     threatening, min_threat_dist, min_ghost_dist_after, powered, breakdown
+        # )
+        # self._ghost_lure_reward(
+        #     edible_nearby, min_edible_dist, min_ghost_dist_after, powered, breakdown
+        # )
+        # self._zone_control_reward(px, py, maze, threatening, powered, breakdown)
         # self._zone_stagnation_penalty(
         #     px, py, events, bfs_shaping, threat_dist, breakdown
         # )
-        # self._bfs_shaping(bfs_shaping, breakdown)
-        # self._milestone_reward(frac, breakdown)
         # self._hunger_penalty(steps_since_pellet, breakdown)
-        # self._ghost_proximity_penalty(
-        #     min_ghost_dist_after,
-        #     min_ghost_dist_before,
-        #     events,
-        #     powered,
-        #     breakdown,
-        # )
-        # self._evasion_skill_reward(min_ghost_dist_after, breakdown)
-        # self._incomplete_penalty(events, frac, breakdown)
+        # self._region_cleared_reward(events, breakdown)
+        # self._region_dirty_penalty(events, breakdown)
+        # self._backtrack_penalty(events, breakdown)
 
         self.last_min_ghost_dist = (
             min_ghost_dist_after if min_ghost_dist_after >= 0 else min_threat_dist

@@ -47,6 +47,8 @@ class PacmanPlayerEnv:
         maze_h_min: int | None = None,  # ← NEW
         maze_h_max: int | None = None,  # ← NEW
         start_pellets: tuple[int, ...] | None = None,  # ← completion curriculum
+        ghost_speed_ratio: float = 0.35,
+        ghost_confusion_prob: float = 0.0,
     ) -> None:
         if not pygame.get_init():
             os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -83,9 +85,9 @@ class PacmanPlayerEnv:
         self.pellet_history: deque[bool] = deque(maxlen=6)
         self.region_pellets: dict[tuple[int, int], int] = {}
         self.region_pellets_initial: dict[tuple[int, int], int] = {}  # ← NEW
+        self.cleared_regions: set[tuple[int, int]] = set()
         self.last_region: tuple[int, int] | None = None
 
-        self.use_reverse_mask = True
         self.use_bfs_shaping = use_bfs_shaping
         self.bfs_shaping_gamma = 0.99
 
@@ -99,7 +101,8 @@ class PacmanPlayerEnv:
         self.episode_telemetry: dict[str, float] = {}
         self._in_corner_threat = False
         self._open_escape_deadline = -1
-        self.ghost_confusion_prob = 0.01  # REMOVE
+        self.ghost_speed_ratio = ghost_speed_ratio
+        self.ghost_confusion_prob = ghost_confusion_prob
         self.death_count = 0
 
         # ← NEW: spatial / temporal memory state
@@ -125,7 +128,9 @@ class PacmanPlayerEnv:
 
         # ── Delegates ──
         self._reward_calc = RewardCalculator(stage=stage)
-        self._ghost_ctrl = GhostController(movement=None, rng=self.rng)
+        self._ghost_ctrl = GhostController(
+            movement=None, rng=self.rng, ghost_speed_ratio=ghost_speed_ratio
+        )
 
     # ------------------------------------------------------------------ #
     #  Public API
@@ -172,6 +177,7 @@ class PacmanPlayerEnv:
         self.episode_reward_breakdown = {
             "step": 0.0,
             "oscillation": 0.0,
+            "momentum": 0.0,
             "pellet": 0.0,
             "super_pellet": 0.0,
             "ghost": 0.0,
@@ -194,23 +200,26 @@ class PacmanPlayerEnv:
             "survival_truncation": 0.0,
             "exploration": 0.0,
             "zone_stagnation": 0.0,
+            "bypassed_pellet": 0.0,
         }
 
         self._reward_calc.reset()
         # self.reward_calculator.reset()
         # ← NEW: curriculum-friendly sizing
-        # mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
-        # mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
-        # mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
-        # mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
+        mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
+        mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
+        mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
+        mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
 
-        # maze_w = self.rng.randint(mw_min, mw_max)
-        # maze_h = self.rng.randint(mh_min, mh_max)
-        # current_seed = self.rng.randint(1, 44444)
-        maze_w = 25
-        maze_h = 20
-        fixed_seeds = [20, 77, 1337, 42, 100]
-        current_seed = fixed_seeds[self.rng.randint(0, len(fixed_seeds) - 1)]
+        maze_w = self.rng.randint(mw_min, mw_max)
+        maze_h = self.rng.randint(mh_min, mh_max)
+        current_seed = self.rng.randint(1, 44444)
+
+        # maze_w = 25
+        # maze_h = 20
+        # fixed_seeds = [20, 77, 1337, 42, 100]
+        # current_seed = fixed_seeds[self.rng.randint(0, len(fixed_seeds) - 1)]
+
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
         self.movement = MovementSystem(self.maze)
@@ -263,6 +272,7 @@ class PacmanPlayerEnv:
         self.visited_tiles.add(start_cell)
         self.last_cell = start_cell
         self.last_region = (start_cell[0] // 4, start_cell[1] // 4)
+        self.cleared_regions.clear()
         h, w = len(self.maze), len(self.maze[0])
         self.visit_counts: list[list[int]] = [[0 for _ in range(w)] for _ in range(h)]
         self.visit_counts[start_cell[0]][start_cell[1]] = 1
@@ -297,6 +307,9 @@ class PacmanPlayerEnv:
         `explore=True` marks ε-explorer steps: behavioral penalties that would
         punish pure exploration noise (oscillation) are skipped for them.
         """
+        if self.just_died > 0:
+            self.just_died = 0.0
+
         if isinstance(action, torch.Tensor):
             action = int(action.item())
 
@@ -311,6 +324,7 @@ class PacmanPlayerEnv:
 
         assert self.player is not None
         self.player.next_direction = DIRECTIONS[action]
+        prev_action = self.last_action
         self.last_action = action
         events = {
             "pellet_eaten": False,
@@ -322,9 +336,22 @@ class PacmanPlayerEnv:
             "left_dirty_region": False,
             "cleared_region": False,
             "backtracked": False,  # ← NEW
+            "bypassed_pellet": False,  # ← NEW
         }
 
         start_cell = (self.player.grid_y, self.player.grid_x)
+        start_y, start_x = start_cell
+
+        had_adjacent_pellet = False
+        if self.movement is not None and self.maze is not None and self.pellets is not None:
+            h_m = len(self.maze)
+            w_m = len(self.maze[0]) if h_m > 0 else 0
+            for d_name, (dy_o, dx_o) in (("UP", (-1, 0)), ("DOWN", (1, 0)), ("LEFT", (0, -1)), ("RIGHT", (0, 1))):
+                if self.movement.can_move(start_y, start_x, d_name):
+                    ny_o, nx_o = start_y + dy_o, start_x + dx_o
+                    if 0 <= ny_o < h_m and 0 <= nx_o < w_m and self.pellets[ny_o][nx_o] in (1, 2):
+                        had_adjacent_pellet = True
+                        break
 
         # ← NEW: snapshot distances BEFORE moving (for delta features)
         if self.movement is not None and self.maze is not None:
@@ -416,23 +443,36 @@ class PacmanPlayerEnv:
 
         # ── Anti-oscillation & backtracking tracking ──
         # ── Oscillation & loop detection ──
+        OPPOSITE_ACTION = {0: 1, 1: 0, 2: 3, 3: 2}
+        is_action_reversal = (
+            prev_action is not None
+            and action == OPPOSITE_ACTION.get(prev_action, -1)
+        )
+
         if cell_changed:
             history = list(self.cell_history)
 
-            # 1) Classic 2-cell flip A->B->A
+            # 2-cell direction reversal A -> B -> A is an oscillation ONLY if:
+            # - tile B (self.last_cell) was NOT a dead end (>1 walkable exit)
+            # - no pellet was eaten on this step
+            # - not fleeing a close ghost (threat_dist > 3 or powered)
             if self.prev_prev_cell is not None and current_pos == self.prev_prev_cell:
-                events["oscillating"] = True
-                self._osc_count += 1
-
-            # 2) 4-cell loop A->B->C->D->A (only if no pellet eaten this step)
-            elif len(history) >= 4:
-                if current_pos == history[-4]:
-                    if (
-                        self.pellets
-                        and self.pellets[current_pos[0]][current_pos[1]] == 0
-                    ):
-                        events["oscillating"] = True
-                        self._osc_count += 1
+                last_c_exits = 0
+                if self.last_cell is not None and self.movement is not None:
+                    last_c_exits = sum(
+                        1
+                        for d in DIRECTIONS
+                        if self.movement.can_move(self.last_cell[0], self.last_cell[1], d)
+                    )
+                is_dead_end = last_c_exits <= 1
+                is_fleeing = threat_dist <= 3 and (
+                    self.player is not None and self.player.powered_timer <= 0
+                )
+                if not is_dead_end and not is_fleeing and not (
+                    events["pellet_eaten"] or events["super_pellet_eaten"]
+                ):
+                    events["oscillating"] = True
+                    self._osc_count += 1
 
             self.prev_prev_cell = self.last_cell
             self.last_cell = current_pos
@@ -465,34 +505,101 @@ class PacmanPlayerEnv:
                 rem_old = self.region_pellets.get(self.last_region, 0)
                 if 0 < rem_old <= 2:
                     events["left_dirty_region"] = True
-                elif rem_old == 0:
+                elif rem_old == 0 and self.last_region not in self.cleared_regions and self.region_pellets_initial.get(self.last_region, 0) > 0:
                     events["cleared_region"] = True
+                    self.cleared_regions.add(self.last_region)
             self.last_region = curr_region
+        else:
+            # If Pac-Man did not advance to a new cell center (e.g. wall bump or stopped mid-tile)
+            # and flipped directions or toggled repeatedly on an empty cell:
+            if is_action_reversal and not (
+                events["pellet_eaten"] or events["super_pellet_eaten"]
+            ):
+                events["oscillating"] = True
+                self._osc_count += 1
+
+        if had_adjacent_pellet and not (
+            events["pellet_eaten"] or events["super_pellet_eaten"] or events["pacman_died"]
+        ):
+            events["bypassed_pellet"] = True
 
         if events["pacman_died"]:
-            self.last_cell = None
+            spawn_cell = (self.player.grid_y, self.player.grid_x)
+            self.last_cell = spawn_cell
             self.prev_prev_cell = None
-            self.last_region = (current_pos[0] // 4, current_pos[1] // 4)
-            # ← NEW: tell next observation that death just happened
+            self.cell_history.clear()
+            self.cell_history.append(spawn_cell)
+            self.visited_recent.clear()
+            self.visited_recent.append(spawn_cell)
+            self.last_positions.clear()
+            self.last_positions.append(spawn_cell)
+            self.steps_since_pellet = 0
+            self.same_action_count = 0
+            self.last_action = None
+            self.last_region = (spawn_cell[0] // 4, spawn_cell[1] // 4)
             self.just_died = 1.0
 
-        # ← NEW: decay death flag
+            # Re-initialize spatial memory & visit grids on death
+            self.visited_tiles.clear()
+            self.visited_tiles.add(spawn_cell)
+            if self.maze is not None:
+                h_m, w_m = len(self.maze), len(self.maze[0])
+                self.visit_counts = [[0 for _ in range(w_m)] for _ in range(h_m)]
+                self.visit_counts[spawn_cell[0]][spawn_cell[1]] = 1
+                self.visited_heatmap = [[0.0 for _ in range(w_m)] for _ in range(h_m)]
+                self.visited_heatmap[spawn_cell[0]][spawn_cell[1]] = 1.0
+
+            if self.use_bfs_shaping:
+                self._pellet_dist_grid = self._compute_pellet_distance_grid()
+                self._cached_potential = self._potential_at(*spawn_cell)
+
+            if self.movement is not None and self.maze is not None:
+                bfs_sp = self.movement.bfs_distances(spawn_cell)
+                w_sp = len(self.maze[0])
+                np_dists = [
+                    bfs_sp[gy * w_sp + gx]
+                    for gy in range(len(self.maze))
+                    for gx in range(w_sp)
+                    if self.pellets[gy][gx] == 1
+                    and 0 <= gy * w_sp + gx < len(bfs_sp)
+                    and bfs_sp[gy * w_sp + gx] >= 0
+                ]
+                self.prev_nearest_pellet_dist = min(np_dists) if np_dists else -1
+
+                ghost_dists = [
+                    bfs_sp[g.grid_y * w_sp + g.grid_x]
+                    for g in self.ghosts
+                    if not g.in_prison
+                    and not g.is_edible
+                    and 0 <= g.grid_y * w_sp + g.grid_x < len(bfs_sp)
+                    and bfs_sp[g.grid_y * w_sp + g.grid_x] >= 0
+                ]
+                self.prev_nearest_ghost_dist = min(ghost_dists) if ghost_dists else -1
+
+                pp_dists = [
+                    bfs_sp[gy * w_sp + gx]
+                    for gy in range(len(self.maze))
+                    for gx in range(w_sp)
+                    if self.pellets[gy][gx] == 2
+                    and 0 <= gy * w_sp + gx < len(bfs_sp)
+                    and bfs_sp[gy * w_sp + gx] >= 0
+                ]
+                self.prev_nearest_pp_dist = min(pp_dists) if pp_dists else -1
+
         if self.just_died > 0:
             self.just_died = max(0.0, self.just_died - 0.05)
 
         # ── BFS potential shaping ──
         bfs_shaping = 0.0
         if self.use_bfs_shaping:
-            if events["pellet_eaten"] or events["super_pellet_eaten"]:
-                # Throttle: only recompute every 5% of total pellets consumed
-                new_frac = self.remaining_pellets / max(self.total_pellets, 1)
-                old_frac = getattr(self, "_last_pellet_grid_frac", 1.0)
-                if old_frac - new_frac >= 0.05:
+            if events["pacman_died"]:
+                bfs_shaping = 0.0
+            else:
+                if events["pellet_eaten"] or events["super_pellet_eaten"]:
                     self._pellet_dist_grid = self._compute_pellet_distance_grid()
-                    self._last_pellet_grid_frac = new_frac
-            potential_after = self._potential_at(*current_pos)
-            bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
-            self._cached_potential = potential_after
+                potential_after = self._potential_at(*current_pos)
+                bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
+                self._cached_potential = potential_after
 
         # ← NEW: mark truncation in events so reward calc can penalize incomplete
         truncated = self.step_count >= self.max_steps
@@ -512,6 +619,7 @@ class PacmanPlayerEnv:
             threat_dist=threat_dist,
             min_ghost_dist_after=min_ghost_dist_after,
             min_ghost_dist_before=min_ghost_dist_before,  # ← CRITICAL for evasion_skill
+            same_action_count=self.same_action_count,
             explore_step=explore,
         )
         for key, val in breakdown.items():
@@ -965,15 +1073,6 @@ class PacmanPlayerEnv:
             region_is_dirty=region_is_dirty,
         )
 
-        if self.last_action is not None and self.use_reverse_mask:
-            # Reversals are masked when safe (ghost dist >= 4 or unthreatened) to prevent 50%+ oscillation.
-            # When ghosts are close (< 4), reversals are unmasked so Pac-Man can retreat.
-            if self.prev_nearest_ghost_dist < 0 or self.prev_nearest_ghost_dist >= 4:
-                rev = self._reverse_action(self.last_action)
-                if valid_player_actions[0, rev]:
-                    if valid_player_actions.sum().item() > 1:
-                        valid_player_actions = valid_player_actions.clone()
-                        valid_player_actions[0, rev] = False
 
         return grid, extra_features, valid_player_actions
 

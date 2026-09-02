@@ -50,12 +50,30 @@ class CNNPlayerController:
         self.model.eval()
         self.last_diagnostics: dict[str, Any] = {}
         self.last_action_idx: int | None = None
-        self._hidden: torch.Tensor | None = None  # ← GRU memory persists across steps
+        self._hidden: torch.Tensor | None = None  # GRU memory persists across steps
+
+        # Observation feature state tracking
+        self.visit_counts: list[list[int]] | None = None
+        self.initial_pellet_count: int | None = None
+        self.prev_nearest_pellet_dist: float = -1.0
+        self.prev_nearest_ghost_dist: float = -1.0
+        self.prev_nearest_pp_dist: float = -1.0
+        self.steps_since_pellet: int = 0
+        self.same_action_count: int = 0
+        self.last_positions: list[tuple[int, int]] = []
 
     def reset_state(self) -> None:
-        """Reset internal state history (e.g. between games)."""
+        """Reset internal state history (e.g. between games or post-respawn)."""
         self.last_action_idx = None
-        self._hidden = None  # ← wipe GRU memory on new game
+        self._hidden = None  # wipe GRU memory on new game/life
+        self.visit_counts = None
+        self.initial_pellet_count = None
+        self.prev_nearest_pellet_dist = -1.0
+        self.prev_nearest_ghost_dist = -1.0
+        self.prev_nearest_pp_dist = -1.0
+        self.steps_since_pellet = 0
+        self.same_action_count = 0
+        self.last_positions = []
 
     def get_action(
         self,
@@ -64,9 +82,27 @@ class CNNPlayerController:
         player: Player,
         ghosts: list[Ghost],
         movement_system: Any,
-        sample: bool = True,
+        sample: bool = False,
     ) -> str:
         """Construct state tensors and select action (sampling from distribution or greedy)."""
+        height = len(maze)
+        width = len(maze[0]) if height else 0
+        px, py = player.grid_x, player.grid_y
+
+        if self.initial_pellet_count is None and pellets:
+            self.initial_pellet_count = sum(
+                1 for row in pellets for cell in row if cell in (1, 2)
+            )
+
+        if self.visit_counts is None or len(self.visit_counts) != height or (height > 0 and len(self.visit_counts[0]) != width):
+            self.visit_counts = [[0 for _ in range(width)] for _ in range(height)]
+
+        if 0 <= py < height and 0 <= px < width:
+            self.visit_counts[py][px] += 1
+            self.last_positions.append((py, px))
+            if len(self.last_positions) > 20:
+                self.last_positions.pop(0)
+
         grid, extra_features, valid_actions = self._build_observation(
             maze, pellets, player, ghosts, movement_system
         )
@@ -76,9 +112,9 @@ class CNNPlayerController:
             logits, value, self._hidden = self.model(grid, extra_features, self._hidden)
             logits = logits.float()
             value = value.float()
-            masked_logits = logits.masked_fill(~valid_actions, -1e8)
+            masked_logits = logits.masked_fill(~valid_actions, -1e4)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
+                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
             )
             probs = torch.softmax(masked_logits, dim=-1)[0]
             probs = torch.nan_to_num(probs, nan=0.0, posinf=1.0, neginf=0.0)
@@ -93,8 +129,19 @@ class CNNPlayerController:
             else:
                 action_index = int(torch.argmax(masked_logits, dim=-1).item())
 
+        if self.last_action_idx is not None and self.last_action_idx == action_index:
+            self.same_action_count += 1
+        else:
+            self.same_action_count = 0
+
         self.last_action_idx = action_index
         chosen_action = DIRECTIONS[action_index]
+
+        if 0 <= py < height and 0 <= px < width and pellets and pellets[py][px] in (1, 2):
+            self.steps_since_pellet = 0
+        else:
+            self.steps_since_pellet += 1
+
         self.last_diagnostics = {
             "chosen_action": chosen_action,
             "estimated_value": round(float(value.item()), 4),
@@ -126,5 +173,14 @@ class CNNPlayerController:
             player=player,
             ghosts=ghosts,
             movement=movement_system,
+            initial_pellet_count=self.initial_pellet_count,
             device=self.device,
+            visit_counts=self.visit_counts,
+            prev_nearest_pellet_dist=self.prev_nearest_pellet_dist,
+            prev_nearest_ghost_dist=self.prev_nearest_ghost_dist,
+            prev_nearest_pp_dist=self.prev_nearest_pp_dist,
+            steps_since_pellet=self.steps_since_pellet,
+            last_positions=self.last_positions,
+            just_died=0.0,
+            same_action_count=self.same_action_count,
         )

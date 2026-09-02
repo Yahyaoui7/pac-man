@@ -116,18 +116,18 @@ class TrainingConfig:
     num_updates: int = 1500
     rollout_steps: int = 3000
     seq_len: int = 32
-    minibatch_seqs: int = 8
-    ppo_epochs: int = 1
+    minibatch_seqs: int = 4
+    ppo_epochs: int = 4
 
     # ── Optimization ──
     learning_rate: float = 3e-4
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_eps: float = 0.2
-    entropy_coef: float = 0.04
-    value_coef: float = 0.25
+    entropy_coef: float = 0.001
+    value_coef: float = 0.005
     max_grad_norm: float = 0.5
-    rollout_epsilon: float = 0.05
+    rollout_epsilon: float = 0.0
 
     # ── Execution ──
     seed: int = 42
@@ -140,6 +140,8 @@ class TrainingConfig:
     # ── Curriculum ──
     start_pellets: tuple[int, ...] | None = (3, 5, 8)
     use_bfs_shaping: bool = True
+    ghost_speed_ratio: float = 0.20  # was 0.35 — faster ghosts collapse safe-zone exploit
+    ghost_confusion_prob: float = 0.0
 
     # ── Evaluation ──
     eval_episodes: int = 20
@@ -196,6 +198,7 @@ class TrainingConfig:
             ppo_epochs=args.ppo_epochs,
             learning_rate=args.lr,
             entropy_coef=args.entropy,
+            value_coef=args.value_coef,
             rollout_epsilon=args.epsilon,
             seed=args.seed,
             save_interval=args.save_interval,
@@ -205,6 +208,8 @@ class TrainingConfig:
             run_name=args.name,
             start_pellets=_parse_pellets(args.start_pellets),
             use_bfs_shaping=not args.no_bfs_shaping,
+            ghost_speed_ratio=args.ghost_speed_ratio,
+            ghost_confusion_prob=args.ghost_confusion,
             eval_episodes=args.eval_episodes,
             auto_curriculum=args.auto_curriculum,
             stage1_grad_threshold=args.grad_threshold,
@@ -245,19 +250,22 @@ class TrainingConfig:
         )
         p.add_argument("--seq-len", type=int, default=32, help="BPTT sequence length")
         p.add_argument(
-            "--minibatch-seqs", type=int, default=8, help="sequences per minibatch"
+            "--minibatch-seqs", type=int, default=4, help="sequences per minibatch"
         )
         p.add_argument(
-            "--ppo-epochs", type=int, default=1, help="PPO epochs per rollout"
+            "--ppo-epochs", type=int, default=4, help="PPO epochs per rollout"
         )
 
         # ── Optimization ──
         p.add_argument("--lr", type=float, default=3e-4, help="learning rate")
         p.add_argument(
-            "--entropy", type=float, default=0.04, help="entropy coefficient"
+            "--entropy", type=float, default=0.01, help="entropy coefficient"
         )
         p.add_argument(
-            "--epsilon", type=float, default=0.15, help="rollout ε-exploration"
+            "--value-coef", type=float, default=0.05, help="value loss coefficient"
+        )
+        p.add_argument(
+            "--epsilon", type=float, default=0.0, help="rollout ε-exploration"
         )
 
         # ── Execution ──
@@ -292,6 +300,18 @@ class TrainingConfig:
             "--no-bfs-shaping",
             action="store_true",
             help="disable BFS potential shaping",
+        )
+        p.add_argument(
+            "--ghost-speed-ratio",
+            type=float,
+            default=0.50,
+            help="ghost speed ratio relative to player (default: 0.50)",
+        )
+        p.add_argument(
+            "--ghost-confusion",
+            type=float,
+            default=0.0,
+            help="ghost movement confusion probability (default: 0.0)",
         )
 
         # ── Evaluation ──
@@ -347,6 +367,7 @@ class TrainingConfig:
             f"  SL warmstart     : {self.sl_warmstart}",
             f"  Start pellets    : {pellets_str}",
             f"  BFS shaping      : {self.use_bfs_shaping}",
+            f"  Ghost speed/conf : {self.ghost_speed_ratio:.2f} / {self.ghost_confusion_prob:.2f}",
             f"  Eval             : every {self.eval_interval} upd × {self.eval_episodes} eps",
             f"  Save dir         : {self.model_dir}",
             f"  Log file         : {self.log_file}",
@@ -403,7 +424,8 @@ class PacmanTrainer:
             self.policy.backbone.gru_num_layers * self.policy.backbone.gru_hidden_size
         )  # matches PacmanCNNBackbone GRU (2 layers x 384 = 768)
         self.optimizer = self._build_optimizer()
-        self.scaler = torch.amp.GradScaler("cuda", enabled=(self.device.type == "cuda"))
+        # Full float32 precision across CPU and GPU for RL stability
+        self.scaler = torch.amp.GradScaler("cuda", enabled=False)
         self.ref_policy: PlayerActorCritic | None = None  # for SL warmstart KL reg
 
         # Loaded state
@@ -458,6 +480,8 @@ class PacmanTrainer:
             device="cpu",
             start_pellets=self.cfg.start_pellets,
             use_bfs_shaping=self.cfg.use_bfs_shaping,
+            ghost_speed_ratio=self.cfg.ghost_speed_ratio,
+            ghost_confusion_prob=self.cfg.ghost_confusion_prob,
         )
 
     def _build_optimizer(self) -> torch.optim.Adam:
@@ -592,10 +616,13 @@ class PacmanTrainer:
                 features.to(self.device),
                 self.policy_hidden,
             )
-            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e8)
-            masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
-            )
+            if torch.isnan(logits).any() or torch.isinf(logits).any():
+                raise RuntimeError(
+                    "NaN/Inf detected in policy logits during rollout! Policy network corrupted."
+                )
+
+            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e4)
+            masked_logits = torch.clamp(masked_logits, min=-1e4, max=1e4)
 
             if self.cfg.rollout_epsilon > 0:
                 probs = F.softmax(masked_logits, dim=-1)
@@ -615,7 +642,7 @@ class PacmanTrainer:
                     dist = Categorical(probs=probs)
                     explore_branch = False
                 action = dist.sample()
-                log_prob = torch.log(mix[0, action])
+                log_prob = torch.log(mix[0, action].clamp(min=1e-8))
             else:
                 explore_branch = False
                 dist = Categorical(logits=masked_logits)
@@ -654,7 +681,9 @@ class PacmanTrainer:
                 self.current_ep_steps = 0
                 self.total_completed_episodes += 1
                 return True
-            return True
+            else:
+                self.obs = next_obs
+                return True
         else:
             self.obs = next_obs
             return False
@@ -800,34 +829,30 @@ class PacmanTrainer:
         )
 
         self.optimizer.zero_grad()
-        with torch.amp.autocast("cuda", enabled=(self.device.type == "cuda")):
+        # FP32 precision across CPU and GPU for numerical stability
+        with torch.amp.autocast("cuda", enabled=False):
             logits, values, _ = self.policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            masked_logits = logits.masked_fill(~mb_valid, -1e8)
-            masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
-            )
+            if torch.isnan(logits).any() or torch.isnan(values).any():
+                raise RuntimeError(
+                    "NaN detected in policy or value forward pass during PPO update!"
+                )
+
+            masked_logits = logits.masked_fill(~mb_valid, -1e4)
+            masked_logits = torch.clamp(masked_logits, min=-1e4, max=1e4)
             dist = Categorical(logits=masked_logits)
 
             new_log_probs = dist.log_prob(mb_actions)
             entropy = dist.entropy().mean()
 
-            ratio = torch.exp(new_log_probs - mb_old_log_probs)
+            log_ratio = torch.clamp(new_log_probs - mb_old_log_probs, min=-20.0, max=20.0)
+            ratio = torch.exp(log_ratio)
             surr1 = ratio * mb_adv
             surr2 = torch.clamp(ratio, 1.0 - cfg.clip_eps, 1.0 + cfg.clip_eps) * mb_adv
             policy_loss = -torch.min(surr1, surr2).mean()
 
-            # Sanitize values and returns for value loss calculation
-            values_clean = torch.nan_to_num(
-                values.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0
-            )
-            returns_clean = torch.nan_to_num(
-                mb_returns.reshape(-1), nan=0.0, posinf=100.0, neginf=-100.0
-            )
-            value_loss = F.smooth_l1_loss(values_clean, returns_clean)
-            if torch.isnan(value_loss):
-                value_loss = torch.tensor(0.0, device=self.device)
+            value_loss = F.smooth_l1_loss(values.reshape(-1), mb_returns.reshape(-1))
 
             kl_loss = self._compute_kl_loss(
                 mb_grid, mb_features, mb_hidden, mb_resets, mb_valid, masked_logits
@@ -840,11 +865,12 @@ class PacmanTrainer:
                 + kl_coef * kl_loss
             )
 
-        self.scaler.scale(loss).backward()
-        self.scaler.unscale_(self.optimizer)
+            if torch.isnan(loss):
+                raise RuntimeError("NaN detected in calculated PPO loss!")
+
+        loss.backward()
         nn.utils.clip_grad_norm_(self.policy.parameters(), cfg.max_grad_norm)
-        self.scaler.step(self.optimizer)
-        self.scaler.update()
+        self.optimizer.step()
 
         return policy_loss.item(), value_loss.item(), entropy.item()
 
@@ -864,10 +890,8 @@ class PacmanTrainer:
             ref_logits, _, _ = self.ref_policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            ref_masked = ref_logits.masked_fill(~mb_valid, -1e8)
-            ref_masked = torch.nan_to_num(
-                ref_masked, nan=-1e8, posinf=10.0, neginf=-1e8
-            )
+            ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
+            ref_masked = torch.clamp(ref_masked, min=-1e4, max=1e4)
             ref_probs = F.softmax(ref_masked, dim=-1)
             ref_log_p = F.log_softmax(ref_masked, dim=-1)
         log_p = F.log_softmax(masked_logits, dim=-1)
@@ -994,7 +1018,11 @@ class PacmanTrainer:
         cfg = self.cfg
         if self.eval_env is None:
             self.eval_env = PacmanPlayerEnv(
-                seed=cfg.eval_seed_base, stage=cfg.stage, device="cpu"
+                seed=cfg.eval_seed_base,
+                stage=cfg.stage,
+                device="cpu",
+                ghost_speed_ratio=cfg.ghost_speed_ratio,
+                ghost_confusion_prob=cfg.ghost_confusion_prob,
             )
             self.eval_env.start_pellets = cfg.start_pellets
         else:

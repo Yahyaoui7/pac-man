@@ -1,3 +1,4 @@
+
 """Risk-aware search teacher that produces Pac-Man imitation labels."""
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ class PacmanExpert:
 
         self.horizon = horizon
         self.safety_margin = safety_margin
-        
+
         self.distance_cache: dict[
             tuple[int, int],
             list[int],

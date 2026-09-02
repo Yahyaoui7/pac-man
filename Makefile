@@ -11,7 +11,7 @@ debug:
 	uv run python -m pdb -m pac_man.py config.json
 
 collect:
-	uv run python -m AI_arena.ghosts.ghost_collector --samples 50000 --stage 2
+	uv run python -m AI_arena.ghosts.ghost_collector --samples 150000 --stage 2
 
 train:
 	uv run python -m AI_arena.ghosts.ghost_training --epochs 30 --patience 20

@@ -307,6 +307,9 @@ class PacmanPlayerEnv:
         `explore=True` marks ε-explorer steps: behavioral penalties that would
         punish pure exploration noise (oscillation) are skipped for them.
         """
+        if self.just_died > 0:
+            self.just_died = 0.0
+
         if isinstance(action, torch.Tensor):
             action = int(action.item())
 
@@ -521,29 +524,82 @@ class PacmanPlayerEnv:
             events["bypassed_pellet"] = True
 
         if events["pacman_died"]:
-            self.last_cell = None
+            spawn_cell = (self.player.grid_y, self.player.grid_x)
+            self.last_cell = spawn_cell
             self.prev_prev_cell = None
-            self.last_region = (current_pos[0] // 4, current_pos[1] // 4)
-            # ← NEW: tell next observation that death just happened
+            self.cell_history.clear()
+            self.cell_history.append(spawn_cell)
+            self.visited_recent.clear()
+            self.visited_recent.append(spawn_cell)
+            self.last_positions.clear()
+            self.last_positions.append(spawn_cell)
+            self.steps_since_pellet = 0
+            self.same_action_count = 0
+            self.last_action = None
+            self.last_region = (spawn_cell[0] // 4, spawn_cell[1] // 4)
             self.just_died = 1.0
 
-        # ← NEW: decay death flag
+            # Re-initialize spatial memory & visit grids on death
+            self.visited_tiles.clear()
+            self.visited_tiles.add(spawn_cell)
+            if self.maze is not None:
+                h_m, w_m = len(self.maze), len(self.maze[0])
+                self.visit_counts = [[0 for _ in range(w_m)] for _ in range(h_m)]
+                self.visit_counts[spawn_cell[0]][spawn_cell[1]] = 1
+                self.visited_heatmap = [[0.0 for _ in range(w_m)] for _ in range(h_m)]
+                self.visited_heatmap[spawn_cell[0]][spawn_cell[1]] = 1.0
+
+            if self.use_bfs_shaping:
+                self._pellet_dist_grid = self._compute_pellet_distance_grid()
+                self._cached_potential = self._potential_at(*spawn_cell)
+
+            if self.movement is not None and self.maze is not None:
+                bfs_sp = self.movement.bfs_distances(spawn_cell)
+                w_sp = len(self.maze[0])
+                np_dists = [
+                    bfs_sp[gy * w_sp + gx]
+                    for gy in range(len(self.maze))
+                    for gx in range(w_sp)
+                    if self.pellets[gy][gx] == 1
+                    and 0 <= gy * w_sp + gx < len(bfs_sp)
+                    and bfs_sp[gy * w_sp + gx] >= 0
+                ]
+                self.prev_nearest_pellet_dist = min(np_dists) if np_dists else -1
+
+                ghost_dists = [
+                    bfs_sp[g.grid_y * w_sp + g.grid_x]
+                    for g in self.ghosts
+                    if not g.in_prison
+                    and not g.is_edible
+                    and 0 <= g.grid_y * w_sp + g.grid_x < len(bfs_sp)
+                    and bfs_sp[g.grid_y * w_sp + g.grid_x] >= 0
+                ]
+                self.prev_nearest_ghost_dist = min(ghost_dists) if ghost_dists else -1
+
+                pp_dists = [
+                    bfs_sp[gy * w_sp + gx]
+                    for gy in range(len(self.maze))
+                    for gx in range(w_sp)
+                    if self.pellets[gy][gx] == 2
+                    and 0 <= gy * w_sp + gx < len(bfs_sp)
+                    and bfs_sp[gy * w_sp + gx] >= 0
+                ]
+                self.prev_nearest_pp_dist = min(pp_dists) if pp_dists else -1
+
         if self.just_died > 0:
             self.just_died = max(0.0, self.just_died - 0.05)
 
         # ── BFS potential shaping ──
         bfs_shaping = 0.0
         if self.use_bfs_shaping:
-            if events["pellet_eaten"] or events["super_pellet_eaten"]:
-                # Throttle: only recompute every 5% of total pellets consumed
-                new_frac = self.remaining_pellets / max(self.total_pellets, 1)
-                old_frac = getattr(self, "_last_pellet_grid_frac", 1.0)
-                if old_frac - new_frac >= 0.05:
+            if events["pacman_died"]:
+                bfs_shaping = 0.0
+            else:
+                if events["pellet_eaten"] or events["super_pellet_eaten"]:
                     self._pellet_dist_grid = self._compute_pellet_distance_grid()
-                    self._last_pellet_grid_frac = new_frac
-            potential_after = self._potential_at(*current_pos)
-            bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
-            self._cached_potential = potential_after
+                potential_after = self._potential_at(*current_pos)
+                bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
+                self._cached_potential = potential_after
 
         # ← NEW: mark truncation in events so reward calc can penalize incomplete
         truncated = self.step_count >= self.max_steps

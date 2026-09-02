@@ -112,7 +112,7 @@ class RewardCalculator:
             # Exempt if a dangerous non-edible ghost is threatening nearby (threat_dist < 3)
             if threat_dist < 3:
                 return
-            breakdown["bypassed_pellet"] = -0.2
+            breakdown["bypassed_pellet"] = -0.8
 
     def _momentum_reward(
         self,
@@ -228,32 +228,22 @@ class RewardCalculator:
         if powered or min_ghost_dist_after < 0:
             return
         d = min_ghost_dist_after
-        # Static repulsion: the closer, the stronger (extended out to distance 8)
+        # Static repulsion: only at immediate danger (dist <= 3)
         if d == 1:
-            breakdown["ghost_proximity"] -= 3.0
+            breakdown["ghost_proximity"] -= 1.2
         elif d == 2:
-            breakdown["ghost_proximity"] -= 1.5
-        elif d == 3:
-            breakdown["ghost_proximity"] -= 1.0
-        elif d == 4:
             breakdown["ghost_proximity"] -= 0.6
-        elif d == 5:
-            breakdown["ghost_proximity"] -= 0.3
-        elif d == 6:
-            breakdown["ghost_proximity"] -= 0.15
-        elif d == 7:
-            breakdown["ghost_proximity"] -= 0.08
-        elif d == 8:
-            breakdown["ghost_proximity"] -= 0.04
+        elif d == 3:
+            breakdown["ghost_proximity"] -= 0.2
 
-        # Directional approach penalty: moving closer to a ghost is penalized up to 8 tiles away
+        # Directional approach penalty: moving closer to a ghost when near (dist <= 4)
         if (
             min_ghost_dist_before > 0
             and d < min_ghost_dist_before
             and not events.get("super_pellet_eaten", False)
         ):
-            approach_strength = max(0, 9 - d)  # stronger when closer (1 to 8 tiles out)
-            breakdown["ghost_proximity"] -= 0.3 * approach_strength
+            approach_strength = max(0, 5 - d)  # stronger when closer (1 to 4 tiles out)
+            breakdown["ghost_proximity"] -= 0.2 * approach_strength
 
     def _region_cleared_reward(
         self, events: dict[str, bool], breakdown: dict[str, float]
@@ -548,11 +538,11 @@ class RewardCalculator:
         )
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
         self._bypassed_pellet_penalty(events, threat_dist, breakdown)
-        self._momentum_reward(events, same_action_count, breakdown)
+        # self._momentum_reward(events, same_action_count, breakdown)
 
         # ── Commented out noisy auxiliary channels to focus purely on navigation & oscillation ──
-        # self._milestone_reward(frac, breakdown)
-        # self._evasion_skill_reward(min_ghost_dist_after, breakdown)
+        self._milestone_reward(frac, breakdown)
+        self._evasion_skill_reward(min_ghost_dist_after, breakdown)
         # self._threat_mastery_reward(
         #     threatening, min_threat_dist, min_ghost_dist_after, powered, breakdown
         # )

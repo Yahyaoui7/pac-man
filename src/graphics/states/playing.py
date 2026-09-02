@@ -184,7 +184,7 @@ class PlayingState(State):
                     em.player,
                     em.ghosts,
                     self.movement,
-                    sample=False,
+                    sample=True,
                 )
                 if action:
                     em.player.next_direction = action

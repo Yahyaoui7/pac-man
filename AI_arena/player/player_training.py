@@ -140,7 +140,7 @@ class TrainingConfig:
     # ── Curriculum ──
     start_pellets: tuple[int, ...] | None = (3, 5, 8)
     use_bfs_shaping: bool = True
-    ghost_speed_ratio: float = 0.50  # was 0.35 — faster ghosts collapse safe-zone exploit
+    ghost_speed_ratio: float = 0.20  # was 0.35 — faster ghosts collapse safe-zone exploit
     ghost_confusion_prob: float = 0.0
 
     # ── Evaluation ──

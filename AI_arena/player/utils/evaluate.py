@@ -106,6 +106,8 @@ def run_evaluation(
             else:
                 action = int(Categorical(logits=masked_logits).sample())
             obs, reward, done, info, _ = env.step(action)
+            if info.get("events", {}).get("pacman_died", False):
+                hidden = None
             total_reward += reward
             steps += 1
 

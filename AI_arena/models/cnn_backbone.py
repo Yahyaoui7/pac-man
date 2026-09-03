@@ -19,8 +19,12 @@ class ResBlock(nn.Module):
     def __init__(self, channels: int, dilation: int = 1) -> None:
         super().__init__()
         pad = dilation
-        self.conv1 = nn.Conv2d(channels, channels, 3, padding=pad, dilation=dilation)
-        self.conv2 = nn.Conv2d(channels, channels, 3, padding=pad, dilation=dilation)
+        self.conv1 = nn.Conv2d(
+            channels, channels, 3, padding=pad, dilation=dilation
+        )
+        self.conv2 = nn.Conv2d(
+            channels, channels, 3, padding=pad, dilation=dilation
+        )
         self.relu = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -69,11 +73,13 @@ class PacmanCNNBackbone(nn.Module):
         extra_feature_count: int = EXTRA_FEATURE_COUNT,
         gru_hidden_size: int = 384,
         gru_num_layers: int = 2,
+        use_gru: bool = True,
     ) -> None:
         super().__init__()
 
         self.gru_hidden_size = gru_hidden_size
         self.gru_num_layers = gru_num_layers
+        self.use_gru = use_gru
 
         # ── Spatial tower (dense map information) ──
         self.cnn = nn.Sequential(
@@ -92,6 +98,7 @@ class PacmanCNNBackbone(nn.Module):
         )
 
         # Two-stage compression: less brutal than 10,400 → 256 in one shot
+        self.spatial_pool = nn.AdaptiveAvgPool2d((13, 25))
         self.spatial_compress = nn.Sequential(
             nn.Linear(32 * 25 * 13, 256),
             nn.ReLU(),
@@ -120,18 +127,21 @@ class PacmanCNNBackbone(nn.Module):
         )
 
         # ── GRU memory (2-layer with dropout between layers) ──
-        self.gru = nn.GRU(
-            gru_hidden_size,
-            gru_hidden_size,
-            num_layers=gru_num_layers,
-            batch_first=True,
-            dropout=0.1 if gru_num_layers > 1 else 0.0,  # only between layers
-        )
+        if self.use_gru:
+            self.gru = nn.GRU(
+                gru_hidden_size,
+                gru_hidden_size,
+                num_layers=gru_num_layers,
+                batch_first=True,
+                dropout=(
+                    0.1 if gru_num_layers > 1 else 0.0
+                ),  # only between layers
+            )
 
-        # ── LayerNorm after GRU — stabilizes output over long sequences ──
-        # Critical for 32-step BPTT: prevents hidden state from drifting
-        # or exploding across the sequence chunk.
-        self.gru_ln = nn.LayerNorm(gru_hidden_size)
+            # ── LayerNorm after GRU — stabilizes output over long sequences ──
+            # Critical for 32-step BPTT: prevents hidden state from drifting
+            # or exploding across the sequence chunk.
+            self.gru_ln = nn.LayerNorm(gru_hidden_size)
 
         self.out = nn.Sequential(
             nn.Linear(gru_hidden_size, 256),
@@ -150,7 +160,9 @@ class PacmanCNNBackbone(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
             elif isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                nn.init.kaiming_normal_(
+                    m.weight, mode="fan_out", nonlinearity="relu"
+                )
 
     def forward(
         self,
@@ -169,6 +181,7 @@ class PacmanCNNBackbone(nn.Module):
 
             # Spatial path
             x_s = self.cnn(grid_flat)
+            x_s = self.spatial_pool(x_s)
             x_s = torch.flatten(x_s, start_dim=1)
             x_s = self.spatial_compress(x_s)  # [B*L, 128]
 
@@ -181,31 +194,39 @@ class PacmanCNNBackbone(nn.Module):
             x_f = x_f.view(b, l, self.gru_hidden_size)
 
             # GRU with reset-safe masking
-            if dones is not None:
-                dones_t = dones.view(b, l, 1).to(device=grid.device, dtype=x_f.dtype)
-                h = (
-                    hidden
-                    if hidden is not None
-                    else torch.zeros(
-                        self.gru_num_layers,
-                        b,
-                        self.gru_hidden_size,
-                        device=grid.device,
-                        dtype=x_f.dtype,
+            if self.use_gru:
+                if dones is not None:
+                    dones_t = dones.view(b, l, 1).to(
+                        device=grid.device, dtype=x_f.dtype
                     )
-                )
-                outs: list[Tensor] = []
-                for t in range(l):
-                    mask = dones_t[:, t : t + 1].permute(1, 0, 2)  # (1, b, 1)
-                    h = h * (1.0 - mask)
-                    out_t, h = self.gru(x_f[:, t : t + 1], h)
-                    out_t = self.gru_ln(out_t)  # ← normalize each step
-                    outs.append(out_t)
-                out = torch.cat(outs, dim=1)
-                hidden = h
+                    h = (
+                        hidden
+                        if hidden is not None
+                        else torch.zeros(
+                            self.gru_num_layers,
+                            b,
+                            self.gru_hidden_size,
+                            device=grid.device,
+                            dtype=x_f.dtype,
+                        )
+                    )
+                    outs: list[Tensor] = []
+                    for t in range(l):
+                        mask = dones_t[:, t : t + 1].permute(
+                            1, 0, 2
+                        )  # (1, b, 1)
+                        h = h * (1.0 - mask)
+                        out_t, h = self.gru(x_f[:, t : t + 1], h)
+                        out_t = self.gru_ln(out_t)  # ← normalize each step
+                        outs.append(out_t)
+                    out = torch.cat(outs, dim=1)
+                    hidden = h
+                else:
+                    out, hidden = self.gru(x_f, hidden)
+                    out = self.gru_ln(out)  # ← normalize full sequence
             else:
-                out, hidden = self.gru(x_f, hidden)
-                out = self.gru_ln(out)  # ← normalize full sequence
+                out = x_f
+                hidden = None
 
             return self.out(out), hidden
 
@@ -213,16 +234,21 @@ class PacmanCNNBackbone(nn.Module):
         #  Single step mode: (batch, C, H, W)
         # ═══════════════════════════════════════════════════════════════
         x_s = self.cnn(grid)
+        x_s = self.spatial_pool(x_s)
         x_s = torch.flatten(x_s, start_dim=1)
         x_s = self.spatial_compress(x_s)
 
         x_sc = self.scalar_encoder(extra_features)
 
         x_f = torch.cat([x_s, x_sc], dim=-1)
-        x_f = self.fusion(x_f).unsqueeze(1)
 
-        out, hidden = self.gru(x_f, hidden)
-        out = self.gru_ln(out)  # ← normalize single step
-        out = out.squeeze(1)
+        if self.use_gru:
+            x_f = self.fusion(x_f).unsqueeze(1)
+            out, hidden = self.gru(x_f, hidden)
+            out = self.gru_ln(out)  # ← normalize single step
+            out = out.squeeze(1)
+        else:
+            out = self.fusion(x_f)
+            hidden = None
 
         return self.out(out), hidden

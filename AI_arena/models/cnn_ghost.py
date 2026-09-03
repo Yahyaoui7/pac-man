@@ -20,21 +20,29 @@ class GhostCNN(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         # backbone.out produces 256-dim vectors (Linear(gru_hidden) → ReLU → Dropout → 256)
-        self.backbone = PacmanCNNBackbone(dropout_prob=0.3)
-        self.head = nn.Linear(256, GHOST_COUNT * ACTION_COUNT)
+        self.backbone = PacmanCNNBackbone(dropout_prob=0.3, use_gru=False)
+        self.heads = nn.ModuleList(
+            [nn.Linear(256, ACTION_COUNT) for _ in range(GHOST_COUNT)]
+        )
 
     def forward(self, grid: Tensor, extra_features: Tensor) -> Tensor:
         """Return logits shaped as [batch, GHOST_COUNT, ACTION_COUNT]."""
         # backbone.forward() returns (out, hidden); we only need the output tensor
         latent, _ = self.backbone(grid, extra_features)
-        logits = self.head(latent)
-        return logits.view(-1, GHOST_COUNT, ACTION_COUNT)
+
+        # Pass latent through each ghost's dedicated head
+        ghost_logits = [head(latent) for head in self.heads]
+
+        # Stack the results into [batch, GHOST_COUNT, ACTION_COUNT]
+        return torch.stack(ghost_logits, dim=1)
 
 
 def main() -> None:
     """Smoke test to verify forward pass of GhostCNN."""
     model = GhostCNN()
-    dummy_grid = torch.zeros((2, CNN_CHANNEL_COUNT, 25, 50), dtype=torch.float32)
+    dummy_grid = torch.zeros(
+        (2, CNN_CHANNEL_COUNT, 25, 50), dtype=torch.float32
+    )
     dummy_features = torch.zeros((2, EXTRA_FEATURE_COUNT), dtype=torch.float32)
 
     logits = model(dummy_grid, dummy_features)

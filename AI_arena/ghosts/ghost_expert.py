@@ -47,16 +47,42 @@ class GhostExpert:
         movement = env.movement
         width = len(env.maze[0])
         player_cell = (env.player.grid_y, env.player.grid_x)
-
-        # BFS distances from the player — used for both hunting and fleeing
-        player_dists = movement.bfs_distances(player_cell)
+        player_dir = getattr(env.player, "direction", 0)
 
         labels: list[int] = []
         all_scores: list[tuple[float, ...]] = []
 
-        for ghost in env.ghosts:
+        # Target offsets:
+        # Ghost 0: 0 steps (direct)
+        # Ghost 1: 1 step ahead
+        # Ghost 2: 2 steps ahead
+        # Ghost 3: 4 steps ahead
+        offsets = [0, 1, 2, 4]
+
+        for i, ghost in enumerate(env.ghosts):
+            steps = offsets[i] if i < len(offsets) else 0
+            
+            target_cell = player_cell
+            if steps > 0:
+                try:
+                    d_name = DIRECTIONS[player_dir]
+                except (IndexError, TypeError):
+                    d_name = DIRECTIONS[0]
+                
+                dy, dx = DELTAS[d_name]
+                ty, tx = target_cell
+                for _ in range(steps):
+                    if movement.can_move(ty, tx, d_name):
+                        ty += dy
+                        tx += dx
+                    else:
+                        break
+                target_cell = (ty, tx)
+
+            target_dists = movement.bfs_distances(target_cell)
+
             label, scores = self._label_for_ghost(
-                ghost, movement, player_cell, player_dists, width
+                ghost, movement, target_cell, target_dists, width
             )
             labels.append(label)
             all_scores.append(scores)

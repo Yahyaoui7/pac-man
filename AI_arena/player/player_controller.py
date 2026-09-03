@@ -14,7 +14,7 @@ from AI_arena.models.cnn_player import (
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
 
-from AI_arena.player.data.observation import format_player_observation
+from AI_arena.player.data.observation import format_player_observation, PLAYER_EXTRA_FEATURE_COUNT
 
 BEST_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_best.pt"
 
@@ -27,7 +27,7 @@ class CNNPlayerController:
 
     def __init__(self, model_path: str | Path | None = None) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = PlayerActorCritic().to(self.device)
+        self.model = PlayerActorCritic(extra_feature_count=PLAYER_EXTRA_FEATURE_COUNT).to(self.device)
 
         if model_path is None:
             if BEST_STAGE_PATH.exists():

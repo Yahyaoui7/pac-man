@@ -350,3 +350,13 @@ The collector:
 2. At each step, calls `ObservationFormatter.format_observation()` to build `grid` and `extra_features`.
 3. Calls `GhostExpert` to compute the BFS-optimal label for each ghost.
 4. Writes one JSONL record per step to `CNN_DATA.jsonl`.
+
+
+
+
+1- usr RL on the ghosts in small maps
+2- use the same reward system : oscillation and ghosts proximity
+2- find the solution to reward system to each the ghosts
+3- make ghosts faster than the player
+4- make the player model take 4 choice on choice for on ghost
+

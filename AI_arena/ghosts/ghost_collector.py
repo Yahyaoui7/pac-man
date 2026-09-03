@@ -33,9 +33,7 @@ from AI_arena.player.data.expert import PacmanExpert
 from AI_arena.player.player_env import PacmanPlayerEnv
 
 # ── Output path — same directory as the rest of the training data ──
-DEFAULT_DATASET_PATH = (
-    Path(__file__).parent.parent / "data" / "CNN_DATA.jsonl"
-)
+DEFAULT_DATASET_PATH = Path(__file__).parent.parent / "data" / "CNN_DATA.jsonl"
 
 # How many steps of a single episode to keep at most (avoids one very long
 # episode dominating the dataset when the player expert nearly solves the maze)
@@ -46,7 +44,10 @@ MAX_STEPS_PER_EPISODE = 300
 #  Deduplication helpers
 # ────────────────────────────────────────────────────────────────────────────
 
-def _record_key(grid: torch.Tensor, extra: torch.Tensor, labels: list[int]) -> bytes:
+
+def _record_key(
+    grid: torch.Tensor, extra: torch.Tensor, labels: list[int]
+) -> bytes:
     """Blake2b fingerprint of (grid, extra, labels) for fast deduplication."""
     digest = hashlib.blake2b(digest_size=16)
     digest.update(grid.to(torch.float16).cpu().numpy().tobytes())
@@ -59,6 +60,7 @@ def _record_key(grid: torch.Tensor, extra: torch.Tensor, labels: list[int]) -> b
 # ────────────────────────────────────────────────────────────────────────────
 #  Ghost state helper
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _ghost_states(env: Any) -> list[dict[str, Any]]:
     """Extract the ghost-state dicts ObservationFormatter expects."""
@@ -77,6 +79,7 @@ def _ghost_states(env: Any) -> list[dict[str, Any]]:
 # ────────────────────────────────────────────────────────────────────────────
 #  Main collection function
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def collect_demonstrations(
     samples: int,
@@ -128,31 +131,33 @@ def collect_demonstrations(
             # ── Periodically reset to get a new maze layout ──
             if written % 50 == 0:
                 env.reset()
-                
+
             assert env.maze is not None
             assert env.pellets is not None
             assert env.player is not None
             assert env.movement is not None
-            
+
             maze = env.maze
             height = len(maze)
             width = len(maze[0])
-            
+
             # Find all walkable cells
             walkable_cells = [
-                (y, x) for y in range(height) for x in range(width)
+                (y, x)
+                for y in range(height)
+                for x in range(width)
                 if maze[y][x] != 15
             ]
             if not walkable_cells:
                 env.reset()
                 continue
-                
+
             # ── Randomize Player ──
             py, px = rng.choice(walkable_cells)
             env.player.grid_y = py
             env.player.grid_x = px
             env.player.direction = rng.choice([0, 1, 2, 3])
-            
+
             # 20% chance of being powered (frightened mode)
             is_powered = rng.random() < 0.2
             env.player.powered_mode = True if is_powered else None
@@ -188,6 +193,18 @@ def collect_demonstrations(
             decision = ghost_expert.choose_actions(env)
             labels = list(decision.labels)
 
+            # ── Intersection Filter ──
+            # valid_ghost_actions has shape [1, 4, 4]
+            # A true intersection has 3 or more open directions (since ghosts cannot reverse, 
+            # 2 valid moves means it's a corridor/corner, 3+ means it's an intersection)
+            valid_counts = valid_ghost_actions[0].sum(dim=-1)
+            is_intersection = (valid_counts >= 3).any().item()
+            
+            # We want to keep all intersections, but throw away 80% of "boring" states 
+            # to force the CNN to learn decision making
+            if not is_intersection and rng.random() > 0.2:
+                continue
+
             # ── Deduplicate ──
             key = _record_key(grid, extra_features, labels)
             if key not in seen:
@@ -208,19 +225,16 @@ def collect_demonstrations(
 
                 if written % 500 == 0 or written == samples:
                     pct = 100 * written / samples
-                    print(
-                        f"  [{pct:5.1f}%] {written}/{samples} samples"
-                    )
+                    print(f"  [{pct:5.1f}%] {written}/{samples} samples")
 
-    print(
-        f"\nDone — wrote {written} randomized records to {destination}"
-    )
+    print(f"\nDone — wrote {written} randomized records to {destination}")
     return destination
 
 
 # ────────────────────────────────────────────────────────────────────────────
 #  CLI
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -279,5 +293,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

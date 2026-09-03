@@ -126,7 +126,7 @@ class ObservationFormatter:
         px = max(0, min(CNN_WIDTH - 1, px))
         ObservationFormatter._paint_entity_patch(grid[0, 3], py, px, height, width)
 
-        # Channel 4: Signed Ghost positions (Positive = dangerous, Negative = edible)
+        # Channels 4-7: Signed Ghost positions (one channel per ghost)
         for idx in range(min(GHOST_COUNT, len(ghost_states))):
             gst = ghost_states[idx]
             if gst.get("in_prison", False):
@@ -136,11 +136,11 @@ class ObservationFormatter:
             gx = max(0, min(CNN_WIDTH - 1, gx))
             is_edible = gst.get("is_edible", False)
             ObservationFormatter._paint_signed_ghost_patch(
-                grid[0, 4], gy, gx, height, width, is_edible=is_edible
+                grid[0, 4 + idx], gy, gx, height, width, is_edible=is_edible
             )
 
-        # Channel 5: Walkable Path & Active Map Mask (1.0 = Walkable cell inside active maze, 0.0 = Wall or Padded region)
-        grid[0, 5, :height, :width] = (maze_tensor != 15).float()
+        # Channel 8: Walkable Path & Active Map Mask (1.0 = Walkable cell inside active maze, 0.0 = Wall or Padded region)
+        grid[0, 8, :height, :width] = (maze_tensor != 15).float()
 
         # Build Extra Features
         player_dir_vec = [float(player_direction == d) for d in DIRECTIONS]

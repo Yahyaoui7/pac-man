@@ -87,10 +87,23 @@ class CNNGhostController:
         )
 
         predictions: dict[str, str | None] = {}
+        reverse_map = {"UP": "DOWN", "DOWN": "UP", "LEFT": "RIGHT", "RIGHT": "LEFT"}
+        
         with torch.no_grad():
             logits = self.model(grid, extra_features)  # (1, 4, 4)
             for idx, ghost in enumerate(ghosts):
-                valid_mask = valid_ghost_actions[idx]  # (4,)
+                valid_mask = valid_ghost_actions[idx].clone()  # (4,)
+                
+                # Pac-Man Golden Rule: Ghosts cannot reverse direction!
+                current_dir = ghost.direction
+                if current_dir in reverse_map:
+                    rev_dir = reverse_map[current_dir]
+                    if rev_dir in DIRECTIONS:
+                        rev_idx = DIRECTIONS.index(rev_dir)
+                        # Only ban reverse if they aren't trapped in a dead-end
+                        if valid_mask.sum() > 1:
+                            valid_mask[rev_idx] = False
+
                 ghost_logits = logits[0, idx].masked_fill(~valid_mask, -1e9)
                 chosen_idx = int(torch.argmax(ghost_logits).item())
                 if bool(valid_mask[chosen_idx]):

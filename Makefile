@@ -14,7 +14,7 @@ collect:
 	uv run python -m AI_arena.ghosts.ghost_collector --samples 150000 --stage 2
 
 train:
-	uv run python -m AI_arena.ghosts.ghost_training --epochs 30 --patience 20
+	uv run python -m AI_arena.ghosts.ghost_training --epochs 100 --patience 20
 
 collect-player:
 	uv run python -m AI_arena.player.player_collector --samples 10000 --stage 2

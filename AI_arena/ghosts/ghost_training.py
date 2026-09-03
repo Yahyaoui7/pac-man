@@ -54,10 +54,15 @@ def masked_cross_entropy(
     safe_mask = safe_mask | label_one_hot
 
     masked_logits = logits.masked_fill(~safe_mask, float("-inf"))
-    return nn.functional.cross_entropy(
+    loss = nn.functional.cross_entropy(
         masked_logits.reshape(-1, ACTION_COUNT),
         labels.reshape(-1),
+        reduction="none",
     )
+    valid_ghosts = ~all_masked.reshape(-1)
+    if valid_ghosts.any():
+        return (loss * valid_ghosts.float()).sum() / valid_ghosts.float().sum()
+    return loss.sum() * 0.0
 
 
 def train(
@@ -85,10 +90,8 @@ def train(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = CNNJSONLDataset(dataset_path, validate=True)
     episode_count = len(dataset) // EPISODE_LENGTH
-    if episode_count < 2 or len(dataset) % EPISODE_LENGTH:
-        raise ValueError(
-            f"dataset must contain complete {EPISODE_LENGTH}-sample episodes"
-        )
+    if episode_count < 2:
+        raise ValueError("dataset must contain at least 2 episodes")
     validation_episodes = max(1, round(episode_count * validation_fraction))
     validation_samples = validation_episodes * EPISODE_LENGTH
     split_index = len(dataset) - validation_samples
@@ -106,7 +109,8 @@ def train(
     if Path(model_path).exists():
         print(f"Resuming training from {model_path}")
         model.load_state_dict(
-            torch.load(model_path, map_location=device, weights_only=True)
+            torch.load(model_path, map_location=device, weights_only=True),
+            strict=False,
         )
     else:
         print("No saved model found — training from scratch.")
@@ -139,12 +143,13 @@ def train(
                 current_batch_size = grid.shape[0]
                 total_loss += loss.item() * current_batch_size
                 sample_count += current_batch_size
+                valid_mask = valid_actions.any(dim=-1)
                 predictions = logits.masked_fill(
                     ~valid_actions,
                     float("-inf"),
                 ).argmax(dim=-1)
-                correct += (predictions == labels).sum().item()
-                prediction_count += labels.numel()
+                correct += ((predictions == labels) & valid_mask).sum().item()
+                prediction_count += valid_mask.sum().item()
 
             average_loss = total_loss / sample_count
             train_accuracy = correct / prediction_count
@@ -164,13 +169,15 @@ def train(
                 f"Epoch {epoch:03d}/{epochs:03d} - "
                 f"train loss: {average_loss:.6f} acc: {train_accuracy:.2%} - "
                 f"val loss: {validation_loss:.6f} "
-                f"acc: {validation_accuracy:.2%}"
-            , flush=True)
+                f"acc: {validation_accuracy:.2%}",
+                flush=True,
+            )
             if epochs_without_improvement >= patience:
                 print(
                     f"Early stopping after {epoch} epochs; validation accuracy "
-                    f"has not improved for {patience} epochs."
-                , flush=True)
+                    f"has not improved for {patience} epochs.",
+                    flush=True,
+                )
                 break
 
     except KeyboardInterrupt:
@@ -219,12 +226,13 @@ def evaluate(
             current_batch_size = grid.shape[0]
             total_loss += loss.item() * current_batch_size
             sample_count += current_batch_size
+            valid_mask = valid_actions.any(dim=-1)
             predictions = logits.masked_fill(
                 ~valid_actions,
                 float("-inf"),
             ).argmax(dim=-1)
-            correct += (predictions == labels).sum().item()
-            prediction_count += labels.numel()
+            correct += ((predictions == labels) & valid_mask).sum().item()
+            prediction_count += valid_mask.sum().item()
     return total_loss / sample_count, correct / prediction_count
 
 

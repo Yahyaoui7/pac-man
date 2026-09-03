@@ -73,7 +73,7 @@ class PlayingState(State):
 
         curr_idx = self.game.level_manager.current_level_index
         self.movement = MovementSystem(self.maze)
-        self.use_cnn_ghosts = False
+        self.use_cnn_ghosts = True
         if self.use_cnn_ghosts:
             try:
                 self.ghost_controller = CNNGhostController()

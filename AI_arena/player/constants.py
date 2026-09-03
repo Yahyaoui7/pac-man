@@ -12,7 +12,7 @@ GHOST_SPECS = [
 ]
 
 MAZE_WIDTH_MIN = 10
-MAZE_WIDTH_MAX = 30
+MAZE_WIDTH_MAX = 43
 MAZE_HEIGHT_MIN = 10
 MAZE_HEIGHT_MAX = 23
 MAX_PHYSICS_TICKS = 40
@@ -24,11 +24,11 @@ MAZE_STEP_MULTIPLIER = 14.0
 # ═══════════════════════════════════════════════════════════════════
 
 STEP_REWARD = -0.1
-DEATH_REWARD = -150.0  # Reduced: -50 was dominating gradient, masking intermediate reward signal
+DEATH_REWARD = -50.0  # Reduced: -50 was dominating gradient, masking intermediate reward signal
 OSCILLATION_REWARD = -2.0  # Soft direction-flip penalty when safe
 COMPLETION_REWARD = 1000.0
 EAT_GHOST_REWARD = 35.0
-PELLET_REWARD = 1.0  # Restored strong pellet clearing incentive
+PELLET_REWARD = 1.5  # Restored strong pellet clearing incentive
 SUPER_PELLET_REWARD = 8.0
 
 SURVIVAL_TRUNCATION_BASE = 10.0

@@ -9,3 +9,4 @@ AI_arena/data/PACMAN_IMITATION_DATA.jsonl
 # *.pth
 # *.onnx
 # *.safetensors
+AI_arena/models/backups

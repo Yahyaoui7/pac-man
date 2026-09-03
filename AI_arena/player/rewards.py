@@ -153,8 +153,7 @@ class RewardCalculator:
         self, events: dict[str, bool], breakdown: dict[str, float]
     ) -> None:
         """Always apply a -0.1/step tax to discourage safe-zone camping.
-        Pellet steps are NOT exempt — progress is already rewarded via _pellet_reward.
-        """
+        Pellet steps are NOT exempt — progress is already rewarded via _pellet_reward."""
         breakdown["step"] = STEP_REWARD
 
     def _hunger_penalty(
@@ -168,7 +167,7 @@ class RewardCalculator:
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
     ) -> None:
         if events.get("pellet_eaten", False):
-            base_reward = PELLET_REWARD
+            base_reward = 3.0 if self.stage == 1 else PELLET_REWARD
             breakdown["pellet"] = base_reward + 5.0 * frac
 
     def _super_pellet_reward(
@@ -196,7 +195,7 @@ class RewardCalculator:
                 breakdown["milestone"] += reward
 
     def _bfs_shaping(self, bfs_shaping: float, breakdown: dict[str, float]) -> None:
-        breakdown["bfs"] = 2.0 * bfs_shaping
+        breakdown["bfs"] = 5.0 * bfs_shaping
 
     def _oscillation_penalty(
         self,
@@ -308,13 +307,13 @@ class RewardCalculator:
         ):
             escape_quality = min_ghost_dist_after - self.last_min_ghost_dist
             if self.last_min_ghost_dist == 1:
-                breakdown["evasion_skill"] += 1.0 * escape_quality
+                breakdown["evasion_skill"] += 2.0 * escape_quality
             elif self.last_min_ghost_dist == 2:
-                breakdown["evasion_skill"] += 0.8 * escape_quality
+                breakdown["evasion_skill"] += 1.0 * escape_quality
             elif self.last_min_ghost_dist == 3:
-                breakdown["evasion_skill"] += 0.3 * escape_quality
+                breakdown["evasion_skill"] += 0.5 * escape_quality
             elif self.last_min_ghost_dist == 4:
-                breakdown["evasion_skill"] += 0.1 * escape_quality
+                breakdown["evasion_skill"] += 0.2 * escape_quality
 
     def _zone_control_reward(
         self,
@@ -527,22 +526,22 @@ class RewardCalculator:
             self._count_threatening_ghosts(px, py, ghosts, maze)
         )
         # ── Core Navigation, Pellet Collection & Anti-Oscillation Rewards ──
-        # self._step_reward(events, breakdown)
+        self._step_reward(events, breakdown)
         self._death_penalty(events, breakdown)
         self._completion_reward(events, step_count, max_steps, breakdown)
         self._pellet_reward(events, frac, breakdown)
         self._super_pellet_reward(events, powered, threatening, breakdown)
         self._bfs_shaping(bfs_shaping, breakdown)
         self._ghost_eat_reward(events, breakdown)
-        # self._ghost_proximity_penalty(
-        #     min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
-        # )
+        self._ghost_proximity_penalty(
+            min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
+        )
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
         self._bypassed_pellet_penalty(events, threat_dist, breakdown)
         # self._momentum_reward(events, same_action_count, breakdown)
 
         # ── Commented out noisy auxiliary channels to focus purely on navigation & oscillation ──
-        self._milestone_reward(frac, breakdown)
+        # self._milestone_reward(frac, breakdown)
         # self._evasion_skill_reward(min_ghost_dist_after, breakdown)
         # self._threat_mastery_reward(
         #     threatening, min_threat_dist, min_ghost_dist_after, powered, breakdown
@@ -554,7 +553,7 @@ class RewardCalculator:
         # self._zone_stagnation_penalty(
         #     px, py, events, bfs_shaping, threat_dist, breakdown
         # )
-        self._hunger_penalty(steps_since_pellet, breakdown)
+        # self._hunger_penalty(steps_since_pellet, breakdown)
         # self._region_cleared_reward(events, breakdown)
         # self._region_dirty_penalty(events, breakdown)
         # self._backtrack_penalty(events, breakdown)

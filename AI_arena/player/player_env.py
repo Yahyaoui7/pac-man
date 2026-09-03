@@ -47,7 +47,7 @@ class PacmanPlayerEnv:
         maze_h_min: int | None = None,  # ← NEW
         maze_h_max: int | None = None,  # ← NEW
         start_pellets: tuple[int, ...] | None = None,  # ← completion curriculum
-        ghost_speed_ratio: float = 0.35,
+        ghost_speed_ratio: float = 0.5,
         ghost_confusion_prob: float = 0.0,
     ) -> None:
         if not pygame.get_init():

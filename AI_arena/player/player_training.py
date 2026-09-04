@@ -140,7 +140,9 @@ class TrainingConfig:
     # ── Curriculum ──
     start_pellets: tuple[int, ...] | None = (3, 5, 8)
     use_bfs_shaping: bool = True
-    ghost_speed_ratio: float = 0.20  # was 0.35 — faster ghosts collapse safe-zone exploit
+    ghost_speed_ratio: float = (
+        0.20  # was 0.35 — faster ghosts collapse safe-zone exploit
+    )
     ghost_confusion_prob: float = 0.0
 
     # ── Evaluation ──
@@ -621,8 +623,8 @@ class PacmanTrainer:
                     "NaN/Inf detected in policy logits during rollout! Policy network corrupted."
                 )
 
-            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e4)
-            masked_logits = torch.clamp(masked_logits, min=-1e4, max=1e4)
+            masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e8)
+            masked_logits = torch.clamp(masked_logits, min=-1e8, max=1e4)
 
             if self.cfg.rollout_epsilon > 0:
                 probs = F.softmax(masked_logits, dim=-1)
@@ -839,14 +841,16 @@ class PacmanTrainer:
                     "NaN detected in policy or value forward pass during PPO update!"
                 )
 
-            masked_logits = logits.masked_fill(~mb_valid, -1e4)
-            masked_logits = torch.clamp(masked_logits, min=-1e4, max=1e4)
+            masked_logits = logits.masked_fill(~mb_valid, -1e8)
+            masked_logits = torch.clamp(masked_logits, min=-1e8, max=1e4)
             dist = Categorical(logits=masked_logits)
 
             new_log_probs = dist.log_prob(mb_actions)
             entropy = dist.entropy().mean()
 
-            log_ratio = torch.clamp(new_log_probs - mb_old_log_probs, min=-20.0, max=20.0)
+            log_ratio = torch.clamp(
+                new_log_probs - mb_old_log_probs, min=-20.0, max=20.0
+            )
             ratio = torch.exp(log_ratio)
             surr1 = ratio * mb_adv
             surr2 = torch.clamp(ratio, 1.0 - cfg.clip_eps, 1.0 + cfg.clip_eps) * mb_adv
@@ -890,8 +894,8 @@ class PacmanTrainer:
             ref_logits, _, _ = self.ref_policy(
                 mb_grid, mb_features, mb_hidden, dones=mb_resets
             )
-            ref_masked = ref_logits.masked_fill(~mb_valid, -1e4)
-            ref_masked = torch.clamp(ref_masked, min=-1e4, max=1e4)
+            ref_masked = ref_logits.masked_fill(~mb_valid, -1e8)
+            ref_masked = torch.clamp(ref_masked, min=-1e8, max=1e4)
             ref_probs = F.softmax(ref_masked, dim=-1)
             ref_log_p = F.log_softmax(ref_masked, dim=-1)
         log_p = F.log_softmax(masked_logits, dim=-1)

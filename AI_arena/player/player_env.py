@@ -206,19 +206,20 @@ class PacmanPlayerEnv:
         self._reward_calc.reset()
         # self.reward_calculator.reset()
         # ← NEW: curriculum-friendly sizing
-        mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
-        mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
-        mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
-        mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
+        # mw_min = self._maze_w_min if self._maze_w_min is not None else MAZE_WIDTH_MIN
+        # mw_max = self._maze_w_max if self._maze_w_max is not None else MAZE_WIDTH_MAX
+        # mh_min = self._maze_h_min if self._maze_h_min is not None else MAZE_HEIGHT_MIN
+        # mh_max = self._maze_h_max if self._maze_h_max is not None else MAZE_HEIGHT_MAX
 
-        maze_w = self.rng.randint(mw_min, mw_max)
-        maze_h = self.rng.randint(mh_min, mh_max)
-        current_seed = self.rng.randint(1, 44444)
+        # maze_w = self.rng.randint(mw_min, mw_max)
+        # maze_h = self.rng.randint(mh_min, mh_max)
+        # current_seed = self.rng.randint(1, 44444)
 
-        # maze_w = 25
-        # maze_h = 20
+        maze_w = 35
+        maze_h = 20
         # fixed_seeds = [20, 77, 1337, 42, 100]
         # current_seed = fixed_seeds[self.rng.randint(0, len(fixed_seeds) - 1)]
+        current_seed = 42
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
@@ -343,13 +344,26 @@ class PacmanPlayerEnv:
         start_y, start_x = start_cell
 
         had_adjacent_pellet = False
-        if self.movement is not None and self.maze is not None and self.pellets is not None:
+        if (
+            self.movement is not None
+            and self.maze is not None
+            and self.pellets is not None
+        ):
             h_m = len(self.maze)
             w_m = len(self.maze[0]) if h_m > 0 else 0
-            for d_name, (dy_o, dx_o) in (("UP", (-1, 0)), ("DOWN", (1, 0)), ("LEFT", (0, -1)), ("RIGHT", (0, 1))):
+            for d_name, (dy_o, dx_o) in (
+                ("UP", (-1, 0)),
+                ("DOWN", (1, 0)),
+                ("LEFT", (0, -1)),
+                ("RIGHT", (0, 1)),
+            ):
                 if self.movement.can_move(start_y, start_x, d_name):
                     ny_o, nx_o = start_y + dy_o, start_x + dx_o
-                    if 0 <= ny_o < h_m and 0 <= nx_o < w_m and self.pellets[ny_o][nx_o] in (1, 2):
+                    if (
+                        0 <= ny_o < h_m
+                        and 0 <= nx_o < w_m
+                        and self.pellets[ny_o][nx_o] in (1, 2)
+                    ):
                         had_adjacent_pellet = True
                         break
 
@@ -444,9 +458,8 @@ class PacmanPlayerEnv:
         # ── Anti-oscillation & backtracking tracking ──
         # ── Oscillation & loop detection ──
         OPPOSITE_ACTION = {0: 1, 1: 0, 2: 3, 3: 2}
-        is_action_reversal = (
-            prev_action is not None
-            and action == OPPOSITE_ACTION.get(prev_action, -1)
+        is_action_reversal = prev_action is not None and action == OPPOSITE_ACTION.get(
+            prev_action, -1
         )
 
         if cell_changed:
@@ -462,14 +475,18 @@ class PacmanPlayerEnv:
                     last_c_exits = sum(
                         1
                         for d in DIRECTIONS
-                        if self.movement.can_move(self.last_cell[0], self.last_cell[1], d)
+                        if self.movement.can_move(
+                            self.last_cell[0], self.last_cell[1], d
+                        )
                     )
                 is_dead_end = last_c_exits <= 1
                 is_fleeing = threat_dist <= 3 and (
                     self.player is not None and self.player.powered_timer <= 0
                 )
-                if not is_dead_end and not is_fleeing and not (
-                    events["pellet_eaten"] or events["super_pellet_eaten"]
+                if (
+                    not is_dead_end
+                    and not is_fleeing
+                    and not (events["pellet_eaten"] or events["super_pellet_eaten"])
                 ):
                     events["oscillating"] = True
                     self._osc_count += 1
@@ -505,7 +522,11 @@ class PacmanPlayerEnv:
                 rem_old = self.region_pellets.get(self.last_region, 0)
                 if 0 < rem_old <= 2:
                     events["left_dirty_region"] = True
-                elif rem_old == 0 and self.last_region not in self.cleared_regions and self.region_pellets_initial.get(self.last_region, 0) > 0:
+                elif (
+                    rem_old == 0
+                    and self.last_region not in self.cleared_regions
+                    and self.region_pellets_initial.get(self.last_region, 0) > 0
+                ):
                     events["cleared_region"] = True
                     self.cleared_regions.add(self.last_region)
             self.last_region = curr_region
@@ -519,7 +540,9 @@ class PacmanPlayerEnv:
                 self._osc_count += 1
 
         if had_adjacent_pellet and not (
-            events["pellet_eaten"] or events["super_pellet_eaten"] or events["pacman_died"]
+            events["pellet_eaten"]
+            or events["super_pellet_eaten"]
+            or events["pacman_died"]
         ):
             events["bypassed_pellet"] = True
 
@@ -598,7 +621,9 @@ class PacmanPlayerEnv:
                 if events["pellet_eaten"] or events["super_pellet_eaten"]:
                     self._pellet_dist_grid = self._compute_pellet_distance_grid()
                 potential_after = self._potential_at(*current_pos)
-                bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
+                bfs_shaping = (
+                    self.bfs_shaping_gamma * potential_after - potential_before
+                )
                 self._cached_potential = potential_after
 
         # ← NEW: mark truncation in events so reward calc can penalize incomplete
@@ -1072,7 +1097,6 @@ class PacmanPlayerEnv:
             region_completion_frac=region_completion_frac,
             region_is_dirty=region_is_dirty,
         )
-
 
         return grid, extra_features, valid_player_actions
 

@@ -20,7 +20,7 @@ ABILITY_KICK = "kick"
 
 class Player(Entity):
     def __init__(self, y: int, x: int) -> None:
-        super().__init__(y, x, speed=3.5)
+        super().__init__(y, x, speed=3.9)
 
         self.score = 0
         self.msg_txt = ""

@@ -94,7 +94,11 @@ class CNNPlayerController:
                 1 for row in pellets for cell in row if cell in (1, 2)
             )
 
-        if self.visit_counts is None or len(self.visit_counts) != height or (height > 0 and len(self.visit_counts[0]) != width):
+        if (
+            self.visit_counts is None
+            or len(self.visit_counts) != height
+            or (height > 0 and len(self.visit_counts[0]) != width)
+        ):
             self.visit_counts = [[0 for _ in range(width)] for _ in range(height)]
 
         if 0 <= py < height and 0 <= px < width:
@@ -112,9 +116,9 @@ class CNNPlayerController:
             logits, value, self._hidden = self.model(grid, extra_features, self._hidden)
             logits = logits.float()
             value = value.float()
-            masked_logits = logits.masked_fill(~valid_actions, -1e4)
+            masked_logits = logits.masked_fill(~valid_actions, -1e8)
             masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
             )
             probs = torch.softmax(masked_logits, dim=-1)[0]
             probs = torch.nan_to_num(probs, nan=0.0, posinf=1.0, neginf=0.0)
@@ -137,7 +141,12 @@ class CNNPlayerController:
         self.last_action_idx = action_index
         chosen_action = DIRECTIONS[action_index]
 
-        if 0 <= py < height and 0 <= px < width and pellets and pellets[py][px] in (1, 2):
+        if (
+            0 <= py < height
+            and 0 <= px < width
+            and pellets
+            and pellets[py][px] in (1, 2)
+        ):
             self.steps_since_pellet = 0
         else:
             self.steps_since_pellet += 1

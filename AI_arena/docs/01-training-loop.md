@@ -70,7 +70,7 @@ Eval constants (`EVAL_*`) are documented in
 ## Per-update flow
 
 ### 1. Rollout collection (3000 steps)
-- Samples actions from a masked categorical: invalid moves get logit `-1e4`.
+- Samples actions from a masked categorical: invalid moves get logit `-1e8`.
 - **ε-explorer** (`ROLLOUT_EPSILON > 0`): branch-explicit sampling — with
   prob ε sample a uniformly random *valid* action, otherwise sample from π;
   the stored log-prob is always the true mixture probability

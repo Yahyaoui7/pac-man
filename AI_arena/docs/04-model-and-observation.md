@@ -56,7 +56,7 @@ A length assertion guards this list: changing it requires updating
 ### 3. Action mask — `[1, 4]`
 
 Boolean tensor over UP/DOWN/LEFT/RIGHT from `movement.can_move`. Training and
-eval mask logits with `-1e4` before sampling/argmax.
+eval mask logits with `-1e8` before sampling/argmax.
 
 ## Policy: `PlayerActorCritic` (`AI_arena/models/cnn_player.py`)
 

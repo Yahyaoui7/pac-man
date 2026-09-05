@@ -143,7 +143,9 @@ class PlayingState(State):
         for effect in expired_effects:
             if effect == "speed boost" and "speed boost" not in self.active_cheats:
                 self.game.entity_manager.player.speed = self.player_speed
-            print(f"⌛ [GAMBLE] Timed effect expired: {effect}")
+            self.msg_text = f"SPECIAL EFFECT: {effect.upper()} EXPIRED"
+            self.msg_timer = 1.5
+            print(f"⌛ [SPECIAL EFFECT] Expired: {effect}")
 
         self._handle_input(input_state)
         self._update_entities()
@@ -427,9 +429,9 @@ class PlayingState(State):
 
     def on_special_pellet_spawned(self) -> None:
         """Triggered when a special gamble pellet appears in the maze."""
-        self.msg_text = "✨ A MYSTERY PELLET HAS APPEARED! ✨"
+        self.msg_text = "SPECIAL PELLET SPAWNED!"
         self.msg_timer = 2.5
-        print("✨ [GAMBLE] Special Mystery Pellet spawned in the maze!")
+        print("✨ [SPECIAL EFFECT] Special Mystery Pellet spawned in the maze!")
 
     def on_special_pellet_eaten(self) -> None:
         """Triggered when player eats a special mystery pellet (pellet == 3).
@@ -445,22 +447,22 @@ class PlayingState(State):
 
         if chosen == "invincible":
             self.timed_effects["invincible"] = 10.0
-            self.msg_text = "🎲 GAMBLE: 🛡️ INVINCIBILITY (10s)!"
+            self.msg_text = "SPECIAL EFFECT: INVINCIBLE (10s)"
             self.msg_timer = 2.5
-            print("🎲 [GAMBLE] Rolled: INVINCIBILITY for 10.0s!")
+            print("✨ [SPECIAL EFFECT] Rolled: INVINCIBLE for 10.0s!")
 
         elif chosen == "speed boost":
             self.timed_effects["speed boost"] = 10.0
             self.game.entity_manager.player.speed = self.player_speed * 2
-            self.msg_text = "🎲 GAMBLE: ⚡ SPEED BOOST (10s)!"
+            self.msg_text = "SPECIAL EFFECT: SPEED BOOST (10s)"
             self.msg_timer = 2.5
-            print("🎲 [GAMBLE] Rolled: SPEED BOOST for 10.0s!")
+            print("✨ [SPECIAL EFFECT] Rolled: SPEED BOOST for 10.0s!")
 
         elif chosen == "ghost freeze":
             self.timed_effects["ghost freeze"] = 10.0
-            self.msg_text = "🎲 GAMBLE: ❄️ GHOST FREEZE (10s)!"
+            self.msg_text = "SPECIAL EFFECT: GHOST FREEZE (10s)"
             self.msg_timer = 2.5
-            print("🎲 [GAMBLE] Rolled: GHOST FREEZE for 10.0s!")
+            print("✨ [SPECIAL EFFECT] Rolled: GHOST FREEZE for 10.0s!")
 
         elif chosen == "ghost hunter":
             self.hunter_cursed_until_death = True
@@ -468,9 +470,9 @@ class PlayingState(State):
                 ghost.speed = round(
                     self.player_speed * GHOST_SPEED_RATIO_HUNTER, 2
                 )
-            self.msg_text = "💀 GAMBLE LOST: GHOST HUNTER CURSE!"
+            self.msg_text = "SPECIAL EFFECT: GHOST HUNTER (UNTIL DEATH)"
             self.msg_timer = 3.0
-            print("💀 [GAMBLE] Lost gamble! Ghost Hunter active until next death!")
+            print("💀 [SPECIAL EFFECT] Rolled: GHOST HUNTER active until death!")
 
     def draw(self, screen: pygame.Surface) -> None:
         self._draw_maze_panel(screen)
@@ -818,27 +820,22 @@ class PlayingState(State):
 
         if self.active_cheats:
             cheat_labels = " + ".join(sorted(self.active_cheats)).upper()
-            parts.append(f"CHEAT: {cheat_labels}")
+            parts.append(f"CHEATS ACTIVE: {cheat_labels}")
 
+        special_items: list[str] = []
         for effect, rem in sorted(self.timed_effects.items()):
-            icon = (
-                "🛡️ "
-                if effect == "invincible"
-                else "⚡ "
-                if effect == "speed boost"
-                else "❄️ "
-                if effect == "ghost freeze"
-                else "🎲 "
-            )
-            parts.append(f"{icon}{effect.upper()}: {rem:.1f}s")
+            special_items.append(f"{effect.upper()} ({rem:.1f}s)")
 
         if is_cursed:
-            parts.append("💀 HUNTER CURSE (UNTIL DEATH)")
+            special_items.append("GHOST HUNTER (UNTIL DEATH)")
+
+        if special_items:
+            parts.append(f"SPECIAL EFFECT: {' + '.join(special_items)}")
 
         if not parts:
             return
 
-        text = "  |  ".join(parts)
+        text = "   |   ".join(parts)
         banner_color = ui.COLOR_RED if is_cursed else ui.COLOR_NEON_YELLOW
         border_color = (*banner_color, 200)
 
@@ -1018,8 +1015,12 @@ class PlayingState(State):
                         # Lift hunter curse upon death if active
                         if self.hunter_cursed_until_death:
                             self.hunter_cursed_until_death = False
+                            self.msg_text = (
+                                "SPECIAL EFFECT: GHOST HUNTER LIFTED"
+                            )
+                            self.msg_timer = 2.0
                             print(
-                                "💀 [GAMBLE] Ghost Hunter curse lifted upon death!"
+                                "💀 [SPECIAL EFFECT] Ghost Hunter curse lifted upon death!"
                             )
                             if "ghost hunter" not in self.active_cheats:
                                 for g in ghosts:

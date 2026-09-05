@@ -143,6 +143,12 @@ class EntityManager:
     def play_sound(self, name: str) -> None:
         self.sound.play_sound_with_duck(name)
 
+    def _get_current_state(self) -> Any:
+        sm = getattr(self.game, "state_manager", None)
+        if sm is None:
+            return None
+        return getattr(sm, "current", getattr(sm, "current_state", None))
+
     def update(self, maze: list[list[int]], dt: float) -> None:
         assert self.player is not None
         px, py = self.player.grid_x, self.player.grid_y
@@ -176,9 +182,7 @@ class EntityManager:
         elif pellet == 3:
             self.play_sound("eat_super_pacgum")
             self.score_management.add_super_pacgum()
-            curr_state = getattr(
-                getattr(self.game, "state_manager", None), "current_state", None
-            )
+            curr_state = self._get_current_state()
             if curr_state and hasattr(curr_state, "on_special_pellet_eaten"):
                 curr_state.on_special_pellet_eaten()
 
@@ -196,11 +200,7 @@ class EntityManager:
                     self.spawned_milestones.add(milestone)
                     spawned = self.spawn_special_pellet()
                     if spawned:
-                        curr_state = getattr(
-                            getattr(self.game, "state_manager", None),
-                            "current_state",
-                            None,
-                        )
+                        curr_state = self._get_current_state()
                         if curr_state and hasattr(
                             curr_state, "on_special_pellet_spawned"
                         ):

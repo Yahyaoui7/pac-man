@@ -137,6 +137,12 @@ class TrainingConfig:
     device: str | None = None  # None → auto (cuda if available)
     run_name: str = ""  # tag for log file naming
 
+    # ── Search Guidance & Distillation ──
+    search_guided: bool = False
+    search_horizon: int = 12
+    search_alpha: float = 0.85
+    distill_coef: float = 0.5
+
     # ── Curriculum ──
     start_pellets: tuple[int, ...] | None = (3, 5, 8)
     use_bfs_shaping: bool = True
@@ -214,6 +220,10 @@ class TrainingConfig:
             auto_curriculum=args.auto_curriculum,
             stage1_grad_threshold=args.grad_threshold,
             stage1_grad_evals=args.grad_evals,
+            search_guided=args.search_guided,
+            search_horizon=args.search_horizon,
+            search_alpha=args.search_alpha,
+            distill_coef=args.distill_coef,
         )
 
         # Paths: only override if the user explicitly passed them.
@@ -340,6 +350,31 @@ class TrainingConfig:
             help="consecutive evals above threshold required to graduate (default: 2)",
         )
 
+        # ── Search Guidance & Distillation ──
+        p.add_argument(
+            "--search-guided",
+            action="store_true",
+            help="enable Chess-like lookahead search guidance during rollout collection",
+        )
+        p.add_argument(
+            "--search-horizon",
+            type=int,
+            default=12,
+            help="lookahead search depth in steps (default: 12)",
+        )
+        p.add_argument(
+            "--search-alpha",
+            type=float,
+            default=0.85,
+            help="probability of taking the search action during rollout (default: 0.85)",
+        )
+        p.add_argument(
+            "--distill-coef",
+            type=float,
+            default=0.5,
+            help="auxiliary distillation cross-entropy loss coefficient (default: 0.5)",
+        )
+
         # ── Paths ──
         p.add_argument(
             "--model-dir", type=str, default=None, help="checkpoint directory"
@@ -368,6 +403,7 @@ class TrainingConfig:
             f"  Start pellets    : {pellets_str}",
             f"  BFS shaping      : {self.use_bfs_shaping}",
             f"  Ghost speed/conf : {self.ghost_speed_ratio:.2f} / {self.ghost_confusion_prob:.2f}",
+            f"  Search guided    : {self.search_guided} (depth {self.search_horizon}, α={self.search_alpha:.2f}, distill={self.distill_coef:.2f})",
             f"  Eval             : every {self.eval_interval} upd × {self.eval_episodes} eps",
             f"  Save dir         : {self.model_dir}",
             f"  Log file         : {self.log_file}",
@@ -396,6 +432,7 @@ class RolloutBuffer:
     values: list[torch.Tensor]
     seq_hiddens: list[torch.Tensor]
     finished_episodes: list[dict[str, Any]]  # ep records for logging/eval
+    search_dists: list[torch.Tensor] = field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -564,6 +601,7 @@ class PacmanTrainer:
             values=[],
             seq_hiddens=[],
             finished_episodes=[],
+            search_dists=[],
         )
         step_just_reset = True
 
@@ -578,8 +616,15 @@ class PacmanTrainer:
                     else torch.zeros(self.hidden_dim)
                 )
 
+            search_dist = None
+            if self.cfg.search_guided:
+                search_dist = self.env.get_search_distribution(
+                    horizon=self.cfg.search_horizon
+                )
+                buf.search_dists.append(search_dist.cpu())
+
             action, log_prob, value, explore_branch = self._sample_action(
-                grid, features, valid_actions
+                grid, features, valid_actions, search_dist
             )
             next_obs, reward, done, info = self._env_step(action, explore_branch)
 
@@ -608,6 +653,7 @@ class PacmanTrainer:
         grid: torch.Tensor,
         features: torch.Tensor,
         valid_actions: torch.Tensor,
+        search_dist: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, bool]:
         """Forward policy, sample action with ε-exploration, return (action, log_prob, value, explore)."""
         with torch.no_grad():
@@ -623,9 +669,20 @@ class PacmanTrainer:
 
             masked_logits = logits.masked_fill(~valid_actions.to(self.device), -1e4)
             masked_logits = torch.clamp(masked_logits, min=-1e4, max=1e4)
+            probs = F.softmax(masked_logits, dim=-1)
+
+            # Search-guided sampling
+            if self.cfg.search_guided and search_dist is not None:
+                s_dist = search_dist.to(self.device).view(1, -1)
+                alpha = self.cfg.search_alpha
+                if torch.rand(1).item() < alpha:
+                    action = torch.argmax(s_dist, dim=-1)
+                else:
+                    action = Categorical(probs=probs).sample()
+                log_prob = torch.log(probs[0, action].clamp(min=1e-8))
+                return action, log_prob, value, False
 
             if self.cfg.rollout_epsilon > 0:
-                probs = F.softmax(masked_logits, dim=-1)
                 valid_f = valid_actions.to(self.device).float()
                 uniform = valid_f / valid_f.sum(dim=-1, keepdim=True).clamp(min=1.0)
                 mix = (
@@ -748,7 +805,7 @@ class PacmanTrainer:
             cfg.gae_lambda,
         )
 
-        return {
+        seq_dict = {
             "grids_seq": b_grids.view(
                 cfg.num_sequences, cfg.seq_len, *b_grids.shape[1:]
             ),
@@ -765,6 +822,12 @@ class PacmanTrainer:
             "returns_seq": returns.view(cfg.num_sequences, cfg.seq_len),
             "seq_hiddens": b_seq_hiddens,
         }
+        if buf.search_dists:
+            b_search_dists = torch.stack(buf.search_dists, dim=0)[:n].to(self.device)
+            seq_dict["search_dists_seq"] = b_search_dists.view(
+                cfg.num_sequences, cfg.seq_len, 4
+            )
+        return seq_dict
 
     # ───────────────────────────────────────────────────────────────────────
     # PPO update
@@ -858,11 +921,18 @@ class PacmanTrainer:
                 mb_grid, mb_features, mb_hidden, mb_resets, mb_valid, masked_logits
             )
 
+            distill_loss = torch.tensor(0.0, device=self.device)
+            if "search_dists_seq" in seq_tensors:
+                mb_search_dists = seq_tensors["search_dists_seq"][mb_idx]
+                log_probs_all = F.log_softmax(masked_logits, dim=-1)
+                distill_loss = -(mb_search_dists * log_probs_all).sum(dim=-1).mean()
+
             loss = (
                 policy_loss
                 + cfg.value_coef * value_loss
                 - eff_entropy * entropy
                 + kl_coef * kl_loss
+                + (cfg.distill_coef * distill_loss if cfg.search_guided else 0.0)
             )
 
             if torch.isnan(loss):
@@ -1195,6 +1265,7 @@ class PacmanTrainer:
             "resets",
             "values",
             "seq_hiddens",
+            "search_dists",
         ]:
             getattr(buf, attr).clear()
         if self.device.type == "cuda":

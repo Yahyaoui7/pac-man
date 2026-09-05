@@ -76,8 +76,10 @@ class PlayingState(State):
         else:
             self.ghost_controller = None
 
+        use_search = not getattr(self.game, "player_ai_no_search", False)
+        ckpt = getattr(self.game, "player_ai_checkpoint", None)
         try:
-            self.player_controller = CNNPlayerController()
+            self.player_controller = CNNPlayerController(model_path=ckpt, use_search=use_search)
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             print(f"Player RL model unavailable: {exc}")
             self.player_controller = None
@@ -184,20 +186,25 @@ class PlayingState(State):
                     em.player,
                     em.ghosts,
                     self.movement,
-                    sample=True,
+                    sample=False,
                 )
                 if action:
                     em.player.next_direction = action
                     self.ai_player_decision = action
                     diag = self.player_controller.last_diagnostics
+                    mode = "SEARCH" if diag.get("search_used") else "NN"
                     probs_str = " | ".join(
                         f"{d}:{p*100:.0f}%"
                         for d, p in diag.get("probabilities", {}).items()
                     )
+                    scores_dict = diag.get("search_scores")
+                    scores_str = ""
+                    if scores_dict:
+                        scores_str = " | Search: [" + " ".join(f"{d}:{s:+.0f}" for d, s in scores_dict.items()) + "]"
                     print(
-                        f"🤖 [PLAYER AI] Frame {self.ai_frame_counter:04d} "
+                        f"🤖 [AI {mode}] Frame {self.ai_frame_counter:04d} "
                         f"Node ({em.player.grid_x:02d},{em.player.grid_y:02d}) "
-                        f"-> Choice: {action:<5s} | Probs: [{probs_str}]"
+                        f"-> {action:<5s} | NN: [{probs_str}]{scores_str}"
                     )
 
         self.movement.update_entity(em.player)

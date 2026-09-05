@@ -22,6 +22,17 @@ def main() -> int:
         default=str(DEFAULT_CONFIG),
         help="Path to level configuration JSON file",
     )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=None,
+        help="Path to .pt checkpoint (defaults to latest trained)",
+    )
+    parser.add_argument(
+        "--no-search",
+        action="store_true",
+        help="Disable lookahead beam search and use pure 1-step neural network",
+    )
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -38,8 +49,13 @@ def main() -> int:
 
     game = GameStarter(config)
     game.use_ai_player = True
+    game.player_ai_no_search = args.no_search
+    game.player_ai_checkpoint = args.checkpoint
+
+    mode_str = "Pure 1-Step Neural Network" if args.no_search else "Lookahead Tactical Search Engine + Neural Network"
     print("============================================================")
-    print("Launching Visual Game with AI Player Model Active")
+    print(f"Launching Visual Game with AI Player Model Active")
+    print(f"Mode: {mode_str}")
     print("Controls: Press 'P' or 'A' in game to toggle manual vs AI control")
     print("============================================================")
     game.run()

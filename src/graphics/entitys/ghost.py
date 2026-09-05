@@ -29,7 +29,7 @@ class Ghost(Entity):
         x: int,
         color: tuple[int, int, int] | pygame.Color,
         name: str,
-        speed: float = 2.45,
+        speed: float = 1.9,
     ) -> None:
         super().__init__(y, x, speed=speed)
 

@@ -34,10 +34,12 @@ class MovementSystem:
         self.rng = random.Random()
         self.pattern_42: Optional[List[Tuple[int, int]]] = None
         self._dist_cache: dict[tuple[int, int], list[int]] = {}
+        self._pred_cache: dict[tuple[int, int, str, int], tuple[int, int]] = {}
 
     def clear_cache(self) -> None:
-        """Clear precomputed distance cache if maze structure changes."""
+        """Clear precomputed distance and prediction cache."""
         self._dist_cache.clear()
+        self._pred_cache.clear()
 
     def set_direction(self, entity: Entity, direction: str) -> None:
         """Set entity direction and convert it to grid_y/grid_x movement."""
@@ -400,6 +402,119 @@ class MovementSystem:
         self.pattern_42 = None
         self._navigate_bfs(ghost, player.grid_y, player.grid_x)
 
+    def predict_player_position(
+        self,
+        player: Any,
+        lookahead: int,
+        maze: Optional[Any] = None,
+        pellets: Optional[Any] = None,
+        ghosts: Optional[Any] = None,
+    ) -> tuple[int, int]:
+        """Predict player position lookahead cells ahead with memoization."""
+        if lookahead <= 0:
+            return (int(player.grid_y), int(player.grid_x))
+
+        direction = (
+            getattr(player, "next_direction", None) or player.direction or "UP"
+        )
+        cache_key = (
+            int(player.grid_y),
+            int(player.grid_x),
+            str(direction),
+            int(lookahead),
+        )
+
+        if cache_key in self._pred_cache:
+            return self._pred_cache[cache_key]
+
+        DIRECTION_DELTA: dict[str, tuple[int, int]] = {
+            "UP": (-1, 0),
+            "DOWN": (1, 0),
+            "LEFT": (0, -1),
+            "RIGHT": (0, 1),
+        }
+        OPPOSITE_DIR: dict[str, str] = {
+            "UP": "DOWN",
+            "DOWN": "UP",
+            "LEFT": "RIGHT",
+            "RIGHT": "LEFT",
+        }
+
+        y, x = int(player.grid_y), int(player.grid_x)
+        curr_dir = str(direction)
+        remaining = lookahead
+
+        # Step 1: commit to one cell in current/next direction if legal
+        if self.can_move(y, x, curr_dir):
+            dy, dx = DIRECTION_DELTA.get(curr_dir, (0, 0))
+            y += dy
+            x += dx
+            remaining -= 1
+
+        # Simulate subsequent steps: walk corridors, consult expert at forks
+        while (
+            remaining > 0
+            and maze is not None
+            and pellets is not None
+            and ghosts is not None
+        ):
+            valid_dirs = [
+                d for d in DIRECTION_DELTA if self.can_move(y, x, d)
+            ]
+            if not valid_dirs:
+                break
+
+            # If can keep going straight through corridor, keep going
+            if curr_dir in valid_dirs and len(valid_dirs) <= 2:
+                next_dir = curr_dir
+            else:
+                opp = OPPOSITE_DIR.get(curr_dir)
+                choices = [d for d in valid_dirs if d != opp] or valid_dirs
+                if len(choices) == 1:
+                    next_dir = choices[0]
+                else:
+                    try:
+                        from src.logic.expert import PacmanExpert, DIRECTIONS
+
+                        fake_player = _PredictivePlayer(
+                            grid_y=y,
+                            grid_x=x,
+                            direction=curr_dir,
+                            next_direction=curr_dir,
+                            powered_timer=float(
+                                getattr(player, "powered_timer", 0.0)
+                            ),
+                        )
+                        fake_env = _PredictiveEnv(
+                            movement=self,
+                            player=fake_player,
+                            maze=maze,
+                            pellets=pellets,
+                            ghosts=ghosts,
+                        )
+                        expert = PacmanExpert(horizon=min(remaining, 2))
+                        dec = expert.choose_action(fake_env)
+                        chosen = DIRECTIONS[dec.action]
+                        next_dir = chosen if chosen in choices else choices[0]
+                    except Exception:
+                        next_dir = choices[0]
+
+            dy, dx = DIRECTION_DELTA.get(next_dir, (0, 0))
+            if self.can_move(y, x, next_dir):
+                y += dy
+                x += dx
+                curr_dir = next_dir
+                remaining -= 1
+            else:
+                break
+
+        if len(self._pred_cache) > 256:
+            self._pred_cache.clear()
+
+        result = (y, x)
+        self._pred_cache[cache_key] = result
+        return result
+
     def update_predictive_ghost(
         self,
         ghost: Any,
@@ -411,100 +526,14 @@ class MovementSystem:
     ) -> None:
         """Predict Pac-Man's future position and navigate the ghost toward it."""
         self.pattern_42 = None
+        if not self.is_centered(ghost):
+            self.update_entity(ghost)
+            return
 
-        DIRECTION_DELTA: dict[str, tuple[int, int]] = {
-            "UP": (-1, 0),
-            "DOWN": (1, 0),
-            "LEFT": (0, -1),
-            "RIGHT": (0, 1),
-        }
-
-        def get_valid_directions(y: int, x: int) -> list[str]:
-            valid = []
-            for d in DIRECTION_DELTA:
-                if self.can_move(y, x, d):
-                    valid.append(d)
-            return valid
-
-        direction = (
-            getattr(player, "next_direction", None) or player.direction
+        target_y, target_x = self.predict_player_position(
+            player, lookahead, maze, pellets, ghosts
         )
-        y, x = player.grid_y, player.grid_x
-
-        if lookahead > 0:
-            if self.can_move(y, x, direction):
-                dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
-                y += dy
-                x += dx
-                remaining = lookahead - 1
-            else:
-                remaining = lookahead
-        else:
-            remaining = 0
-
-        if (
-            remaining > 0
-            and maze is not None
-            and pellets is not None
-            and ghosts is not None
-        ):
-            try:
-                from src.logic.expert import PacmanExpert, DIRECTIONS
-
-                for _ in range(remaining):
-                    valid_directions = get_valid_directions(y, x)
-
-                    if not valid_directions:
-                        break
-
-                    if len(valid_directions) == 1:
-                        predicted_dir = valid_directions[0]
-                    else:
-
-                        fake_player = _PredictivePlayer(
-                            grid_y=y,
-                            grid_x=x,
-                            direction=direction,
-                            next_direction=direction,
-                            powered_timer=float(
-                                getattr(player, "powered_timer", 0.0)
-                            ),
-                        )
-
-                        fake_env = _PredictiveEnv(
-                            movement=self,
-                            player=fake_player,
-                            maze=maze,
-                            pellets=pellets,
-                            ghosts=ghosts,
-                        )
-
-                        expert = PacmanExpert(horizon=remaining)
-                        decision = expert.choose_action(fake_env)
-
-                        predicted_dir = DIRECTIONS[decision.action]
-
-                        if predicted_dir not in valid_directions:
-                            predicted_dir = valid_directions[0]
-
-                    dy, dx = DIRECTION_DELTA.get(predicted_dir, (0, 0))
-                    if self.can_move(y, x, predicted_dir):
-                        y += dy
-                        x += dx
-                        direction = predicted_dir
-                    else:
-                        break
-
-            except Exception:
-                dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
-                for _ in range(remaining):
-                    if self.can_move(y, x, direction):
-                        y += dy
-                        x += dx
-                    else:
-                        break
-
-        self._navigate_bfs(ghost, y, x)
+        self._navigate_bfs(ghost, target_y, target_x)
 
     def update_cnn_ghost(
         self,

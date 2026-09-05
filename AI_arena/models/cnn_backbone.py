@@ -163,8 +163,8 @@ class PacmanCNNBackbone(nn.Module):
         #  Sequence chunk mode: (batch, seq_len, C, H, W)
         # ═══════════════════════════════════════════════════════════════
         if grid.ndim == 5:
-            b, l, c, h, w = grid.shape
-            grid_flat = grid.reshape(b * l, c, h, w)
+            b, l, c, grid_h, grid_w = grid.shape
+            grid_flat = grid.reshape(b * l, c, grid_h, grid_w)
             extra_flat = extra_features.reshape(b * l, -1)
 
             # Spatial path
@@ -183,7 +183,7 @@ class PacmanCNNBackbone(nn.Module):
             # GRU with reset-safe masking
             if dones is not None:
                 dones_t = dones.view(b, l, 1).to(device=grid.device, dtype=x_f.dtype)
-                h = (
+                h_state = (
                     hidden
                     if hidden is not None
                     else torch.zeros(
@@ -197,17 +197,17 @@ class PacmanCNNBackbone(nn.Module):
                 outs: list[Tensor] = []
                 for t in range(l):
                     mask = dones_t[:, t : t + 1].permute(1, 0, 2)  # (1, b, 1)
-                    h = h * (1.0 - mask)
-                    out_t, h = self.gru(x_f[:, t : t + 1], h)
+                    h_state = h_state * (1.0 - mask)
+                    out_t, h_state = self.gru(x_f[:, t : t + 1], h_state)
                     out_t = self.gru_ln(out_t)  # ← normalize each step
                     outs.append(out_t)
                 out = torch.cat(outs, dim=1)
-                hidden = h
+                final_hidden = h_state
             else:
-                out, hidden = self.gru(x_f, hidden)
+                out, final_hidden = self.gru(x_f, hidden)
                 out = self.gru_ln(out)  # ← normalize full sequence
 
-            return self.out(out), hidden
+            return self.out(out), final_hidden
 
         # ═══════════════════════════════════════════════════════════════
         #  Single step mode: (batch, C, H, W)

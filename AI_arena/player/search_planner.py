@@ -12,13 +12,10 @@ Provides:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 import numpy as np
 import torch
 import torch.nn.functional as F
-
-if TYPE_CHECKING:
-    from AI_arena.player.player_env import PacmanPlayerEnv
 
 
 class PacmanLookaheadSearch:
@@ -30,7 +27,7 @@ class PacmanLookaheadSearch:
 
     def __init__(
         self,
-        env: PacmanPlayerEnv | None = None,
+        env: Any = None,
         maze: list[list[int]] | None = None,
         movement: Any = None,
         horizon: int = 12,
@@ -38,10 +35,18 @@ class PacmanLookaheadSearch:
         ghost_speed_ratio: float = 0.70,
     ) -> None:
         self.env = env
-        self.movement = movement if movement is not None else (env.movement if env else None)
-        self.maze = maze if maze is not None else (env.maze if env else None)
-        self.h = len(self.maze) if self.maze else 0
-        self.w = len(self.maze[0]) if self.h else 0
+        self.movement: Any = (
+            movement
+            if movement is not None
+            else (getattr(env, "movement", None) if env else None)
+        )
+        self.maze: list[list[int]] = (
+            maze
+            if maze is not None
+            else (getattr(env, "maze", []) if env else [])
+        )
+        self.h: int = len(self.maze)
+        self.w: int = len(self.maze[0]) if self.h > 0 else 0
         self.horizon = horizon
         self.beam_width = beam_width
         self.ghost_speed_ratio = (
@@ -92,6 +97,8 @@ class PacmanLookaheadSearch:
 
         h, w = self.h, self.w
         dist = [[-1] * w for _ in range(h)]
+        if not self.maze or h == 0 or w == 0:
+            return dist
         q: deque[tuple[int, int]] = deque()
         for y in range(h):
             for x in range(w):
@@ -380,6 +387,8 @@ class PacmanLookaheadSearch:
         new_ghosts: list[dict[str, Any]] = []
         collided = False
         eaten_count = 0
+        if self.movement is None:
+            return ghosts, False, 0
         w = self.w
 
         target_dists = self.movement.bfs_distances(pac_pos)

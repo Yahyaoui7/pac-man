@@ -46,6 +46,10 @@ class GameStarter:
 
         self.lives: int = config.lives
         self.use_ai_player: bool = False
+        self.use_ai_ghosts: bool = False
+        self.player_ai_no_search: bool = False
+        self.player_ai_checkpoint: str | None = None
+        self.ghost_ai_checkpoint: str | None = None
 
     def resize_window(self, width: int, height: int) -> None:
         """Resize the window dynamically if width/height changed."""

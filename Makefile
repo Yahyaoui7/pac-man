@@ -1,26 +1,36 @@
-.PHONY: install run debug collect train collect-player train-player clean lint lint-strict
+.PHONY: install run run-ai run-ai-fast run-ghost-ai run-full-ai debug clean lint lint-strict help
 
-
-run:
-	uv run python pac_man.py config.json
+help:
+	@echo "Neon Pac-Man Arcade & AI Commands:"
+	@echo "  make install       - Install dependencies using uv"
+	@echo "  make run           - Launch game in Manual mode"
+	@echo "  make run-ai        - Launch with AI Pac-Man (Lookahead Search + Neural Net)"
+	@echo "  make run-ai-fast   - Launch with AI Pac-Man (Pure 1-step Neural Net)"
+	@echo "  make run-ghost-ai  - Launch with AI Ghosts"
+	@echo "  make run-full-ai   - Launch with AI Pac-Man vs AI Ghosts"
+	@echo "  make clean         - Clean temporary cache files"
+	@echo "  make lint          - Run flake8 and mypy checks"
 
 install:
 	uv sync
 
+run:
+	uv run python pac_man.py config.json
+
+run-ai:
+	uv run python pac_man.py config.json --ai-player
+
+run-ai-fast:
+	uv run python pac_man.py config.json --ai-player --no-search
+
+run-ghost-ai:
+	uv run python pac_man.py config.json --ai-ghosts
+
+run-full-ai:
+	uv run python pac_man.py config.json --ai-player --ai-ghosts
+
 debug:
 	uv run python -m pdb -m pac_man.py config.json
-
-collect:
-	uv run python -m AI_arena.data_collector.main_loop 
-
-train:
-	uv run python -m AI_arena.ghosts.ghost_training --epochs 30 --patience 5
-
-collect-player:
-	uv run python -m AI_arena.player.player_collector --samples 10000 --stage 2
-
-train-player:
-	uv run python -m AI_arena.player.player_training --epochs 20 --batch-size 64
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

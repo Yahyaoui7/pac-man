@@ -1,5 +1,6 @@
 import math
 import json
+from pathlib import Path
 
 import pygame
 import pygame.draw as dr
@@ -64,15 +65,36 @@ class PlayingState(State):
 
         curr_idx = self.game.level_manager.current_level_index
         self.movement = MovementSystem(self.maze)
-        self.use_cnn_ghosts = False
+        self.use_cnn_ghosts = getattr(self.game, "use_ai_ghosts", False)
         if self.use_cnn_ghosts:
-            try:
-                self.ghost_controller = CNNGhostController()
-                if hasattr(self.ghost_controller, "init_observation"):
-                    self.ghost_controller.init_observation(self.maze)
-            except (FileNotFoundError, RuntimeError, ValueError) as exc:
-                print(f"Ghost CNN unavailable; using scripted movement: {exc}")
+            ghost_ckpt = getattr(self.game, "ghost_ai_checkpoint", None)
+            from AI_arena.ghosts.ghost_controller import (
+                DEFAULT_MODEL_PATH,
+                QUANTIZED_MODEL_PATH,
+            )
+            has_weights = (
+                Path(ghost_ckpt).exists()
+                if ghost_ckpt
+                else (Path(QUANTIZED_MODEL_PATH).exists() or Path(DEFAULT_MODEL_PATH).exists())
+            )
+            if not has_weights:
+                print("👻 Ghost AI weights not found on this machine; falling back to classic/scripted movement.")
                 self.ghost_controller = None
+                self.use_cnn_ghosts = False
+            else:
+                try:
+                    self.ghost_controller = (
+                        CNNGhostController(model_path=ghost_ckpt)
+                        if ghost_ckpt
+                        else CNNGhostController()
+                    )
+                    if hasattr(self.ghost_controller, "init_observation"):
+                        self.ghost_controller.init_observation(self.maze)
+                    print("👻 Ghost AI neural network controller active.")
+                except (FileNotFoundError, RuntimeError, ValueError) as exc:
+                    print(f"Ghost CNN unavailable; using scripted movement: {exc}")
+                    self.ghost_controller = None
+                    self.use_cnn_ghosts = False
         else:
             self.ghost_controller = None
 
@@ -116,6 +138,10 @@ class PlayingState(State):
         for event in events:
             if event.type == pygame.KEYDOWN and event.key in (pygame.K_p, pygame.K_a):
                 self.use_ai_player = not self.use_ai_player
+                status = "AI PAC-MAN: ON" if self.use_ai_player else "MANUAL CONTROL"
+                self.msg_text = status
+                self.msg_timer = 1.5
+                print(f"🎮 {status}")
 
         self._handle_input(input_state)
         self._update_entities()

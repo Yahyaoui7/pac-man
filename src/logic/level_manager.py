@@ -30,7 +30,7 @@ class LevelManager:
     @staticmethod
     def clamp_dimensions(width: int, height: int) -> tuple[int, int]:
         """Force any configured size into the range the game can render."""
-        return max(5, min(43, width)), max(5, min(35, height))
+        return max(10, min(43, width)), max(10, min(23, height))
 
     def load_level(self, level_index: int) -> bool:
         if level_index >= len(self.config.levels):

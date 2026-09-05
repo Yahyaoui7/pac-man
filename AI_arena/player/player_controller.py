@@ -25,23 +25,32 @@ DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 class CNNPlayerController:
     """Build live observations and predict Pac-Man's best move."""
 
-    def __init__(self, model_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        model_path: str | Path | None = None,
+        use_search: bool = True,
+        search_horizon: int = 12,
+    ) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = PlayerActorCritic().to(self.device)
+        self.use_search = use_search
+        self.search_horizon = search_horizon
+        self.search_planner: Any = None
 
         if model_path is None:
-            if BEST_STAGE_PATH.exists():
-                path = BEST_STAGE_PATH
-            elif DEFAULT_STAGE_PATH.exists():
+            candidates = [DEFAULT_STAGE_PATH, BEST_STAGE_PATH]
+            existing = [c for c in candidates if c.exists()]
+            if existing:
+                path = max(existing, key=lambda p: p.stat().st_mtime)
+            else:
                 path = DEFAULT_STAGE_PATH
-
         else:
             path = Path(model_path)
 
         if path.exists() and load_checkpoint_into_policy(
             self.model, path, device=self.device
         ):
-            print(f"Loaded player RL checkpoint from {path}")
+            print(f"Loaded player RL checkpoint from {path} (Search lookahead: {self.use_search})")
         else:
             print(
                 f"Warning: Player RL checkpoint {path} not found or failed to load. Using untrained weights."
@@ -83,6 +92,7 @@ class CNNPlayerController:
         ghosts: list[Ghost],
         movement_system: Any,
         sample: bool = False,
+        use_search: bool | None = None,
     ) -> str:
         """Construct state tensors and select action (sampling from distribution or greedy)."""
         height = len(maze)
@@ -128,10 +138,35 @@ class CNNPlayerController:
                     probs = torch.ones_like(probs)
             probs = probs / probs.sum()
 
-            if sample:
-                action_index = int(torch.multinomial(probs, 1).item())
-            else:
-                action_index = int(torch.argmax(masked_logits, dim=-1).item())
+            nn_action_index = (
+                int(torch.multinomial(probs, 1).item())
+                if sample
+                else int(torch.argmax(masked_logits, dim=-1).item())
+            )
+
+        active_search = self.use_search if use_search is None else use_search
+        search_scores = None
+        if active_search:
+            if self.search_planner is None:
+                from AI_arena.player.search_planner import PacmanLookaheadSearch
+
+                self.search_planner = PacmanLookaheadSearch(
+                    maze=maze,
+                    movement=movement_system,
+                    horizon=self.search_horizon,
+                )
+            action_index = self.search_planner.get_best_action(
+                player=player,
+                ghosts=ghosts,
+                pellets=pellets,
+            )
+            search_scores = self.search_planner.get_action_scores(
+                player=player,
+                ghosts=ghosts,
+                pellets=pellets,
+            )
+        else:
+            action_index = nn_action_index
 
         if self.last_action_idx is not None and self.last_action_idx == action_index:
             self.same_action_count += 1
@@ -153,6 +188,8 @@ class CNNPlayerController:
 
         self.last_diagnostics = {
             "chosen_action": chosen_action,
+            "search_used": active_search,
+            "nn_action": DIRECTIONS[nn_action_index],
             "estimated_value": round(float(value.item()), 4),
             "probabilities": {
                 d: round(float(probs[i].item()), 4) for i, d in enumerate(DIRECTIONS)
@@ -165,6 +202,10 @@ class CNNPlayerController:
                 d: bool(valid_actions[0, i].item()) for i, d in enumerate(DIRECTIONS)
             },
         }
+        if search_scores is not None:
+            self.last_diagnostics["search_scores"] = {
+                DIRECTIONS[a]: round(float(s), 1) for a, s in search_scores.items()
+            }
 
         return chosen_action
 

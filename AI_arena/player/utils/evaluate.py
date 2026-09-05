@@ -63,6 +63,8 @@ def run_evaluation(
     env: PacmanPlayerEnv | None = None,
     ghost_speed_ratio: float = 0.35,
     ghost_confusion_prob: float = 0.0,
+    use_search: bool = False,
+    search_horizon: int = 12,
 ) -> dict[str, Any]:
     """Run `episodes` deterministic episodes; returns aggregate metrics.
 
@@ -95,16 +97,19 @@ def run_evaluation(
 
         done = False
         while not done:
-            grid, features, valid_actions = obs
-            logits, _, hidden = policy(grid.to(device_t), features.to(device_t), hidden)
-            masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e8)
-            masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
-            )
-            if greedy:
-                action = int(torch.argmax(masked_logits, dim=-1).item())
+            if use_search:
+                action = env.get_search_action(horizon=search_horizon)
             else:
-                action = int(Categorical(logits=masked_logits).sample())
+                grid, features, valid_actions = obs
+                logits, _, hidden = policy(grid.to(device_t), features.to(device_t), hidden)
+                masked_logits = logits.masked_fill(~valid_actions.to(device_t), -1e4)
+                masked_logits = torch.nan_to_num(
+                    masked_logits, nan=-1e4, posinf=10.0, neginf=-1e4
+                )
+                if greedy:
+                    action = int(torch.argmax(masked_logits, dim=-1).item())
+                else:
+                    action = int(Categorical(logits=masked_logits).sample())
             obs, reward, done, info, _ = env.step(action)
             if info.get("events", {}).get("pacman_died", False):
                 hidden = None
@@ -247,6 +252,12 @@ def main() -> None:
     parser.add_argument(
         "--no-save", action="store_true", help="Do not append to eval_history.json"
     )
+    parser.add_argument(
+        "--use-search", action="store_true", help="Use beam search lookahead instead of pure neural network"
+    )
+    parser.add_argument(
+        "--search-horizon", type=int, default=12, help="Horizon for beam search lookahead"
+    )
     args = parser.parse_args()
 
     ckpt_path = _resolve_checkpoint(args.stage, args.checkpoint)
@@ -256,10 +267,11 @@ def main() -> None:
     ):
         raise SystemExit(f"ERROR: could not load weights from {ckpt_path}")
 
+    mode_str = "search-guided" if args.use_search else ("sample" if args.sample else "greedy")
     print(
         f"Evaluating {ckpt_path.name} | stage {args.stage} | "
         f"{args.episodes} eps @ seeds {args.seed_base}..{args.seed_base + args.episodes - 1} "
-        f"({'sample' if args.sample else 'greedy'})"
+        f"({mode_str})"
     )
     t0 = time.time()
     result = run_evaluation(
@@ -269,6 +281,8 @@ def main() -> None:
         episodes=args.episodes,
         seed_base=args.seed_base,
         greedy=not args.sample,
+        use_search=args.use_search,
+        search_horizon=args.search_horizon,
     )
     result["checkpoint"] = ckpt_path.name
 

@@ -4,6 +4,7 @@ __pycache__/
 .highscores.json
 .venv/
 .mypy_cache/
+scratch/
 AI_arena/data/PACMAN_IMITATION_DATA.jsonl
 # *.pt
 # *.pth

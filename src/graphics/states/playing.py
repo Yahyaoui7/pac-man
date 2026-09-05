@@ -48,6 +48,7 @@ class PlayingState(State):
         self.active_cheats: set[str] = set()
         self.timed_effects: dict[str, float] = {}
         self.hunter_cursed_until_death: bool = False
+        self.effect_deck: list[str] = []
         self.player_speed: float = 0.0
         self.ghost_controller: CNNGhostController | None = None
         self.ghost_decision_sources: dict[str, str] = {}
@@ -100,6 +101,7 @@ class PlayingState(State):
         self.active_cheats = set()
         self.timed_effects = {}
         self.hunter_cursed_until_death = False
+        self.effect_deck = []
         if getattr(self.game.config, "ghost_hunter", False):
             self._toggle_cheat("ghost hunter")
         else:
@@ -434,14 +436,22 @@ class PlayingState(State):
     def on_special_pellet_eaten(self) -> None:
         """Triggered when player eats a special mystery pellet (pellet == 3).
 
-        Rolls a 75% positive, 25% negative effect:
+        Uses a fair shuffle-deck so all 4 outcomes occur with 25% distribution:
         - 25%: Invincibility for 10s
         - 25%: Speed boost for 10s
         - 25%: Ghost freeze for 10s
         - 25%: Ghost Hunter mode until death (just one death)
         """
-        outcomes = ["invincible", "speed boost", "ghost freeze", "ghost hunter"]
-        chosen = random.choice(outcomes)
+        if not self.effect_deck:
+            self.effect_deck = [
+                "invincible",
+                "speed boost",
+                "ghost freeze",
+                "ghost hunter",
+            ]
+            random.shuffle(self.effect_deck)
+
+        chosen = self.effect_deck.pop()
 
         if chosen == "invincible":
             self.timed_effects["invincible"] = 10.0
@@ -904,7 +914,7 @@ class PlayingState(State):
             or self.hunter_cursed_until_death
         )
         bottom_y = (
-            screen.get_height() - 28 if has_banner else screen.get_height() - 8
+            screen.get_height() - 44 if has_banner else screen.get_height() - 8
         )
 
         bubble_rect = pygame.Rect(0, 0, w, h)

@@ -22,6 +22,15 @@ from src.logic.config import (
     WEST,
 )
 
+# Lookahead (cells) each ghost predicts the player will travel.
+# Blinky=0 (current pos), Pinky=1, Inky=3, Clyde=5
+GHOST_LOOKAHEAD: dict[str, int] = {
+    "Blinky": 0,
+    "Pinky": 1,
+    "Inky": 3,
+    "Clyde": 5,
+}
+
 
 class PlayingState(State):
     """The active gameplay state handling movements, collisions, timers."""
@@ -80,6 +89,8 @@ class PlayingState(State):
 
         self.player_speed = self.game.entity_manager.player.speed
         self.active_cheats = set()
+        if getattr(self.game.config, "ghost_hunter", False):
+            self._toggle_cheat("ghost hunter")
 
     def update(
         self,
@@ -131,6 +142,8 @@ class PlayingState(State):
             self._toggle_cheat("ghost freeze")
         elif input_state.ai_player:
             self._toggle_cheat("ai pacman")
+        elif input_state.ghost_hunter:
+            self._toggle_cheat("ghost hunter")
 
         if input_state.action_pressed:
             player.use_ability()
@@ -154,11 +167,24 @@ class PlayingState(State):
         elif name == "ai pacman":
             self.use_ai_player = turning_on
             status = (
-                "CHEAT: AI PAC-MAN ON" if turning_on else "CHEAT: AI PAC-MAN OFF"
+                "CHEAT: AI PAC-MAN ON"
+                if turning_on
+                else "CHEAT: AI PAC-MAN OFF"
             )
             self.msg_text = status
             self.msg_timer = 2.0
             print(f"🤖 {status}")
+        elif name == "ghost hunter":
+            for ghost in self.game.entity_manager.ghosts:
+                ghost.speed = 3.9 if turning_on else 1.5
+            status = (
+                "CHEAT: GHOST HUNTER ON"
+                if turning_on
+                else "CHEAT: GHOST HUNTER OFF"
+            )
+            self.msg_text = status
+            self.msg_timer = 2.0
+            print(f"👻 {status}")
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager
@@ -291,8 +317,24 @@ class PlayingState(State):
                         self.ghost_decision_sources[gst.name] = "RUNAWAY"
                         self.movement.update_runaway_ghost(gst, em.player)
                     else:
-                        self.ghost_decision_sources[gst.name] = "BFS"
-                        self.movement.update_bfs_ghost(gst, em.player)
+                        if "ghost hunter" in self.active_cheats:
+                            lookahead = GHOST_LOOKAHEAD.get(gst.name, 0)
+                            self.ghost_decision_sources[gst.name] = (
+                                f"HUNTER+{lookahead}"
+                            )
+                            gst.speed = 3.9
+                            self.movement.update_predictive_ghost(
+                                gst,
+                                em.player,
+                                lookahead,
+                                self.maze,
+                                em.pellets,
+                                em.ghosts,
+                            )
+                        else:
+                            gst.speed = 1.5
+                            self.ghost_decision_sources[gst.name] = "BFS"
+                            self.movement.update_bfs_ghost(gst, em.player)
         self.check_collision(em.player, em.ghosts)
         em.update(self.maze, 1 / 60.0)
 

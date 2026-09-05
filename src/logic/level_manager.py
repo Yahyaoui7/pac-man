@@ -1,4 +1,3 @@
-import random
 from typing import Optional
 from mazegenerator import MazeGenerator  # type: ignore
 from src.logic.config import GameConfig, LevelConfig
@@ -28,11 +27,10 @@ class LevelManager:
         )
         return maze
 
-    # TODO: get the old size since this one is just for this trainig stage
     @staticmethod
     def clamp_dimensions(width: int, height: int) -> tuple[int, int]:
         """Force any configured size into the range the game can render."""
-        return max(5, min(43, width)), max(5, min(23, height))
+        return max(5, min(43, width)), max(5, min(35, height))
 
     def load_level(self, level_index: int) -> bool:
         if level_index >= len(self.config.levels):
@@ -40,20 +38,15 @@ class LevelManager:
         self.current_level_index = level_index
         level_conf = self.get_current_level_config()
         try:
-
-            width, height = self.clamp_dimensions(level_conf.width, level_conf.height)
+            width, height = self.clamp_dimensions(
+                level_conf.width, level_conf.height
+            )
 
             self.current_maze = self.build_maze(
                 width,
                 height,
-                random.randint(0, 44444),
+                level_conf.seed,
             )
-
-            # self.current_maze = self.build_maze(
-            #     width,
-            #     height,
-            #     level_conf.seed,
-            # )
 
             self.remaining_time = float(level_conf.level_max_time)
             return True
@@ -65,7 +58,9 @@ class LevelManager:
                 e,
             )
             level_conf = self.config.levels[0]
-            width, height = self.clamp_dimensions(level_conf.width, level_conf.height)
+            width, height = self.clamp_dimensions(
+                level_conf.width, level_conf.height
+            )
             self.current_maze = self.build_maze(
                 width,
                 height,

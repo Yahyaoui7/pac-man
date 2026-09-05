@@ -46,6 +46,8 @@ class EntityManager:
         self.ghosts: list[Ghost] = []
         self.pellets: list[list[int]] = []
         self.total_pellets: int = 0
+        self.initial_total_pellets: int = 0
+        self.spawned_milestones: set[int] = set()
         self.sound = SoundManager()
         self.super_gum_abilities: dict[tuple[int, int], str] = {}
 
@@ -82,6 +84,43 @@ class EntityManager:
                     self.pellets[y][x] = 1
                     self.total_pellets += 1
 
+        self.initial_total_pellets = self.total_pellets
+        self.spawned_milestones = set()
+
+    def spawn_special_pellet(self) -> Optional[tuple[int, int]]:
+        """Spawn a special gamble pellet at a random accessible floor cell."""
+        if not self.maze:
+            return None
+        height, width = len(self.maze), len(self.maze[0])
+        candidates = [
+            (y, x)
+            for y in range(height)
+            for x in range(width)
+            if self.maze[y][x] != 15 and self.pellets[y][x] == 0
+        ]
+        occupied = set()
+        if self.player:
+            occupied.add((self.player.grid_y, self.player.grid_x))
+        for g in self.ghosts:
+            occupied.add((g.grid_y, g.grid_x))
+
+        filtered = [c for c in candidates if c not in occupied]
+        choices = filtered if filtered else candidates
+
+        if not choices:
+            choices = [
+                (y, x)
+                for y in range(height)
+                for x in range(width)
+                if self.maze[y][x] != 15
+            ]
+
+        if choices:
+            sy, sx = random.choice(choices)
+            self.pellets[sy][sx] = 3
+            return (sy, sx)
+        return None
+
     def load_level_entities(self, maze: list[list[int]]) -> None:
         """Setup maze grid, pellets, and spawn entities."""
         self.maze = maze
@@ -111,7 +150,8 @@ class EntityManager:
 
         if pellet != 0:
             self.pellets[py][px] = 0
-            self.total_pellets -= 1
+            if pellet in (1, 2):
+                self.total_pellets -= 1
 
         if pellet == 1:
             self.play_sound("eat_normal_pellet")
@@ -132,6 +172,39 @@ class EntityManager:
                     (pm.PUNCH if ability == ABILITY_PUNCH else pm.KICK),
                     fright_duration,
                 )
+
+        elif pellet == 3:
+            self.play_sound("eat_super_pacgum")
+            self.score_management.add_super_pacgum()
+            curr_state = getattr(
+                getattr(self.game, "state_manager", None), "current_state", None
+            )
+            if curr_state and hasattr(curr_state, "on_special_pellet_eaten"):
+                curr_state.on_special_pellet_eaten()
+
+        # Check 30%, 60%, 90% milestones to spawn special mystery pellets
+        if self.initial_total_pellets > 0:
+            cleared = self.initial_total_pellets - self.total_pellets
+            for milestone in (30, 60, 90):
+                threshold = int(
+                    self.initial_total_pellets * (milestone / 100.0)
+                )
+                if (
+                    cleared >= threshold
+                    and milestone not in self.spawned_milestones
+                ):
+                    self.spawned_milestones.add(milestone)
+                    spawned = self.spawn_special_pellet()
+                    if spawned:
+                        curr_state = getattr(
+                            getattr(self.game, "state_manager", None),
+                            "current_state",
+                            None,
+                        )
+                        if curr_state and hasattr(
+                            curr_state, "on_special_pellet_spawned"
+                        ):
+                            curr_state.on_special_pellet_spawned()
 
         dt_ms = dt * 1000.0
 
@@ -202,6 +275,16 @@ class EntityManager:
                         color = COLOR_PELLET
                         r = max(4, CELL_SIZE // 4) + pulse
                     pygame.draw.circle(screen, color, (px, py), r)
+                elif self.pellets[y][x] == 3:
+                    pulse = int(math.sin(pygame.time.get_ticks() * 0.008) * 3)
+                    r = max(6, CELL_SIZE // 3) + pulse
+                    pygame.draw.circle(
+                        screen, (255, 0, 255), (px, py), r + 2, width=2
+                    )
+                    pygame.draw.circle(screen, (220, 20, 220), (px, py), r)
+                    pygame.draw.circle(
+                        screen, (255, 240, 255), (px, py), max(2, r // 2)
+                    )
 
         self.player.draw(screen)
 

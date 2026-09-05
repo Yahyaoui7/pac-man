@@ -1,5 +1,6 @@
 import math
 import json
+import random
 
 import pygame
 import pygame.draw as dr
@@ -32,7 +33,7 @@ GHOST_LOOKAHEAD: dict[str, int] = {
 }
 
 GHOST_SPEED_RATIO_NORMAL = 0.50
-GHOST_SPEED_RATIO_HUNTER = 0.65
+GHOST_SPEED_RATIO_HUNTER = 0.70
 
 
 class PlayingState(State):
@@ -45,6 +46,8 @@ class PlayingState(State):
         self.msg_text: str = ""
 
         self.active_cheats: set[str] = set()
+        self.timed_effects: dict[str, float] = {}
+        self.hunter_cursed_until_death: bool = False
         self.player_speed: float = 0.0
         self.ghost_controller: CNNGhostController | None = None
         self.ghost_decision_sources: dict[str, str] = {}
@@ -92,6 +95,8 @@ class PlayingState(State):
 
         self.player_speed = self.game.entity_manager.player.speed
         self.active_cheats = set()
+        self.timed_effects = {}
+        self.hunter_cursed_until_death = False
         if getattr(self.game.config, "ghost_hunter", False):
             self._toggle_cheat("ghost hunter")
         else:
@@ -120,6 +125,22 @@ class PlayingState(State):
 
             self.game.state_manager.push_state(PauseState(self.game, self))
             return
+
+        # Decrement active gamble timed effects
+        dt = 1 / 60.0
+        expired_effects = []
+        for effect, rem in list(self.timed_effects.items()):
+            rem -= dt
+            if rem <= 0:
+                expired_effects.append(effect)
+                del self.timed_effects[effect]
+            else:
+                self.timed_effects[effect] = rem
+
+        for effect in expired_effects:
+            if effect == "speed boost" and "speed boost" not in self.active_cheats:
+                self.game.entity_manager.player.speed = self.player_speed
+            print(f"⌛ [GAMBLE] Timed effect expired: {effect}")
 
         self._handle_input(input_state)
         self._update_entities()
@@ -169,9 +190,11 @@ class PlayingState(State):
             self.player_invincible_until = 999999999999 if turning_on else 0
         elif name == "speed boost":
             player = self.game.entity_manager.player
-            player.speed = (
-                self.player_speed * 2 if turning_on else self.player_speed
-            )
+            if turning_on:
+                player.speed = self.player_speed * 2
+            else:
+                if self.timed_effects.get("speed boost", 0.0) <= 0:
+                    player.speed = self.player_speed
         elif name == "ai pacman":
             self.use_ai_player = turning_on
             status = (
@@ -185,7 +208,7 @@ class PlayingState(State):
         elif name == "ghost hunter":
             ratio = (
                 GHOST_SPEED_RATIO_HUNTER
-                if turning_on
+                if (turning_on or self.hunter_cursed_until_death)
                 else GHOST_SPEED_RATIO_NORMAL
             )
             for ghost in self.game.entity_manager.ghosts:
@@ -245,7 +268,11 @@ class PlayingState(State):
 
         self.movement.update_entity(em.player)
 
-        if "ghost freeze" not in self.active_cheats:
+        is_ghost_frozen = (
+            "ghost freeze" in self.active_cheats
+            or self.timed_effects.get("ghost freeze", 0.0) > 0
+        )
+        if not is_ghost_frozen:
             controller = self.ghost_controller
             decision_names: set[str] = set()
             if controller is not None:
@@ -333,7 +360,11 @@ class PlayingState(State):
                         self.ghost_decision_sources[gst.name] = "RUNAWAY"
                         self.movement.update_runaway_ghost(gst, em.player)
                     else:
-                        if "ghost hunter" in self.active_cheats:
+                        is_hunter = (
+                            "ghost hunter" in self.active_cheats
+                            or self.hunter_cursed_until_death
+                        )
+                        if is_hunter:
                             lookahead = GHOST_LOOKAHEAD.get(gst.name, 0)
                             self.ghost_decision_sources[gst.name] = (
                                 f"HUNTER+{lookahead}"
@@ -390,6 +421,53 @@ class PlayingState(State):
             else:
                 self.game.level_manager.current_level_index = next_lvl
                 self.game.state_manager.change_state(PlayingState(self.game))
+
+    def on_special_pellet_spawned(self) -> None:
+        """Triggered when a special gamble pellet appears in the maze."""
+        self.msg_text = "✨ A MYSTERY PELLET HAS APPEARED! ✨"
+        self.msg_timer = 2.5
+        print("✨ [GAMBLE] Special Mystery Pellet spawned in the maze!")
+
+    def on_special_pellet_eaten(self) -> None:
+        """Triggered when player eats a special mystery pellet (pellet == 3).
+
+        Rolls a 75% positive, 25% negative effect:
+        - 25%: Invincibility for 10s
+        - 25%: Speed boost for 10s
+        - 25%: Ghost freeze for 10s
+        - 25%: Ghost Hunter mode until death (just one death)
+        """
+        outcomes = ["invincible", "speed boost", "ghost freeze", "ghost hunter"]
+        chosen = random.choice(outcomes)
+
+        if chosen == "invincible":
+            self.timed_effects["invincible"] = 10.0
+            self.msg_text = "🎲 GAMBLE: 🛡️ INVINCIBILITY (10s)!"
+            self.msg_timer = 2.5
+            print("🎲 [GAMBLE] Rolled: INVINCIBILITY for 10.0s!")
+
+        elif chosen == "speed boost":
+            self.timed_effects["speed boost"] = 10.0
+            self.game.entity_manager.player.speed = self.player_speed * 2
+            self.msg_text = "🎲 GAMBLE: ⚡ SPEED BOOST (10s)!"
+            self.msg_timer = 2.5
+            print("🎲 [GAMBLE] Rolled: SPEED BOOST for 10.0s!")
+
+        elif chosen == "ghost freeze":
+            self.timed_effects["ghost freeze"] = 10.0
+            self.msg_text = "🎲 GAMBLE: ❄️ GHOST FREEZE (10s)!"
+            self.msg_timer = 2.5
+            print("🎲 [GAMBLE] Rolled: GHOST FREEZE for 10.0s!")
+
+        elif chosen == "ghost hunter":
+            self.hunter_cursed_until_death = True
+            for ghost in self.game.entity_manager.ghosts:
+                ghost.speed = round(
+                    self.player_speed * GHOST_SPEED_RATIO_HUNTER, 2
+                )
+            self.msg_text = "💀 GAMBLE LOST: GHOST HUNTER CURSE!"
+            self.msg_timer = 3.0
+            print("💀 [GAMBLE] Lost gamble! Ghost Hunter active until next death!")
 
     def draw(self, screen: pygame.Surface) -> None:
         self._draw_maze_panel(screen)
@@ -732,18 +810,41 @@ class PlayingState(State):
     # ------------------------------------------------------------------
 
     def _draw_cheat_banner(self, screen: pygame.Surface) -> None:
-        if not self.active_cheats:
+        parts: list[str] = []
+        is_cursed = self.hunter_cursed_until_death
+
+        if self.active_cheats:
+            cheat_labels = " + ".join(sorted(self.active_cheats)).upper()
+            parts.append(f"CHEAT: {cheat_labels}")
+
+        for effect, rem in sorted(self.timed_effects.items()):
+            icon = (
+                "🛡️ "
+                if effect == "invincible"
+                else "⚡ "
+                if effect == "speed boost"
+                else "❄️ "
+                if effect == "ghost freeze"
+                else "🎲 "
+            )
+            parts.append(f"{icon}{effect.upper()}: {rem:.1f}s")
+
+        if is_cursed:
+            parts.append("💀 HUNTER CURSE (UNTIL DEATH)")
+
+        if not parts:
             return
 
-        label = " + ".join(sorted(self.active_cheats)).upper()
-        text = f"CHEATS ACTIVE: {label}"
+        text = "  |  ".join(parts)
+        banner_color = ui.COLOR_RED if is_cursed else ui.COLOR_NEON_YELLOW
+        border_color = (*banner_color, 200)
 
         font = ui.get_scaled_font(
             text,
             max_width=screen.get_width() - 24,
-            base_size=18,
+            base_size=16,
         )
-        surf = font.render(text, True, ui.COLOR_NEON_YELLOW)
+        surf = font.render(text, True, banner_color)
         rect = surf.get_rect(
             midbottom=(screen.get_width() // 2, screen.get_height() - 8)
         )
@@ -752,13 +853,13 @@ class PlayingState(State):
         bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
         pygame.draw.rect(
             bubble,
-            (0, 0, 0, 170),
+            (0, 0, 0, 180),
             bubble.get_rect(),
             border_radius=8,
         )
         pygame.draw.rect(
             bubble,
-            (*ui.COLOR_NEON_YELLOW, 200),
+            border_color,
             bubble.get_rect(),
             width=1,
             border_radius=8,
@@ -803,15 +904,22 @@ class PlayingState(State):
         w = max(surf1.get_width(), surf2.get_width()) + 20
         h = surf1.get_height() + surf2.get_height() + 10
         cx = screen.get_width() // 2
+        has_banner = bool(
+            self.active_cheats
+            or self.timed_effects
+            or self.hunter_cursed_until_death
+        )
         bottom_y = (
-            screen.get_height() - 26 if self.active_cheats else screen.get_height() - 8
+            screen.get_height() - 28 if has_banner else screen.get_height() - 8
         )
 
         bubble_rect = pygame.Rect(0, 0, w, h)
         bubble_rect.midbottom = (cx, bottom_y)
 
         bubble = pygame.Surface(bubble_rect.size, pygame.SRCALPHA)
-        pygame.draw.rect(bubble, (0, 0, 0, 200), bubble.get_rect(), border_radius=8)
+        pygame.draw.rect(
+            bubble, (0, 0, 0, 200), bubble.get_rect(), border_radius=8
+        )
         pygame.draw.rect(
             bubble,
             (*ui.COLOR_NEON_CYAN, 220),
@@ -823,7 +931,8 @@ class PlayingState(State):
         screen.blit(bubble, bubble_rect.topleft)
         screen.blit(surf1, surf1.get_rect(midtop=(cx, bubble_rect.top + 4)))
         screen.blit(
-            surf2, surf2.get_rect(midtop=(cx, bubble_rect.top + 4 + surf1.get_height()))
+            surf2,
+            surf2.get_rect(midtop=(cx, bubble_rect.top + 4 + surf1.get_height())),
         )
 
     def give_target(self, ghost: Any) -> None:
@@ -880,7 +989,12 @@ class PlayingState(State):
                     self.msg_timer = 2
                     player.trigger_attack()
                 else:
-                    if expired(self.player_invincible_until):
+                    is_invincible = (
+                        "invincible" in self.active_cheats
+                        or self.timed_effects.get("invincible", 0.0) > 0
+                        or not expired(self.player_invincible_until)
+                    )
+                    if not is_invincible:
                         self.game.sound_manager.play_sound("player_death")
                         self.game.lives -= 1
                         if self.game.lives <= 0:
@@ -897,5 +1011,28 @@ class PlayingState(State):
                         self.ai_last_decision_cell = None
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0
+
+                        # Lift hunter curse upon death if active
+                        if self.hunter_cursed_until_death:
+                            self.hunter_cursed_until_death = False
+                            print(
+                                "💀 [GAMBLE] Ghost Hunter curse lifted upon death!"
+                            )
+                            if "ghost hunter" not in self.active_cheats:
+                                for g in ghosts:
+                                    g.speed = round(
+                                        self.player_speed
+                                        * GHOST_SPEED_RATIO_NORMAL,
+                                        2,
+                                    )
+
+                        # Expire gamble temporary boosts upon death
+                        if (
+                            "speed boost" in self.timed_effects
+                            and "speed boost" not in self.active_cheats
+                        ):
+                            player.speed = self.player_speed
+                        self.timed_effects.clear()
+
                         for ghost in ghosts:
                             ghost.reset()

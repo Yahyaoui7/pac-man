@@ -31,6 +31,7 @@ class InputState:
     speed_boost: bool = False
     extra_life: bool = False
     skip_level: bool = False
+    ai_player: bool = False
 
 
 class InputManager:
@@ -52,11 +53,20 @@ class InputManager:
         self.state.confirm_pressed = False
         self.state.cancel_pressed = False
         keys = pygame.key.get_pressed()
+        ctrl_pressed = keys[pygame.K_LCTRL] or keys[pygame.K_RCTRL]
 
-        self.state.move_up = keys[pygame.K_UP] or keys[pygame.K_w]
-        self.state.move_down = keys[pygame.K_DOWN] or keys[pygame.K_s]
-        self.state.move_left = keys[pygame.K_LEFT] or keys[pygame.K_a]
-        self.state.move_right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
+        self.state.move_up = keys[pygame.K_UP] or (
+            keys[pygame.K_w] and not ctrl_pressed
+        )
+        self.state.move_down = keys[pygame.K_DOWN] or (
+            keys[pygame.K_s] and not ctrl_pressed
+        )
+        self.state.move_left = keys[pygame.K_LEFT] or (
+            keys[pygame.K_a] and not ctrl_pressed
+        )
+        self.state.move_right = keys[pygame.K_RIGHT] or (
+            keys[pygame.K_d] and not ctrl_pressed
+        )
 
         self.state.mouse_pos = pygame.mouse.get_pos()
         self.state.mouse_pressed = pygame.mouse.get_pressed()[0]
@@ -66,6 +76,7 @@ class InputManager:
         self.state.speed_boost = False
         self.state.extra_life = False
         self.state.skip_level = False
+        self.state.ai_player = False
 
         for event in events:
 
@@ -73,17 +84,21 @@ class InputManager:
                 self.state.quit_requested = True
 
             elif event.type == pygame.KEYDOWN:
+                ctrl_mask = (
+                    pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL
+                )
+                is_ctrl = bool(event.mod & ctrl_mask)
 
-                if event.key in (pygame.K_UP, pygame.K_w):
+                if event.key in (pygame.K_UP, pygame.K_w) and not is_ctrl:
                     self.state.move_up_pressed = True
 
-                elif event.key in (pygame.K_DOWN, pygame.K_s):
+                elif event.key in (pygame.K_DOWN, pygame.K_s) and not is_ctrl:
                     self.state.move_down_pressed = True
 
-                elif event.key in (pygame.K_LEFT, pygame.K_a):
+                elif event.key in (pygame.K_LEFT, pygame.K_a) and not is_ctrl:
                     self.state.move_left_pressed = True
 
-                elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                elif event.key in (pygame.K_RIGHT, pygame.K_d) and not is_ctrl:
                     self.state.move_right_pressed = True
 
                 elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
@@ -93,6 +108,9 @@ class InputManager:
                 elif event.key == pygame.K_ESCAPE:
                     self.state.pause_pressed = True
                     self.state.cancel_pressed = True
+
+                elif event.key == pygame.K_a and is_ctrl:
+                    self.state.ai_player = True
 
                 elif event.key == pygame.K_k:
                     self.state.skip_level = True

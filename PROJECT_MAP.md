@@ -27,13 +27,13 @@ User / CLI (pac_man.py)
 ### Core Game Engine (`src/`)
 
 - **`pac_man.py`**:
-  Application entry point with argument parsing (`--ai-player`, `--ai-ghosts`, `--no-search`, `--checkpoint`), terminal banner, and game lifecycle launcher.
+  Clean application entry point running the game directly with level configuration.
 
 - **`src/game_loop.py`**:
-  `GameStarter` coordinator managing Pygame windowing, frame rate, global state transitions, and audio/entity initialization.
+  `GameStarter` coordinator managing Pygame windowing, frame rate, and global state transitions.
 
 - **`src/graphics/states/playing.py`**:
-  Active gameplay state handling frame updates, collision detection, real-time AI inference triggers, cheat activations, and HUD status rendering.
+  Active gameplay state handling frame updates, collision detection, real-time AI inference triggers, in-game cheat activations (`Ctrl + A` for AI Autopilot, `I`, `F`, `B`, `L`, `K`), and HUD rendering.
 
 - **`src/logic/movement.py`**:
   `MovementSystem` managing directional wall checks, grid snapping, BFS pathfinding for hunting ghosts, and flee vectors for frightened ghosts.

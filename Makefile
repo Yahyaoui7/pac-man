@@ -1,33 +1,10 @@
-.PHONY: install run run-ai run-ai-fast run-ghost-ai run-full-ai debug clean lint lint-strict help
-
-help:
-	@echo "Neon Pac-Man Arcade & AI Commands:"
-	@echo "  make install       - Install dependencies using uv"
-	@echo "  make run           - Launch game in Manual mode"
-	@echo "  make run-ai        - Launch with AI Pac-Man (Lookahead Search + Neural Net)"
-	@echo "  make run-ai-fast   - Launch with AI Pac-Man (Pure 1-step Neural Net)"
-	@echo "  make run-ghost-ai  - Launch with AI Ghosts"
-	@echo "  make run-full-ai   - Launch with AI Pac-Man vs AI Ghosts"
-	@echo "  make clean         - Clean temporary cache files"
-	@echo "  make lint          - Run flake8 and mypy checks"
+.PHONY: install run debug clean lint lint-strict
 
 install:
 	uv sync
 
 run:
 	uv run python pac_man.py config.json
-
-run-ai:
-	uv run python pac_man.py config.json --ai-player
-
-run-ai-fast:
-	uv run python pac_man.py config.json --ai-player --no-search
-
-run-ghost-ai:
-	uv run python pac_man.py config.json --ai-ghosts
-
-run-full-ai:
-	uv run python pac_man.py config.json --ai-player --ai-ghosts
 
 debug:
 	uv run python -m pdb -m pac_man.py config.json

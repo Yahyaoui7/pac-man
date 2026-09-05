@@ -65,43 +65,11 @@ class PlayingState(State):
 
         curr_idx = self.game.level_manager.current_level_index
         self.movement = MovementSystem(self.maze)
-        self.use_cnn_ghosts = getattr(self.game, "use_ai_ghosts", False)
-        if self.use_cnn_ghosts:
-            ghost_ckpt = getattr(self.game, "ghost_ai_checkpoint", None)
-            from AI_arena.ghosts.ghost_controller import (
-                DEFAULT_MODEL_PATH,
-                QUANTIZED_MODEL_PATH,
-            )
-            has_weights = (
-                Path(ghost_ckpt).exists()
-                if ghost_ckpt
-                else (Path(QUANTIZED_MODEL_PATH).exists() or Path(DEFAULT_MODEL_PATH).exists())
-            )
-            if not has_weights:
-                print("👻 Ghost AI weights not found on this machine; falling back to classic/scripted movement.")
-                self.ghost_controller = None
-                self.use_cnn_ghosts = False
-            else:
-                try:
-                    self.ghost_controller = (
-                        CNNGhostController(model_path=ghost_ckpt)
-                        if ghost_ckpt
-                        else CNNGhostController()
-                    )
-                    if hasattr(self.ghost_controller, "init_observation"):
-                        self.ghost_controller.init_observation(self.maze)
-                    print("👻 Ghost AI neural network controller active.")
-                except (FileNotFoundError, RuntimeError, ValueError) as exc:
-                    print(f"Ghost CNN unavailable; using scripted movement: {exc}")
-                    self.ghost_controller = None
-                    self.use_cnn_ghosts = False
-        else:
-            self.ghost_controller = None
+        self.use_cnn_ghosts = False
+        self.ghost_controller = None
 
-        use_search = not getattr(self.game, "player_ai_no_search", False)
-        ckpt = getattr(self.game, "player_ai_checkpoint", None)
         try:
-            self.player_controller = CNNPlayerController(model_path=ckpt, use_search=use_search)
+            self.player_controller = CNNPlayerController(use_search=True)
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
             print(f"Player RL model unavailable: {exc}")
             self.player_controller = None
@@ -135,14 +103,6 @@ class PlayingState(State):
             self.game.state_manager.push_state(PauseState(self.game, self))
             return
 
-        for event in events:
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_p, pygame.K_a):
-                self.use_ai_player = not self.use_ai_player
-                status = "AI PAC-MAN: ON" if self.use_ai_player else "MANUAL CONTROL"
-                self.msg_text = status
-                self.msg_timer = 1.5
-                print(f"🎮 {status}")
-
         self._handle_input(input_state)
         self._update_entities()
         self._check_level_end()
@@ -170,6 +130,8 @@ class PlayingState(State):
             self._toggle_cheat("speed boost")
         elif input_state.ghost_freez:
             self._toggle_cheat("ghost freeze")
+        elif input_state.ai_player:
+            self._toggle_cheat("ai pacman")
 
         if input_state.action_pressed:
             player.use_ability()
@@ -188,6 +150,12 @@ class PlayingState(State):
         elif name == "speed boost":
             player = self.game.entity_manager.player
             player.speed = self.player_speed * 2 if turning_on else self.player_speed
+        elif name == "ai pacman":
+            self.use_ai_player = turning_on
+            status = "CHEAT: AI PAC-MAN ON" if turning_on else "CHEAT: AI PAC-MAN OFF"
+            self.msg_text = status
+            self.msg_timer = 2.0
+            print(f"🤖 {status}")
 
     def _update_entities(self) -> None:
         em = self.game.entity_manager

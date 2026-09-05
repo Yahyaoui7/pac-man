@@ -104,6 +104,7 @@ class InstructionsState(State):
             ("B", "Speed Boost"),
             ("L", "Extra Life"),
             ("K", "Skip Level"),
+            ("Ctrl+A", "AI Pac-Man"),
         ]
 
         start_x = panel_left + 50

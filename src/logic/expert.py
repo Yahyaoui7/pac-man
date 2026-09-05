@@ -113,6 +113,13 @@ class PacmanExpert:
 
         current_direction = player.direction
 
+        # Nearby pellets for fast leaf evaluation (search horizon is short)
+        nearby_pellets = [
+            pos
+            for pos in pellet_cells
+            if abs(pos[0] - start[0]) + abs(pos[1] - start[1]) <= 14
+        ]
+
         def nearest_ghost_distance(
             cell: tuple[int, int],
         ) -> int:
@@ -144,19 +151,19 @@ class PacmanExpert:
             # -----------------------------------------------------
 
             if depth >= self.horizon:
-                remaining_pellets = [
-                    pellet for pellet in pellet_cells if pellet not in eaten
+                remaining = [
+                    p for p in nearby_pellets if p not in eaten
                 ]
 
-                if not remaining_pellets:
-                    return 100.0
+                if not remaining:
+                    return 0.0
 
                 distances = distances_from(cell)
 
                 nearest_pellet = min(
                     (
                         distances[y * width + x]
-                        for y, x in remaining_pellets
+                        for y, x in remaining
                         if distances[y * width + x] >= 0
                     ),
                     default=50,

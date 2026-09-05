@@ -145,7 +145,6 @@ class PlayingState(State):
                 self.game.entity_manager.player.speed = self.player_speed
             self.msg_text = f"SPECIAL EFFECT: {effect.upper()} EXPIRED"
             self.msg_timer = 1.5
-            print(f"⌛ [SPECIAL EFFECT] Expired: {effect}")
 
         self._handle_input(input_state)
         self._update_entities()
@@ -431,7 +430,6 @@ class PlayingState(State):
         """Triggered when a special gamble pellet appears in the maze."""
         self.msg_text = "SPECIAL PELLET SPAWNED!"
         self.msg_timer = 2.5
-        print("✨ [SPECIAL EFFECT] Special Mystery Pellet spawned in the maze!")
 
     def on_special_pellet_eaten(self) -> None:
         """Triggered when player eats a special mystery pellet (pellet == 3).
@@ -449,20 +447,17 @@ class PlayingState(State):
             self.timed_effects["invincible"] = 10.0
             self.msg_text = "SPECIAL EFFECT: INVINCIBLE (10s)"
             self.msg_timer = 2.5
-            print("✨ [SPECIAL EFFECT] Rolled: INVINCIBLE for 10.0s!")
 
         elif chosen == "speed boost":
             self.timed_effects["speed boost"] = 10.0
             self.game.entity_manager.player.speed = self.player_speed * 2
             self.msg_text = "SPECIAL EFFECT: SPEED BOOST (10s)"
             self.msg_timer = 2.5
-            print("✨ [SPECIAL EFFECT] Rolled: SPEED BOOST for 10.0s!")
 
         elif chosen == "ghost freeze":
             self.timed_effects["ghost freeze"] = 10.0
             self.msg_text = "SPECIAL EFFECT: GHOST FREEZE (10s)"
             self.msg_timer = 2.5
-            print("✨ [SPECIAL EFFECT] Rolled: GHOST FREEZE for 10.0s!")
 
         elif chosen == "ghost hunter":
             self.hunter_cursed_until_death = True
@@ -472,7 +467,6 @@ class PlayingState(State):
                 )
             self.msg_text = "SPECIAL EFFECT: GHOST HUNTER (UNTIL DEATH)"
             self.msg_timer = 3.0
-            print("💀 [SPECIAL EFFECT] Rolled: GHOST HUNTER active until death!")
 
     def draw(self, screen: pygame.Surface) -> None:
         self._draw_maze_panel(screen)
@@ -1019,9 +1013,6 @@ class PlayingState(State):
                                 "SPECIAL EFFECT: GHOST HUNTER LIFTED"
                             )
                             self.msg_timer = 2.0
-                            print(
-                                "💀 [SPECIAL EFFECT] Ghost Hunter curse lifted upon death!"
-                            )
                             if "ghost hunter" not in self.active_cheats:
                                 for g in ghosts:
                                     g.speed = round(

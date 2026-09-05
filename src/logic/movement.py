@@ -1,9 +1,28 @@
 from collections import deque
+from dataclasses import dataclass
 from typing import List, Optional, Any, Tuple
 
 from src.graphics.entitys.entity import Entity
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 import random
+
+
+@dataclass
+class _PredictivePlayer:
+    grid_y: int
+    grid_x: int
+    direction: str
+    next_direction: str
+    powered_timer: float
+
+
+@dataclass
+class _PredictiveEnv:
+    movement: Any
+    player: Any
+    maze: Any
+    pellets: Any
+    ghosts: Any
 
 
 class MovementSystem:
@@ -19,7 +38,6 @@ class MovementSystem:
     def clear_cache(self) -> None:
         """Clear precomputed distance cache if maze structure changes."""
         self._dist_cache.clear()
-
 
     def set_direction(self, entity: Entity, direction: str) -> None:
         """Set entity direction and convert it to grid_y/grid_x movement."""
@@ -381,6 +399,112 @@ class MovementSystem:
         """Move ghost toward player when ghost is not edible."""
         self.pattern_42 = None
         self._navigate_bfs(ghost, player.grid_y, player.grid_x)
+
+    def update_predictive_ghost(
+        self,
+        ghost: Any,
+        player: Any,
+        lookahead: int,
+        maze: Optional[Any] = None,
+        pellets: Optional[Any] = None,
+        ghosts: Optional[Any] = None,
+    ) -> None:
+        """Predict Pac-Man's future position and navigate the ghost toward it."""
+        self.pattern_42 = None
+
+        DIRECTION_DELTA: dict[str, tuple[int, int]] = {
+            "UP": (-1, 0),
+            "DOWN": (1, 0),
+            "LEFT": (0, -1),
+            "RIGHT": (0, 1),
+        }
+
+        def get_valid_directions(y: int, x: int) -> list[str]:
+            valid = []
+            for d in DIRECTION_DELTA:
+                if self.can_move(y, x, d):
+                    valid.append(d)
+            return valid
+
+        direction = (
+            getattr(player, "next_direction", None) or player.direction
+        )
+        y, x = player.grid_y, player.grid_x
+
+        if lookahead > 0:
+            if self.can_move(y, x, direction):
+                dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
+                y += dy
+                x += dx
+                remaining = lookahead - 1
+            else:
+                remaining = lookahead
+        else:
+            remaining = 0
+
+        if (
+            remaining > 0
+            and maze is not None
+            and pellets is not None
+            and ghosts is not None
+        ):
+            try:
+                from src.logic.expert import PacmanExpert, DIRECTIONS
+
+                for _ in range(remaining):
+                    valid_directions = get_valid_directions(y, x)
+
+                    if not valid_directions:
+                        break
+
+                    if len(valid_directions) == 1:
+                        predicted_dir = valid_directions[0]
+                    else:
+
+                        fake_player = _PredictivePlayer(
+                            grid_y=y,
+                            grid_x=x,
+                            direction=direction,
+                            next_direction=direction,
+                            powered_timer=float(
+                                getattr(player, "powered_timer", 0.0)
+                            ),
+                        )
+
+                        fake_env = _PredictiveEnv(
+                            movement=self,
+                            player=fake_player,
+                            maze=maze,
+                            pellets=pellets,
+                            ghosts=ghosts,
+                        )
+
+                        expert = PacmanExpert(horizon=remaining)
+                        decision = expert.choose_action(fake_env)
+
+                        predicted_dir = DIRECTIONS[decision.action]
+
+                        if predicted_dir not in valid_directions:
+                            predicted_dir = valid_directions[0]
+
+                    dy, dx = DIRECTION_DELTA.get(predicted_dir, (0, 0))
+                    if self.can_move(y, x, predicted_dir):
+                        y += dy
+                        x += dx
+                        direction = predicted_dir
+                    else:
+                        break
+
+            except Exception:
+                dy, dx = DIRECTION_DELTA.get(direction, (0, 0))
+                for _ in range(remaining):
+                    if self.can_move(y, x, direction):
+                        y += dy
+                        x += dx
+                    else:
+                        break
+
+        self._navigate_bfs(ghost, y, x)
 
     def update_cnn_ghost(
         self,

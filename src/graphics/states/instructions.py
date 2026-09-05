@@ -104,12 +104,13 @@ class InstructionsState(State):
             ("B", "Speed Boost"),
             ("L", "Extra Life"),
             ("K", "Skip Level"),
+            ("H", "Ghost Hunter"),
             ("Ctrl+A", "AI Pac-Man"),
         ]
 
         start_x = panel_left + 50
-        start_y = 335
-        row_gap = 48
+        start_y = 330
+        row_gap = 42
         col_gap = 270
         for i, (key, desc) in enumerate(cheats):
             col = i % 2

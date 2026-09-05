@@ -40,6 +40,10 @@ class StateManager:
             return self.stack[-1]
         return None
 
+    @property
+    def current_state(self) -> State | None:
+        return self.current
+
     def change_state(self, state: State) -> None:
         while self.stack:
             self.stack.pop().exit()

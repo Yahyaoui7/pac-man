@@ -31,6 +31,9 @@ GHOST_LOOKAHEAD: dict[str, int] = {
     "Clyde": 5,
 }
 
+GHOST_SPEED_RATIO_NORMAL = 0.70
+GHOST_SPEED_RATIO_HUNTER = 0.80
+
 
 class PlayingState(State):
     """The active gameplay state handling movements, collisions, timers."""
@@ -91,6 +94,11 @@ class PlayingState(State):
         self.active_cheats = set()
         if getattr(self.game.config, "ghost_hunter", False):
             self._toggle_cheat("ghost hunter")
+        else:
+            for ghost in self.game.entity_manager.ghosts:
+                ghost.speed = round(
+                    self.player_speed * GHOST_SPEED_RATIO_NORMAL, 2
+                )
 
     def update(
         self,
@@ -175,8 +183,13 @@ class PlayingState(State):
             self.msg_timer = 2.0
             print(f"🤖 {status}")
         elif name == "ghost hunter":
+            ratio = (
+                GHOST_SPEED_RATIO_HUNTER
+                if turning_on
+                else GHOST_SPEED_RATIO_NORMAL
+            )
             for ghost in self.game.entity_manager.ghosts:
-                ghost.speed = 3.9 if turning_on else 1.5
+                ghost.speed = round(self.player_speed * ratio, 2)
             status = (
                 "CHEAT: GHOST HUNTER ON"
                 if turning_on
@@ -304,7 +317,10 @@ class PlayingState(State):
 
                 else:
                     predicted_direction = self.ghost_predictions.get(gst.name)
-                    if controller is not None and predicted_direction is not None:
+                    if (
+                        controller is not None
+                        and predicted_direction is not None
+                    ):
                         self.ghost_decision_sources[gst.name] = "CNN"
                         if gst.name in decision_names:
                             self.movement.update_cnn_ghost(
@@ -322,7 +338,9 @@ class PlayingState(State):
                             self.ghost_decision_sources[gst.name] = (
                                 f"HUNTER+{lookahead}"
                             )
-                            gst.speed = 3.9
+                            gst.speed = round(
+                                self.player_speed * GHOST_SPEED_RATIO_HUNTER, 2
+                            )
                             self.movement.update_predictive_ghost(
                                 gst,
                                 em.player,
@@ -332,7 +350,9 @@ class PlayingState(State):
                                 em.ghosts,
                             )
                         else:
-                            gst.speed = 1.5
+                            gst.speed = round(
+                                self.player_speed * GHOST_SPEED_RATIO_NORMAL, 2
+                            )
                             self.ghost_decision_sources[gst.name] = "BFS"
                             self.movement.update_bfs_ghost(gst, em.player)
         self.check_collision(em.player, em.ghosts)

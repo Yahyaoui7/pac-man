@@ -169,8 +169,7 @@ class RewardCalculator:
     ) -> None:
         grace = 25
         if steps_since_pellet > grace:
-            extra = min(3.0, (steps_since_pellet - grace) * 0.05)
-            breakdown["hunger"] = -0.3 - extra
+            breakdown["hunger"] = -0.5
 
     def _pellet_reward(
         self, events: dict[str, bool], frac: float, breakdown: dict[str, float]
@@ -559,7 +558,7 @@ class RewardCalculator:
         # self._momentum_reward(events, same_action_count, breakdown)
 
         # ── Active completion urgency & pathing shaping ──
-        self._milestone_reward(frac, breakdown)
+        # self._milestone_reward(frac, breakdown)
         self._hunger_penalty(steps_since_pellet, breakdown)
         self._zone_stagnation_penalty(
             px, py, events, bfs_shaping, threat_dist, breakdown, super_pellet_nearby

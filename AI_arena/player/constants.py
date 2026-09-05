@@ -25,7 +25,7 @@ MAZE_STEP_MULTIPLIER = 14.0
 
 STEP_REWARD = -0.1
 DEATH_REWARD = -75.0  # Balanced penalty for faster ghost survival pressure
-OSCILLATION_REWARD = -2.0  # Soft direction-flip penalty when safe
+OSCILLATION_REWARD = -1.0  # Soft direction-flip penalty when safe
 COMPLETION_REWARD = 1000.0
 EAT_GHOST_REWARD = 100.0  # High reward to turn power pellets into aggressive clearing weapons
 PELLET_REWARD = 1.5  # Base pellet clearing incentive

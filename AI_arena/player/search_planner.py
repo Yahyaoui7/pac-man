@@ -119,6 +119,7 @@ class PacmanLookaheadSearch:
         player: Any = None,
         ghosts: list[Any] | None = None,
         pellets: list[list[int]] | None = None,
+        prev_action: int | None = None,
     ) -> dict[int, float]:
         """Evaluate all candidate initial actions using beam lookahead search.
 
@@ -133,6 +134,12 @@ class PacmanLookaheadSearch:
 
         py, px = curr_player.grid_y, curr_player.grid_x
         powered_timer = float(getattr(curr_player, "powered_timer", 0.0))
+
+        # Precompute or retrieve BFS distance grid to remaining pellets
+        if self.env is not None and hasattr(self.env, "_pellet_dist_grid") and self.env._pellet_dist_grid:
+            pellet_dist_grid = self.env._pellet_dist_grid
+        else:
+            pellet_dist_grid = self._compute_pellet_distance_grid(curr_pellets)
 
         # Extract current active ghost states
         active_ghosts: list[dict[str, Any]] = []
@@ -166,7 +173,21 @@ class PacmanLookaheadSearch:
             rem_pellets = self.env.remaining_pellets
         else:
             rem_pellets = sum(1 for row in curr_pellets for cell in row if cell in (1, 2))
-        is_endgame = rem_pellets <= 15
+
+        total_pellets = (
+            self.env.total_pellets
+            if (self.env is not None and hasattr(self.env, "total_pellets") and self.env.total_pellets > 0)
+            else sum(1 for row in curr_pellets for cell in row if cell in (1, 2))
+        )
+        is_endgame = (rem_pellets <= 25) or (total_pellets > 0 and (rem_pellets / total_pellets) <= 0.25)
+        pellet_prog_weight = 2.5 if is_endgame else 1.0
+
+        # Current distance to nearest pellet
+        cur_p_d = (
+            pellet_dist_grid[py][px]
+            if (pellet_dist_grid and 0 <= py < len(pellet_dist_grid) and 0 <= px < len(pellet_dist_grid[0]))
+            else -1
+        )
 
         # Initialize beam with all legal first moves
         beam: list[tuple[float, list[int], tuple[int, int], dict[tuple[int, int], float], list[dict[str, Any]], float]] = []
@@ -192,7 +213,44 @@ class PacmanLookaheadSearch:
                 is_super = True
 
             new_pwr = 45.0 if is_super else max(0.0, powered_timer - 0.8)
-            init_score = pellet_val + eaten_g * 100.0
+
+            # Pellet distance progress at root
+            new_p_d = (
+                pellet_dist_grid[ny][nx]
+                if (pellet_dist_grid and 0 <= ny < len(pellet_dist_grid) and 0 <= nx < len(pellet_dist_grid[0]))
+                else -1
+            )
+            dist_prog = float(cur_p_d - new_p_d) if (cur_p_d >= 0 and new_p_d >= 0) else 0.0
+
+            min_g_d_root = min(
+                (
+                    abs(g["pos"][0] - ny) + abs(g["pos"][1] - nx)
+                    for g in sim_ghosts
+                    if not g["edible"] and g["pos"][0] >= 0
+                ),
+                default=999,
+            )
+
+            # Directional persistence & anti-oscillation penalty at root
+            momentum = 0.20 if (prev_action is not None and a == prev_action) else 0.0
+            anti_rev = (
+                -3.0
+                if (
+                    prev_action is not None
+                    and a == self.REVERSE_ACTION.get(prev_action)
+                    and min_g_d_root > 3
+                    and pellet_val == 0.0
+                )
+                else 0.0
+            )
+
+            init_score = (
+                pellet_val
+                + eaten_g * 100.0
+                + (dist_prog * pellet_prog_weight)
+                + momentum
+                + anti_rev
+            )
             beam.append(
                 (
                     init_score,
@@ -222,7 +280,7 @@ class PacmanLookaheadSearch:
                     if self.movement.can_move(pos[0], pos[1], self.DIRECTIONS[a])
                 ]
 
-                # Anti-oscillation: prune immediate 180-degree reversal unless trapped or threatened
+                # Anti-oscillation: prune immediate 180-degree reversal inside beam unless trapped or threatened
                 if (
                     len(nbr_actions) > 1
                     and self.REVERSE_ACTION[last_a] in nbr_actions
@@ -264,6 +322,19 @@ class PacmanLookaheadSearch:
                     new_visited = dict(visited_p)
                     new_visited[(ny, nx)] = pellet_val
 
+                    # Step pellet distance progress along 12-step path
+                    pos_pd = (
+                        pellet_dist_grid[pos[0]][pos[1]]
+                        if (pellet_dist_grid and 0 <= pos[0] < len(pellet_dist_grid) and 0 <= pos[1] < len(pellet_dist_grid[0]))
+                        else -1
+                    )
+                    next_pd = (
+                        pellet_dist_grid[ny][nx]
+                        if (pellet_dist_grid and 0 <= ny < len(pellet_dist_grid) and 0 <= nx < len(pellet_dist_grid[0]))
+                        else -1
+                    )
+                    step_prog = float(pos_pd - next_pd) if (pos_pd >= 0 and next_pd >= 0) else 0.0
+
                     # Safety distance to nearest non-edible ghost
                     min_g_d = min(
                         (
@@ -281,8 +352,16 @@ class PacmanLookaheadSearch:
                         if min_g_d <= dist_to_j * 1.5 + 2:
                             dead_end_penalty = -100.0
 
-                    safety_bonus = min(min_g_d, 6) * 0.3 + dead_end_penalty
-                    step_score = score + pellet_val + eaten_g * 100.0 + safety_bonus
+                    safety_bonus = (min(min_g_d, 6) * 0.15 if not is_endgame else 0.0) + dead_end_penalty
+                    beam_momentum = 0.10 if a == last_a else 0.0
+                    step_score = (
+                        score
+                        + pellet_val
+                        + eaten_g * 100.0
+                        + (step_prog * pellet_prog_weight)
+                        + safety_bonus
+                        + beam_momentum
+                    )
 
                     next_beam.append(
                         (
@@ -302,23 +381,20 @@ class PacmanLookaheadSearch:
             beam = next_beam[: self.beam_width]
 
         # Evaluate leaf states
-        if self.env is not None and hasattr(self.env, "_pellet_dist_grid") and self.env._pellet_dist_grid:
-            pellet_dist_grid = self.env._pellet_dist_grid
-        else:
-            pellet_dist_grid = self._compute_pellet_distance_grid(curr_pellets)
-
         for score, path, final_pos, visited_p, g_states, pwr in beam:
             first_action = path[0]
             final_eval = score
 
-            # Pellet distance potential
+            # Pellet distance potential at leaf
             if pellet_dist_grid is not None:
-                p_dist = pellet_dist_grid[final_pos[0]][final_pos[1]]
-                if p_dist >= 0:
-                    weight = 0.25 if is_endgame else 0.1
-                    final_eval += (50.0 - p_dist) * weight
+                fy, fx = final_pos
+                if 0 <= fy < len(pellet_dist_grid) and 0 <= fx < len(pellet_dist_grid[0]):
+                    p_dist = pellet_dist_grid[fy][fx]
+                    if p_dist >= 0:
+                        leaf_weight = 2.0 if is_endgame else 0.8
+                        final_eval += (50.0 - p_dist) * leaf_weight
 
-            # Exit mobility bonus
+            # Dead-end penalty check at leaf (only penalize being in dead-end if ghost is near)
             exits = sum(
                 1
                 for a, (dy, dx) in self.ACTION_DELTAS.items()
@@ -326,7 +402,17 @@ class PacmanLookaheadSearch:
                     final_pos[0], final_pos[1], self.DIRECTIONS[a]
                 )
             )
-            final_eval += exits * 0.5
+            if exits <= 1 and pwr <= 0:
+                min_g_d = min(
+                    (
+                        abs(g["pos"][0] - final_pos[0]) + abs(g["pos"][1] - final_pos[1])
+                        for g in g_states
+                        if not g["edible"] and g["pos"][0] >= 0
+                    ),
+                    default=999,
+                )
+                if min_g_d <= 4:
+                    final_eval -= 50.0
 
             action_leaf_scores[first_action].append(final_eval)
 
@@ -345,9 +431,12 @@ class PacmanLookaheadSearch:
         player: Any = None,
         ghosts: list[Any] | None = None,
         pellets: list[list[int]] | None = None,
+        prev_action: int | None = None,
     ) -> int:
         """Return the single best discrete action chosen by lookahead search."""
-        scores = self.get_action_scores(player=player, ghosts=ghosts, pellets=pellets)
+        scores = self.get_action_scores(
+            player=player, ghosts=ghosts, pellets=pellets, prev_action=prev_action
+        )
         return int(max(scores, key=lambda a: scores[a]))
 
     def get_action_distribution(
@@ -356,9 +445,12 @@ class PacmanLookaheadSearch:
         ghosts: list[Any] | None = None,
         pellets: list[list[int]] | None = None,
         temperature: float = 1.0,
+        prev_action: int | None = None,
     ) -> torch.Tensor:
         """Return a softmax distribution over actions for policy distillation."""
-        scores = self.get_action_scores(player=player, ghosts=ghosts, pellets=pellets)
+        scores = self.get_action_scores(
+            player=player, ghosts=ghosts, pellets=pellets, prev_action=prev_action
+        )
         raw_vals = [scores.get(a, -1e4) for a in range(4)]
         t_vals = torch.tensor(raw_vals, dtype=torch.float32)
         valid_mask = t_vals > -500.0

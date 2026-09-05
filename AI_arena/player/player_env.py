@@ -254,8 +254,8 @@ class PacmanPlayerEnv:
             if self.start_pellets is not None:
                 # Curriculum mode: cap proportionally to actual pellets spawned so episodes end fast if agent gets lost
                 n_actual = (
-                    len(self.pellets)
-                    if self.pellets
+                    self.total_pellets
+                    if self.total_pellets > 0
                     else (max(self.start_pellets) if self.start_pellets else 8)
                 )
                 tight_budget = n_actual * 65 + (maze_w + maze_h) * 4
@@ -514,14 +514,6 @@ class PacmanPlayerEnv:
                     events["cleared_region"] = True
                     self.cleared_regions.add(self.last_region)
             self.last_region = curr_region
-        else:
-            # If Pac-Man did not advance to a new cell center (e.g. wall bump or stopped mid-tile)
-            # and flipped directions or toggled repeatedly on an empty cell:
-            if is_action_reversal and not (
-                events["pellet_eaten"] or events["super_pellet_eaten"]
-            ):
-                events["oscillating"] = True
-                self._osc_count += 1
 
         if had_adjacent_pellet and not (
             events["pellet_eaten"] or events["super_pellet_eaten"] or events["pacman_died"]
@@ -1247,7 +1239,7 @@ class PacmanPlayerEnv:
         from AI_arena.player.search_planner import PacmanLookaheadSearch
 
         searcher = PacmanLookaheadSearch(self, horizon=horizon)
-        return searcher.get_best_action()
+        return searcher.get_best_action(prev_action=self.last_action)
 
     def get_search_distribution(
         self, horizon: int = 12, temperature: float = 1.0
@@ -1256,5 +1248,7 @@ class PacmanPlayerEnv:
         from AI_arena.player.search_planner import PacmanLookaheadSearch
 
         searcher = PacmanLookaheadSearch(self, horizon=horizon)
-        return searcher.get_action_distribution(temperature=temperature)
+        return searcher.get_action_distribution(
+            temperature=temperature, prev_action=self.last_action
+        )
 

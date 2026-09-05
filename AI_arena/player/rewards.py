@@ -550,19 +550,19 @@ class RewardCalculator:
         self._super_pellet_reward(events, powered, close_threats, breakdown)
         self._bfs_shaping(bfs_shaping, breakdown)
         self._ghost_eat_reward(events, breakdown)
-        # self._ghost_proximity_penalty(
-        #     min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
-        # )
+        self._ghost_proximity_penalty(
+            min_ghost_dist_after, min_ghost_dist_before, events, powered, breakdown
+        )
         self._oscillation_penalty(events, threat_dist, breakdown, explore_step)
         self._bypassed_pellet_penalty(events, threat_dist, breakdown)
-        # self._momentum_reward(events, same_action_count, breakdown)
+        self._momentum_reward(events, same_action_count, breakdown)
 
         # ── Active completion urgency & pathing shaping ──
         # self._milestone_reward(frac, breakdown)
-        self._hunger_penalty(steps_since_pellet, breakdown)
-        self._zone_stagnation_penalty(
-            px, py, events, bfs_shaping, threat_dist, breakdown, super_pellet_nearby
-        )
+        # self._hunger_penalty(steps_since_pellet, breakdown)
+        # self._zone_stagnation_penalty(
+        #     px, py, events, bfs_shaping, threat_dist, breakdown, super_pellet_nearby
+        # )
         # self._evasion_skill_reward(min_ghost_dist_after, breakdown)
         # self._threat_mastery_reward(
         #     threatening, min_threat_dist, min_ghost_dist_after, powered, breakdown

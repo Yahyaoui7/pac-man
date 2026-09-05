@@ -121,6 +121,28 @@ class CNNPlayerController:
             maze, pellets, player, ghosts, movement_system
         )
 
+        if movement_system is not None and 0 <= py < height and 0 <= px < width:
+            bfs_p = movement_system.bfs_distances((py, px))
+            if bfs_p:
+                np_d = [
+                    bfs_p[gy * width + gx]
+                    for gy in range(height)
+                    for gx in range(width)
+                    if pellets[gy][gx] == 1
+                    and 0 <= gy * width + gx < len(bfs_p)
+                    and bfs_p[gy * width + gx] >= 0
+                ]
+                self.prev_nearest_pellet_dist = min(np_d) if np_d else -1.0
+                g_d = [
+                    bfs_p[g.grid_y * width + g.grid_x]
+                    for g in ghosts
+                    if not getattr(g, "in_prison", False)
+                    and not getattr(g, "is_edible", False)
+                    and 0 <= g.grid_y * width + g.grid_x < len(bfs_p)
+                    and bfs_p[g.grid_y * width + g.grid_x] >= 0
+                ]
+                self.prev_nearest_ghost_dist = min(g_d) if g_d else -1.0
+
         with torch.no_grad():
             # Pass hidden state into model, receive updated hidden state back
             logits, value, self._hidden = self.model(grid, extra_features, self._hidden)
@@ -159,11 +181,13 @@ class CNNPlayerController:
                 player=player,
                 ghosts=ghosts,
                 pellets=pellets,
+                prev_action=self.last_action_idx,
             )
             search_scores = self.search_planner.get_action_scores(
                 player=player,
                 ghosts=ghosts,
                 pellets=pellets,
+                prev_action=self.last_action_idx,
             )
         else:
             action_index = nn_action_index

@@ -105,7 +105,7 @@ class InstructionsState(State):
             ("L", "Extra Life"),
             ("K", "Skip Level"),
             ("H", "Ghost Hunter"),
-            ("Ctrl+A", "AI Pac-Man"),
+            ("Ctr+A", "AI Pac-Man"),
         ]
 
         start_x = panel_left + 50
@@ -122,7 +122,7 @@ class InstructionsState(State):
             screen.blit(ui.draw_bubble(key), (px, py))
             screen.blit(
                 ui.FONT_TEXT.render(desc, True, ui.COLOR_WHITE),
-                (px + 70, py + 8),
+                (px + 80, py + 8),
             )
 
         # Back button

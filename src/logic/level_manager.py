@@ -1,3 +1,4 @@
+import random
 from typing import Optional
 from mazegenerator import MazeGenerator  # type: ignore
 from src.logic.config import GameConfig, LevelConfig
@@ -47,6 +48,9 @@ class LevelManager:
                 height,
                 level_conf.seed,
             )
+            # MazeGenerator sets global random.seed(seed); reseed with system entropy
+            # so gameplay events (like special pellet rolls) are truly varied and random.
+            random.seed()
 
             self.remaining_time = float(level_conf.level_max_time)
             return True
@@ -66,6 +70,7 @@ class LevelManager:
                 height,
                 level_conf.seed,
             )
+            random.seed()
             self.remaining_time = float(level_conf.level_max_time)
             return True
 

@@ -1,65 +1,73 @@
-# Project Map
+# Project Map: Neon Pac-Man Arcade & AI Engine
 
-## Project Architecture
+## Runtime Architecture
 
-`UI -> Hooks -> Services -> Repositories -> Database`
-
-This project implements a Pac-Man game with Reinforcement Learning (PPO) and Supervised Learning (CNN) agents.
-
-> **RL documentation:** detailed, up-to-date docs for the RL system live in
-> [`AI_arena/docs/`](AI_arena/docs/README.md) (training loop, environment,
-> rewards, model/observation, evaluation & telemetry).
+```
+User / CLI (pac_man.py)
+  └── GameStarter (src/game_loop.py)
+        ├── StateManager (src/graphics/renderer.py)
+        │     └── PlayingState (src/graphics/states/playing.py)
+        │           ├── Player Controller:
+        │           │     ├── Human Input (src/logic/inputmanager.py)
+        │           │     └── AI Autopilot (CNNPlayerController + PacmanLookaheadSearch)
+        │           ├── Ghost Controllers:
+        │           │     ├── Neural Network AI (CNNGhostController)
+        │           │     └── Smart Scripted (BFS Pursuit / Edible Runaway)
+        │           └── Movement & Collisions (src/logic/movement.py)
+        ├── LevelManager (src/logic/level_manager.py)
+        ├── EntityManager (src/graphics/entitys/entity_manager.py)
+        ├── ScoreManager & HighScores (src/logic/score.py)
+        └── SoundManager (src/sounds/soud_manager.py)
+```
 
 ---
 
 ## File Index
 
-### `src/logic/movement.py`
-Purpose: Movement, wall checks, and BFS pathfinding for player & ghosts.
-Key exports:
-- `MovementSystem.__init__` -> initialize system and precompute static maze distance cache
-- `MovementSystem.clear_cache` -> clear precomputed distance cache
-- `MovementSystem.can_move` -> check if move in direction is valid
-- `MovementSystem.bfs_distances` -> return shortest distance array from source cell (O(1) cached)
-- `MovementSystem.bfs_distances_uncached` -> return distance array via direct BFS traversal
-- `MovementSystem.bfs_path` -> return shortest path list from start to target (O(path_len))
-- `MovementSystem.update_bfs_ghost` -> advance hunting ghost toward target
-- `MovementSystem.update_runaway_ghost` -> advance edible ghost away from player
+### Core Game Engine (`src/`)
 
-### `src/logic/level_manager.py`
-Purpose: Level configuration and procedural maze generation.
-Key exports:
-- `LevelManager.build_maze` -> generate procedural maze layout with specified dimensions
+- **`pac_man.py`**:
+  Application entry point with argument parsing (`--ai-player`, `--ai-ghosts`, `--no-search`, `--checkpoint`), terminal banner, and game lifecycle launcher.
 
-### `src/logic/config.py`
-Purpose: Constant definitions for wall bitmasks, cell dimensions, and colors.
-Key exports:
-- `CELL_SIZE` -> grid cell size in pixels
-- `NORTH, EAST, SOUTH, WEST` -> bitmasks for wall detection
+- **`src/game_loop.py`**:
+  `GameStarter` coordinator managing Pygame windowing, frame rate, global state transitions, and audio/entity initialization.
 
-### `AI_arena/player/player_env.py`
-Purpose: Headless Gymnasium-style environment for Pac-Man RL training.
-Key exports:
-- `PacmanPlayerEnv.__init__` -> initialize environment state and delegates
-- `PacmanPlayerEnv.reset` -> reset environment, generate maze, init distances
-- `PacmanPlayerEnv.step` -> execute step, update entities, compute rewards
+- **`src/graphics/states/playing.py`**:
+  Active gameplay state handling frame updates, collision detection, real-time AI inference triggers, cheat activations, and HUD status rendering.
 
-### `AI_arena/player/rewards.py`
-Purpose: Stage-dependent reward calculation engine for PPO policy.
-Key exports:
-- `RewardCalculator.calculate` -> evaluate step events and return total scalar reward
+- **`src/logic/movement.py`**:
+  `MovementSystem` managing directional wall checks, grid snapping, BFS pathfinding for hunting ghosts, and flee vectors for frightened ghosts.
 
-### `AI_arena/player/ghost_controller.py`
-Purpose: Ghost behavior management including respawn, frightened, and hunting states.
-Key exports:
-- `GhostController.update` -> update ghost states and directions per tick
+- **`src/logic/level_manager.py`**:
+  `LevelManager` providing procedural maze generation and level progression.
 
-### `AI_arena/player/data/observation.py`
-Purpose: Formats spatial grid and extra feature vectors for Pac-Man agent.
-Key exports:
-- `format_player_observation` -> return grid, extra features, and action mask tensors
+- **`src/logic/config.py`**:
+  Bitmasks (`NORTH`, `EAST`, `SOUTH`, `WEST`), tile geometry constants, and color definitions.
 
-### `AI_arena/data/formatter.py`
-Purpose: Centralized observation formatter for CNN models.
-Key exports:
-- `ObservationFormatter.format_observation` -> create unified CNN tensors
+---
+
+### AI Inference & Neural Engine (`AI_arena/`)
+
+- **`AI_arena/player/player_controller.py`**:
+  `CNNPlayerController` inference engine. Constructs live observations, queries the Actor-Critic model, applies action masks, integrates the lookahead search planner, and caches cell decisions to eliminate jitter.
+
+- **`AI_arena/player/search_planner.py`**:
+  `PacmanLookaheadSearch` high-performance lookahead search engine. Forward-simulates trajectories to evaluate ghost evasion, pellet yields, and dead-end traps.
+
+- **`AI_arena/ghosts/ghost_controller.py`**:
+  `CNNGhostController` running multi-ghost inference for Blinky, Pinky, Inky, and Clyde. Supports standard PyTorch weights or dynamic INT8 TorchScript models.
+
+- **`AI_arena/models/cnn_player.py`**:
+  `PlayerActorCritic` PyTorch model architecture and `load_checkpoint_into_policy` helper.
+
+- **`AI_arena/models/cnn_ghost.py`**:
+  `GhostCNN` PyTorch architecture predicting simultaneous moves for all active ghosts.
+
+- **`AI_arena/models/cnn_backbone.py`**:
+  `PacmanCNNBackbone` shared visual feature extractor with spatial convolutions and GRU recurrent memory.
+
+- **`AI_arena/player/data/observation.py`**:
+  Constructs live feature vectors (distances to nearest pellets, power pellets, ghosts, and visitation history) for the Pac-Man model.
+
+- **`AI_arena/data/formatter.py`**:
+  `ObservationFormatter` converting live grid geometry and entity positions into standardized 6-channel / 12-channel spatial tensors.

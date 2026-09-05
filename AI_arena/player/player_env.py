@@ -47,7 +47,7 @@ class PacmanPlayerEnv:
         maze_h_min: int | None = None,  # ← NEW
         maze_h_max: int | None = None,  # ← NEW
         start_pellets: tuple[int, ...] | None = None,  # ← completion curriculum
-        ghost_speed_ratio: float = 0.35,
+        ghost_speed_ratio: float = 0.5,
         ghost_confusion_prob: float = 0.0,
     ) -> None:
         if not pygame.get_init():
@@ -125,6 +125,10 @@ class PacmanPlayerEnv:
         # Completion curriculum: when set, each episode starts with one of
         # these pellet counts (chosen per reset) instead of the full map.
         self.start_pellets = start_pellets
+
+        # ── Dead-End Trap Lookahead State ──
+        self._dead_end_traps: dict[tuple[tuple[int, int], str], dict[str, Any]] = {}
+        self._cell_to_trap: dict[tuple[int, int], tuple[tuple[int, int], int]] = {}
 
         # ── Delegates ──
         self._reward_calc = RewardCalculator(stage=stage)
@@ -214,12 +218,12 @@ class PacmanPlayerEnv:
         # maze_w = self.rng.randint(mw_min, mw_max)
         # maze_h = self.rng.randint(mh_min, mh_max)
         # current_seed = self.rng.randint(1, 44444)
-
-        maze_w = 35
+        # REMOVE
+        maze_w = 25
         maze_h = 20
         # fixed_seeds = [20, 77, 1337, 42, 100]
         # current_seed = fixed_seeds[self.rng.randint(0, len(fixed_seeds) - 1)]
-        current_seed = 42
+        current_seed = 45
 
         maze_gen = LevelManager.build_maze(maze_w, maze_h, seed=current_seed)
         self.maze = maze_gen.maze
@@ -228,6 +232,7 @@ class PacmanPlayerEnv:
         # flee targets — reseed it so identical seeds give identical ghosts.
         self.movement.rng.seed(current_seed)
         self._ghost_ctrl.movement = self.movement
+        self._analyze_dead_ends()
 
         # Create Player and Ghosts
         self.player = EntityFactory.create_player(self.maze)
@@ -344,26 +349,13 @@ class PacmanPlayerEnv:
         start_y, start_x = start_cell
 
         had_adjacent_pellet = False
-        if (
-            self.movement is not None
-            and self.maze is not None
-            and self.pellets is not None
-        ):
+        if self.movement is not None and self.maze is not None and self.pellets is not None:
             h_m = len(self.maze)
             w_m = len(self.maze[0]) if h_m > 0 else 0
-            for d_name, (dy_o, dx_o) in (
-                ("UP", (-1, 0)),
-                ("DOWN", (1, 0)),
-                ("LEFT", (0, -1)),
-                ("RIGHT", (0, 1)),
-            ):
+            for d_name, (dy_o, dx_o) in (("UP", (-1, 0)), ("DOWN", (1, 0)), ("LEFT", (0, -1)), ("RIGHT", (0, 1))):
                 if self.movement.can_move(start_y, start_x, d_name):
                     ny_o, nx_o = start_y + dy_o, start_x + dx_o
-                    if (
-                        0 <= ny_o < h_m
-                        and 0 <= nx_o < w_m
-                        and self.pellets[ny_o][nx_o] in (1, 2)
-                    ):
+                    if 0 <= ny_o < h_m and 0 <= nx_o < w_m and self.pellets[ny_o][nx_o] == 1:
                         had_adjacent_pellet = True
                         break
 
@@ -458,8 +450,9 @@ class PacmanPlayerEnv:
         # ── Anti-oscillation & backtracking tracking ──
         # ── Oscillation & loop detection ──
         OPPOSITE_ACTION = {0: 1, 1: 0, 2: 3, 3: 2}
-        is_action_reversal = prev_action is not None and action == OPPOSITE_ACTION.get(
-            prev_action, -1
+        is_action_reversal = (
+            prev_action is not None
+            and action == OPPOSITE_ACTION.get(prev_action, -1)
         )
 
         if cell_changed:
@@ -475,18 +468,14 @@ class PacmanPlayerEnv:
                     last_c_exits = sum(
                         1
                         for d in DIRECTIONS
-                        if self.movement.can_move(
-                            self.last_cell[0], self.last_cell[1], d
-                        )
+                        if self.movement.can_move(self.last_cell[0], self.last_cell[1], d)
                     )
                 is_dead_end = last_c_exits <= 1
-                is_fleeing = threat_dist <= 3 and (
+                is_fleeing = threat_dist <= 6 and (
                     self.player is not None and self.player.powered_timer <= 0
                 )
-                if (
-                    not is_dead_end
-                    and not is_fleeing
-                    and not (events["pellet_eaten"] or events["super_pellet_eaten"])
+                if not is_dead_end and not is_fleeing and not (
+                    events["pellet_eaten"] or events["super_pellet_eaten"]
                 ):
                     events["oscillating"] = True
                     self._osc_count += 1
@@ -522,11 +511,7 @@ class PacmanPlayerEnv:
                 rem_old = self.region_pellets.get(self.last_region, 0)
                 if 0 < rem_old <= 2:
                     events["left_dirty_region"] = True
-                elif (
-                    rem_old == 0
-                    and self.last_region not in self.cleared_regions
-                    and self.region_pellets_initial.get(self.last_region, 0) > 0
-                ):
+                elif rem_old == 0 and self.last_region not in self.cleared_regions and self.region_pellets_initial.get(self.last_region, 0) > 0:
                     events["cleared_region"] = True
                     self.cleared_regions.add(self.last_region)
             self.last_region = curr_region
@@ -540,9 +525,7 @@ class PacmanPlayerEnv:
                 self._osc_count += 1
 
         if had_adjacent_pellet and not (
-            events["pellet_eaten"]
-            or events["super_pellet_eaten"]
-            or events["pacman_died"]
+            events["pellet_eaten"] or events["super_pellet_eaten"] or events["pacman_died"]
         ):
             events["bypassed_pellet"] = True
 
@@ -621,14 +604,28 @@ class PacmanPlayerEnv:
                 if events["pellet_eaten"] or events["super_pellet_eaten"]:
                     self._pellet_dist_grid = self._compute_pellet_distance_grid()
                 potential_after = self._potential_at(*current_pos)
-                bfs_shaping = (
-                    self.bfs_shaping_gamma * potential_after - potential_before
-                )
+                bfs_shaping = self.bfs_shaping_gamma * potential_after - potential_before
                 self._cached_potential = potential_after
 
         # ← NEW: mark truncation in events so reward calc can penalize incomplete
         truncated = self.step_count >= self.max_steps
         events["truncated"] = truncated
+
+        # Check if an uneaten super pellet is within Manhattan distance 4 of player
+        super_pellet_nearby = False
+        if self.pellets is not None and self.player is not None:
+            py_s, px_s = self.player.grid_y, self.player.grid_x
+            h_p, w_p = len(self.pellets), len(self.pellets[0])
+            for dy_s in range(-4, 5):
+                for dx_s in range(-4, 5):
+                    if abs(dy_s) + abs(dx_s) <= 4:
+                        ny_s, nx_s = py_s + dy_s, px_s + dx_s
+                        if 0 <= ny_s < h_p and 0 <= nx_s < w_p and self.pellets[ny_s][nx_s] == 2:
+                            super_pellet_nearby = True
+                            break
+                if super_pellet_nearby:
+                    break
+
         reward, breakdown = self._reward_calc.calculate(
             events=events,
             bfs_shaping=bfs_shaping,
@@ -646,6 +643,7 @@ class PacmanPlayerEnv:
             min_ghost_dist_before=min_ghost_dist_before,  # ← CRITICAL for evasion_skill
             same_action_count=self.same_action_count,
             explore_step=explore,
+            super_pellet_nearby=super_pellet_nearby,
         )
         for key, val in breakdown.items():
             self.episode_reward_breakdown[key] += val
@@ -1098,7 +1096,166 @@ class PacmanPlayerEnv:
             region_is_dirty=region_is_dirty,
         )
 
+        valid_player_actions = self._apply_trap_lookahead_mask(valid_player_actions)
+        extra_features[0, 12:16] = valid_player_actions[0].float()
+
         return grid, extra_features, valid_player_actions
+
+    def _analyze_dead_ends(self) -> None:
+        """Precompute all dead-end branches, their entrance bottleneck junctions, and depths."""
+        if self.maze is None or self.movement is None:
+            self._dead_end_traps = {}
+            self._cell_to_trap = {}
+            return
+
+        h = len(self.maze)
+        w = len(self.maze[0]) if h else 0
+        dead_ends = [
+            (y, x)
+            for y in range(h)
+            for x in range(w)
+            if len(self.movement.get_neighbors(y, x)) == 1
+        ]
+        traps: dict[tuple[tuple[int, int], str], dict[str, Any]] = {}
+        cell_to_trap: dict[tuple[int, int], tuple[tuple[int, int], int]] = {}
+
+        for de in dead_ends:
+            curr = de
+            visited = [curr]
+            prev = None
+            while True:
+                nbrs = [n for n in self.movement.get_neighbors(curr[0], curr[1]) if n != prev]
+                if not nbrs:
+                    break
+                nxt = nbrs[0]
+                deg = len(self.movement.get_neighbors(nxt[0], nxt[1]))
+                visited.append(nxt)
+                if deg >= 3:
+                    junction = nxt
+                    first_step = visited[-2]
+                    d_name = self.movement.direction_to_next_cell(junction, first_step)
+                    if d_name:
+                        branch_cells = set(visited[:-1])
+                        traps[(junction, d_name)] = {
+                            "depth": len(visited) - 1,
+                            "cells": branch_cells,
+                            "junction": junction,
+                        }
+                        for d_idx, c in enumerate(reversed(visited[:-1])):
+                            cell_to_trap[c] = (junction, d_idx + 1)
+                    break
+                prev = curr
+                curr = nxt
+
+        self._dead_end_traps = traps
+        self._cell_to_trap = cell_to_trap
+
+    def _apply_trap_lookahead_mask(
+        self, valid_actions: torch.Tensor
+    ) -> torch.Tensor:
+        """Filter out candidate moves that enter sealed dead-ends with no escape."""
+        if (
+            self.stage <= 1
+            or self.player is None
+            or self.movement is None
+            or self.maze is None
+        ):
+            return valid_actions
+        # While powered, ghosts are edible, so dead-ends are safe
+        if self.player.powered_timer > 0:
+            return valid_actions
+
+        py, px = self.player.grid_y, self.player.grid_x
+        h = len(self.maze)
+        w = len(self.maze[0]) if h else 0
+
+        active_ghosts = [
+            g for g in self.ghosts
+            if not getattr(g, "in_prison", False) and not getattr(g, "is_edible", False)
+        ]
+        if not active_ghosts:
+            return valid_actions
+
+        orig_mask = valid_actions.clone()
+        filtered_mask = valid_actions.clone()
+
+        dir_offsets = {
+            "UP": (-1, 0),
+            "DOWN": (1, 0),
+            "LEFT": (0, -1),
+            "RIGHT": (0, 1),
+        }
+
+        speed = max(0.1, self.ghost_speed_ratio)
+
+        for a_idx, d_name in enumerate(DIRECTIONS):
+            if not orig_mask[0, a_idx]:
+                continue
+
+            dy, dx = dir_offsets[d_name]
+            ny, nx = py + dy, px + dx
+            if not (0 <= ny < h and 0 <= nx < w):
+                continue
+
+            # Case A: Moving from junction into a dead-end branch
+            trap_key = ((py, px), d_name)
+            if trap_key in self._dead_end_traps:
+                trap_info = self._dead_end_traps[trap_key]
+                depth = trap_info["depth"]
+                t_pacman = 2.0 * depth
+                j_dists = self.movement.bfs_distances((py, px))
+                ghost_dists = [
+                    j_dists[g.grid_y * w + g.grid_x]
+                    for g in active_ghosts
+                    if 0 <= g.grid_y * w + g.grid_x < len(j_dists)
+                    and j_dists[g.grid_y * w + g.grid_x] >= 0
+                ]
+                if ghost_dists:
+                    min_g_dist = min(ghost_dists)
+                    t_ghost = min_g_dist / speed
+                    if t_ghost <= t_pacman + 2.0:
+                        filtered_mask[0, a_idx] = False
+
+            # Case B: Already inside a dead-end branch
+            elif (py, px) in self._cell_to_trap:
+                junction, dist_to_junc = self._cell_to_trap[(py, px)]
+                if (ny, nx) in self._cell_to_trap:
+                    _, next_dist_to_junc = self._cell_to_trap[(ny, nx)]
+                    if next_dist_to_junc > dist_to_junc:
+                        j_dists = self.movement.bfs_distances(junction)
+                        ghost_dists = [
+                            j_dists[g.grid_y * w + g.grid_x]
+                            for g in active_ghosts
+                            if 0 <= g.grid_y * w + g.grid_x < len(j_dists)
+                            and j_dists[g.grid_y * w + g.grid_x] >= 0
+                        ]
+                        if ghost_dists:
+                            min_g_dist = min(ghost_dists)
+                            t_ghost = min_g_dist / speed
+                            t_pacman_escape = (next_dist_to_junc + 1) * 1.0
+                            if t_ghost <= t_pacman_escape + 2.0:
+                                filtered_mask[0, a_idx] = False
+
+        if filtered_mask.any():
+            return filtered_mask
+        return orig_mask
 
     def _reverse_action(self, action: int) -> int:
         return {0: 1, 1: 0, 2: 3, 3: 2}[action]
+
+    def get_search_action(self, horizon: int = 12) -> int:
+        """Query the Chess-like Lookahead Search Planner for the best action."""
+        from AI_arena.player.search_planner import PacmanLookaheadSearch
+
+        searcher = PacmanLookaheadSearch(self, horizon=horizon)
+        return searcher.get_best_action()
+
+    def get_search_distribution(
+        self, horizon: int = 12, temperature: float = 1.0
+    ) -> torch.Tensor:
+        """Query the Lookahead Search Planner for action distribution (for distillation)."""
+        from AI_arena.player.search_planner import PacmanLookaheadSearch
+
+        searcher = PacmanLookaheadSearch(self, horizon=horizon)
+        return searcher.get_action_distribution(temperature=temperature)
+

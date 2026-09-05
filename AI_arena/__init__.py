@@ -9,7 +9,6 @@
 #     EXTRA_FEATURE_COUNT,
 #     GHOST_COUNT,
 # )
-# from AI_arena.data.dataset import CNNJSONLDataset, create_cnn_dataloader
 from AI_arena.ghosts.ghost_controller import CNNGhostController
 from AI_arena.ghosts.ghost_env import PacmanGhostEnv
 from AI_arena.models.cnn_backbone import PacmanCNNBackbone
@@ -26,8 +25,6 @@ __all__ = [
     "CNN_HEIGHT",
     "CNN_WIDTH",
     "EPISODE_LENGTH",
-    "CNNJSONLDataset",
-    "create_cnn_dataloader",
     "PacmanCNNBackbone",
     "GhostCNN",
     "PlayerActorCritic",

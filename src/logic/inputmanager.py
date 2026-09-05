@@ -31,7 +31,6 @@ class InputState:
     speed_boost: bool = False
     extra_life: bool = False
     skip_level: bool = False
-    ghost_hunter: bool = False
     ghost_hunter_mode: bool = False
 
 

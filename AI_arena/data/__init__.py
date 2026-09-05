@@ -9,11 +9,6 @@ from AI_arena.data.constants import (
     EXTRA_FEATURE_COUNT,
     GHOST_COUNT,
 )
-from AI_arena.data.dataset import (
-    CNNJSONLDataset,
-    create_cnn_dataloader,
-    iter_jsonl_records,
-)
 from AI_arena.data.formatter import ObservationFormatter
 
 __all__ = [
@@ -24,8 +19,5 @@ __all__ = [
     "CNN_HEIGHT",
     "CNN_WIDTH",
     "EPISODE_LENGTH",
-    "CNNJSONLDataset",
-    "create_cnn_dataloader",
-    "iter_jsonl_records",
     "ObservationFormatter",
 ]

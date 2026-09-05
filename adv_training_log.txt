@@ -59,3 +59,61 @@ U 0030 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% |
 U 0031 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% | Die%:  60.0% | Loss(P/V): -0.002/3.924 | Ent: 1.135 | Time: 2950.9s
 U 0032 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% | Die%:  60.0% | Loss(P/V): -0.003/2.518 | Ent: 1.163 | Time: 3056.1s
 Interrupted.
+
+======================================================================
+Training session started at 2026-09-05T10:39:47.000484
+======================================================================
+Loaded adversarial player checkpoint.
+Loaded adversarial ghost checkpoint.
+============================================================
+Asymmetric Adv PPO | WU: 1 | Ratio: 5:1
+U 0001 [GHOST WARMUP] | Ep 0000 | P_Rew:    0.0 | G_Rew:    0.0 | Win%:   0.0% | Die%:   0.0% | Loss(P/V): 0.018/14.979 | Ent: 0.994 | Time: 2.1s
+
+======================================================================
+Training session started at 2026-09-05T10:45:36.016661
+======================================================================
+Loaded adversarial player checkpoint.
+Loaded adversarial ghost checkpoint.
+============================================================
+Asymmetric Adv PPO | WU: 50 | Ratio: 5:1
+U 0001 [GHOST WARMUP] | Ep 0001 | P_Rew:  242.6 | G_Rew:  -71.3 | Win%:  43.5% | Die%: 100.0% | Loss(P/V): 0.028/10.106 | Ent: 1.197 | Time: 82.4s
+U 0002 [GHOST WARMUP] | Ep 0004 | P_Rew: -459.1 | G_Rew:  279.5 | Win%:  42.7% | Die%: 100.0% | Loss(P/V): 0.027/10.028 | Ent: 1.214 | Time: 173.9s
+U 0003 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.010/13.293 | Ent: 1.223 | Time: 264.4s
+U 0004 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.024/13.631 | Ent: 1.205 | Time: 352.3s
+U 0005 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.017/10.026 | Ent: 1.095 | Time: 440.3s
+U 0006 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.023/8.750 | Ent: 1.058 | Time: 530.3s
+U 0007 [GHOST WARMUP] | Ep 0007 | P_Rew: -2514.8 | G_Rew: 1300.3 | Win%:  55.4% | Die%:  85.7% | Loss(P/V): 0.011/13.464 | Ent: 1.188 | Time: 625.1s
+Quit requested.
+
+======================================================================
+Training session started at 2026-09-05T10:58:20.933907
+======================================================================
+Loaded adversarial player checkpoint.
+Loaded adversarial ghost checkpoint.
+============================================================
+Asymmetric Adv PPO | WU: 50 | Ratio: 5:1
+U 0001 [GHOST WARMUP] | Ep 0002 | P_Rew:   73.4 | G_Rew:   13.3 | Win%:  18.6% | Die%: 100.0% | Loss(P/V): 0.019/13.949 | Ent: 1.219 | Time: 85.8s
+U 0002 [GHOST WARMUP] | Ep 0002 | P_Rew:   73.4 | G_Rew:   13.3 | Win%:  18.6% | Die%: 100.0% | Loss(P/V): 0.015/19.838 | Ent: 1.197 | Time: 182.4s
+U 0003 [GHOST WARMUP] | Ep 0004 | P_Rew: -1227.3 | G_Rew:  661.2 | Win%:  37.0% | Die%: 100.0% | Loss(P/V): 0.010/14.217 | Ent: 1.236 | Time: 270.7s
+U 0004 [GHOST WARMUP] | Ep 0010 | P_Rew: -506.7 | G_Rew:  302.3 | Win%:  31.8% | Die%: 100.0% | Loss(P/V): 0.015/12.077 | Ent: 1.215 | Time: 360.6s
+U 0005 [GHOST WARMUP] | Ep 0010 | P_Rew: -506.7 | G_Rew:  302.3 | Win%:  31.8% | Die%: 100.0% | Loss(P/V): 0.015/14.072 | Ent: 1.231 | Time: 456.9s
+Interrupted.
+
+======================================================================
+Training session started at 2026-09-05T11:07:16.183661
+======================================================================
+Loaded adversarial player checkpoint.
+Loaded adversarial ghost checkpoint.
+============================================================
+Asymmetric Adv PPO | WU: 50 | Ratio: 5:1
+U 0001 [GHOST WARMUP] | Ep 0002 | P_Rew:  347.0 | G_Rew: -128.5 | Win%:  42.8% | Die%: 100.0% | Loss(P/V): 0.006/11.599 | Ent: 1.268 | Time: 90.0s
+U 0002 [GHOST WARMUP] | Ep 0004 | P_Rew:  311.6 | G_Rew: -108.3 | Win%:  45.5% | Die%: 100.0% | Loss(P/V): 0.008/11.475 | Ent: 1.274 | Time: 182.3s
+U 0003 [GHOST WARMUP] | Ep 0004 | P_Rew:  311.6 | G_Rew: -108.3 | Win%:  45.5% | Die%: 100.0% | Loss(P/V): 0.015/13.784 | Ent: 1.258 | Time: 271.5s
+U 0004 [GHOST WARMUP] | Ep 0006 | P_Rew: -715.5 | G_Rew:  404.4 | Win%:  53.4% | Die%: 100.0% | Loss(P/V): 0.005/11.547 | Ent: 1.271 | Time: 363.0s
+U 0005 [GHOST WARMUP] | Ep 0008 | P_Rew: -512.1 | G_Rew:  303.5 | Win%:  53.0% | Die%: 100.0% | Loss(P/V): 0.007/12.576 | Ent: 1.276 | Time: 453.0s
+U 0006 [GHOST WARMUP] | Ep 0010 | P_Rew: -412.0 | G_Rew:  254.0 | Win%:  51.6% | Die%: 100.0% | Loss(P/V): 0.007/10.639 | Ent: 1.293 | Time: 543.6s
+U 0007 [GHOST WARMUP] | Ep 0011 | P_Rew: -328.5 | G_Rew:  210.6 | Win%:  51.0% | Die%: 100.0% | Loss(P/V): -0.006/12.442 | Ent: 1.300 | Time: 642.4s
+U 0008 [GHOST WARMUP] | Ep 0012 | P_Rew: -407.3 | G_Rew:  250.3 | Win%:  51.6% | Die%: 100.0% | Loss(P/V): 0.007/13.308 | Ent: 1.299 | Time: 733.3s
+U 0009 [GHOST WARMUP] | Ep 0013 | P_Rew: -358.2 | G_Rew:  226.0 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): 0.009/11.850 | Ent: 1.300 | Time: 824.4s
+U 0010 [GHOST WARMUP] | Ep 0013 | P_Rew: -358.2 | G_Rew:  226.0 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): 0.012/11.176 | Ent: 1.231 | Time: 918.9s
+U 0011 [GHOST WARMUP] | Ep 0015 | P_Rew: -715.3 | G_Rew:  404.3 | Win%:  54.2% | Die%: 100.0% | Loss(P/V): 0.009/11.003 | Ent: 1.273 | Time: 1012.1s

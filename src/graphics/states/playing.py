@@ -66,6 +66,9 @@ class PlayingState(State):
         self.game.level_manager.load_level(
             self.game.level_manager.current_level_index,
         )
+        self.game.curr_level = (
+            self.game.level_manager.get_current_level_config()
+        )
         self.maze = self.game.level_manager.current_maze.maze
         self.game.entity_manager.load_level_entities(self.maze)
 

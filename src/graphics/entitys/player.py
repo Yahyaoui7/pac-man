@@ -135,6 +135,8 @@ class Player(Entity):
         col: int,
         maze: list[list[int]],
     ) -> bool:
+        if not (0 <= row < len(maze) and 0 <= col < len(maze[0])):
+            return False
         cell = maze[row][col]
         return cell != (NORTH | EAST | SOUTH | WEST)
 
@@ -143,21 +145,15 @@ class Player(Entity):
         game: Any | None,
         maze: list[list[int]],
     ) -> bool:
-        # The graphical game exposes dimensions through curr_level; the
-        # headless RL environment only provides the maze itself.
-        if game is None or not getattr(game, "curr_level", None):
-            height = len(maze)
-            width = len(maze[0])
-        else:
-            height = game.curr_level.height
-            width = game.curr_level.width
+        height = len(maze)
+        width = len(maze[0]) if height else 0
+        if not height or not width:
+            return False
 
         middle_row = height // 2
         middle_col = width // 2
 
-        for radius in range(
-            max(width, height)
-        ):
+        for radius in range(max(width, height)):
             for row in range(middle_row - radius, middle_row + radius + 1):
                 for col in range(middle_col - radius, middle_col + radius + 1):
                     if (

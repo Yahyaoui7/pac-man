@@ -1,6 +1,5 @@
 import math
 import json
-from pathlib import Path
 
 import pygame
 import pygame.draw as dr
@@ -149,10 +148,14 @@ class PlayingState(State):
             self.player_invincible_until = 999999999999 if turning_on else 0
         elif name == "speed boost":
             player = self.game.entity_manager.player
-            player.speed = self.player_speed * 2 if turning_on else self.player_speed
+            player.speed = (
+                self.player_speed * 2 if turning_on else self.player_speed
+            )
         elif name == "ai pacman":
             self.use_ai_player = turning_on
-            status = "CHEAT: AI PAC-MAN ON" if turning_on else "CHEAT: AI PAC-MAN OFF"
+            status = (
+                "CHEAT: AI PAC-MAN ON" if turning_on else "CHEAT: AI PAC-MAN OFF"
+            )
             self.msg_text = status
             self.msg_timer = 2.0
             print(f"🤖 {status}")
@@ -816,9 +819,15 @@ class PlayingState(State):
                     player.trigger_attack()
                 else:
                     if expired(self.player_invincible_until):
-                        if self.game.lives > 1:
-                            self.game.sound_manager.play_sound("player_death")
-                        # self.game.lives -= 1
+                        self.game.sound_manager.play_sound("player_death")
+                        self.game.lives -= 1
+                        if self.game.lives <= 0:
+                            from src.graphics.states.game_over import GameOverState
+
+                            self.game.state_manager.change_state(
+                                GameOverState(self.game, self),
+                            )
+                            return
                         self.player_invincible_until = after(1500)
                         player.reset_location()
                         if self.player_controller is not None:

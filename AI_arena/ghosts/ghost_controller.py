@@ -8,11 +8,12 @@ from typing import Any, TypedDict
 import torch
 
 # from AI_arena.data.constants import CNN_HEIGHT, CNN_WIDTH
-from AI_arena.models.cnn_ghost import GhostCNN
+from AI_arena.models.cnn_ghost import GhostCNN, GhostActorCritic
 from src.logic.config import CELL_SIZE, EAST, NORTH, SOUTH, WEST
 
 DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models" / "ghost_ai.pt"
 QUANTIZED_MODEL_PATH = Path(__file__).parent.parent / "models" / "ghost_ai_quantized.pt"
+ADV_MODEL_PATH = Path(__file__).parent.parent / "models" / "ghost_rl_adv.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 GHOST_NAMES = ("Blinky", "Pinky", "Inky", "Clyde")
 
@@ -91,6 +92,94 @@ class CNNGhostController:
         
         with torch.no_grad():
             logits = self.model(grid, extra_features)  # (1, 4, 4)
+            for idx, ghost in enumerate(ghosts):
+                valid_mask = valid_ghost_actions[idx].clone()  # (4,)
+                
+                # Pac-Man Golden Rule: Ghosts cannot reverse direction!
+                current_dir = ghost.direction
+                if current_dir in reverse_map:
+                    rev_dir = reverse_map[current_dir]
+                    if rev_dir in DIRECTIONS:
+                        rev_idx = DIRECTIONS.index(rev_dir)
+                        # Only ban reverse if they aren't trapped in a dead-end
+                        if valid_mask.sum() > 1:
+                            valid_mask[rev_idx] = False
+
+                ghost_logits = logits[0, idx].masked_fill(~valid_mask, -1e9)
+                chosen_idx = int(torch.argmax(ghost_logits).item())
+                if bool(valid_mask[chosen_idx]):
+                    predictions[ghost.name] = DIRECTIONS[chosen_idx]
+                else:
+                    predictions[ghost.name] = None
+
+        return predictions
+
+
+class AdvGhostController:
+    """Build live observations and predict one legal move per ghost using Actor-Critic with GRU memory."""
+
+    def __init__(self, model_path: str | Path = ADV_MODEL_PATH) -> None:
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
+        self.last_diagnostics: dict[str, GhostDiagnostic] = {}
+
+        self.model = GhostActorCritic().to(self.device)
+        if Path(model_path).exists():
+            weights = torch.load(
+                model_path, map_location=self.device, weights_only=True
+            )
+            self.model.load_state_dict(weights)
+            print(f"👻 [AI Ghosts] Successfully loaded Adversarial Ghost Model: {model_path}")
+        else:
+            print(f"⚠️ [AI Ghosts] Warning: Adv model {model_path} not found! Falling back to BFS.")
+            
+        self.model.eval()
+        self.hidden_state: torch.Tensor | None = None
+
+    def reset_state(self) -> None:
+        self.hidden_state = None
+
+    def predict(
+        self,
+        maze: list[list[int]],
+        pellets: list[list[int]],
+        player: Any,
+        ghosts: list[Any],
+        movement: Any,
+    ) -> dict[str, str | None]:
+        """Predict the move for each ghost given current game state."""
+        ghost_states = [
+            {
+                "grid_x": ghost.grid_x,
+                "grid_y": ghost.grid_y,
+                "is_edible": ghost.is_edible,
+                "direction": ghost.direction,
+            }
+            for ghost in ghosts
+        ]
+
+        from AI_arena.data.formatter import ObservationFormatter
+
+        grid, extra_features, _, valid_ghost_actions = (
+            ObservationFormatter.format_observation(
+                maze=maze,
+                pellets=pellets,
+                player_pos=(player.grid_x, player.grid_y),
+                player_direction=player.direction,
+                ghost_states=ghost_states,
+                movement=movement,
+                device=self.device,
+            )
+        )
+
+        predictions: dict[str, str | None] = {}
+        reverse_map = {"UP": "DOWN", "DOWN": "UP", "LEFT": "RIGHT", "RIGHT": "LEFT"}
+        
+        with torch.no_grad():
+            # Pass through Actor-Critic with GRU hidden state
+            logits, _, self.hidden_state = self.model(grid, extra_features, self.hidden_state)
+            
             for idx, ghost in enumerate(ghosts):
                 valid_mask = valid_ghost_actions[idx].clone()  # (4,)
                 

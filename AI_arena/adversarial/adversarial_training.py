@@ -44,7 +44,7 @@ class AdversarialTrainingConfig:
     ppo_epochs: int = 4
 
     # Asymmetric Training
-    ghosts_warmup_updates: int = 50
+    ghosts_warmup_updates: int = 0
     ghost_update_ratio: int = 5
 
     # Optimization
@@ -65,6 +65,7 @@ class AdversarialTrainingConfig:
     ghost_speed_ratio: float = 0.50
 
     # Paths
+    from_scratch: bool = False
     model_dir: Path = field(
         default_factory=lambda: Path(__file__).resolve().parent.parent
         / "models"
@@ -89,7 +90,7 @@ class AdversarialTrainingConfig:
         parser.add_argument(
             "--warmup-updates",
             type=int,
-            default=50,
+            default=0,
             help="Updates where Player is frozen",
         )
         parser.add_argument(
@@ -97,6 +98,11 @@ class AdversarialTrainingConfig:
             type=int,
             default=5,
             help="Ghost updates per Player update",
+        )
+        parser.add_argument(
+            "--from-scratch",
+            action="store_true",
+            help="Ignore previous adversarial checkpoints and start fresh from baseline models",
         )
         parser.add_argument("--device", choices=["cuda", "cpu"], default=None)
         args = parser.parse_args(argv)
@@ -106,6 +112,7 @@ class AdversarialTrainingConfig:
             rollout_steps=args.rollout_steps,
             ghosts_warmup_updates=args.warmup_updates,
             ghost_update_ratio=args.update_ratio,
+            from_scratch=args.from_scratch,
             device=args.device,
         )
 
@@ -196,8 +203,8 @@ class AdversarialTrainer:
         self.total_eps = 0
 
     def _try_load_models(self) -> None:
-        """Load baseline RL player and SL ghosts if adv checkpoints don't exist."""
-        if self.player_ckpt.exists():
+        """Load baseline RL player and SL ghosts if adv checkpoints don't exist or from_scratch is set."""
+        if not self.cfg.from_scratch and self.player_ckpt.exists():
             load_player_checkpoint(self.player, self.player_ckpt, self.device)
             self.logger.log("Loaded adversarial player checkpoint.")
         else:
@@ -206,7 +213,7 @@ class AdversarialTrainer:
                 load_player_checkpoint(self.player, base_p, self.device)
                 self.logger.log("Loaded baseline player_rl_best.pt.")
 
-        if self.ghost_ckpt.exists():
+        if not self.cfg.from_scratch and self.ghost_ckpt.exists():
             # load as standard state dict since we saved it fully during adv training
             self.ghosts.load_state_dict(
                 torch.load(

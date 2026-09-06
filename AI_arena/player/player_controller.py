@@ -17,8 +17,8 @@ from src.graphics.entitys.player import Player
 from AI_arena.player.data.observation import format_player_observation, PLAYER_EXTRA_FEATURE_COUNT
 
 BEST_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_best.pt"
-
 DEFAULT_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl.pt"
+ADV_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_adv.pt"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
 
@@ -38,12 +38,12 @@ class CNNPlayerController:
         self.search_planner: Any = None
 
         if model_path is None:
-            candidates = [DEFAULT_STAGE_PATH, BEST_STAGE_PATH]
+            candidates = [ADV_STAGE_PATH, BEST_STAGE_PATH, DEFAULT_STAGE_PATH]
             existing = [c for c in candidates if c.exists()]
             if existing:
                 path = max(existing, key=lambda p: p.stat().st_mtime)
             else:
-                path = DEFAULT_STAGE_PATH
+                path = ADV_STAGE_PATH
         else:
             path = Path(model_path)
 

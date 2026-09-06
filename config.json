@@ -9,8 +9,8 @@
         {
             "width": 25,
             "height": 20,
-            "seed": 12,
-            "level_max_time": 180
+            "seed": 30,
+            "level_max_time": 300
         },
         {
             "width": 12,

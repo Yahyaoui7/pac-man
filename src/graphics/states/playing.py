@@ -5,7 +5,7 @@ import pygame
 import pygame.draw as dr
 from typing import Any, List
 
-from AI_arena.ghosts.ghost_controller import CNNGhostController
+from AI_arena.ghosts.ghost_controller import AdvGhostController
 from AI_arena.player.player_controller import CNNPlayerController
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
@@ -76,7 +76,7 @@ class PlayingState(State):
         self.use_cnn_ghosts = True
         if self.use_cnn_ghosts:
             try:
-                self.ghost_controller = CNNGhostController()
+                self.ghost_controller = AdvGhostController()
                 if hasattr(self.ghost_controller, "init_observation"):
                     self.ghost_controller.init_observation(self.maze)
             except (FileNotFoundError, RuntimeError, ValueError) as exc:
@@ -872,6 +872,8 @@ class PlayingState(State):
                         player.reset_location()
                         if self.player_controller is not None:
                             self.player_controller.reset_state()
+                        if hasattr(self.ghost_controller, "reset_state"):
+                            self.ghost_controller.reset_state()
                         self.ai_last_decision_cell = None
                         self.msg_text = "Be careful!"
                         self.msg_timer = 1.0

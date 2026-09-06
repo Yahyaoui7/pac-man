@@ -21,19 +21,39 @@ def plot_logs(log_file_path):
         r"U\s+(\d+)\s+\[.*?\]\s+\|\s+Ep\s+\d+\s+\|\s+P_Rew:\s+([-0-9.]+)\s+\|\s+G_Rew:\s+([-0-9.]+)\s+\|\s+Win%:\s+([0-9.]+)%\s+\|\s+Die%:\s+([0-9.]+)%"
     )
     
+    runs = []
+    current_run = {"updates": [], "p_rews": [], "g_rews": [], "win_pcts": [], "die_pcts": []}
+
     with open(log_path, "r") as f:
         for line in f:
             match = pattern.search(line)
             if match:
-                updates.append(int(match.group(1)))
-                p_rews.append(float(match.group(2)))
-                g_rews.append(float(match.group(3)))
-                win_pcts.append(float(match.group(4)))
-                die_pcts.append(float(match.group(5)))
+                upd = int(match.group(1))
+                if current_run["updates"] and upd <= current_run["updates"][-1]:
+                    runs.append(current_run)
+                    current_run = {"updates": [], "p_rews": [], "g_rews": [], "win_pcts": [], "die_pcts": []}
                 
-    if not updates:
+                current_run["updates"].append(upd)
+                current_run["p_rews"].append(float(match.group(2)))
+                current_run["g_rews"].append(float(match.group(3)))
+                current_run["win_pcts"].append(float(match.group(4)))
+                current_run["die_pcts"].append(float(match.group(5)))
+
+    if current_run["updates"]:
+        runs.append(current_run)
+
+    if not runs:
         print(f"No valid log lines found in {log_file_path}.")
         return
+
+    # Select the latest run with substantial updates (preferring the most recent run)
+    long_runs = [r for r in runs if len(r["updates"]) == max(len(x["updates"]) for x in runs)]
+    best_run = long_runs[-1]  # Take the most recent one!
+    updates = best_run["updates"]
+    p_rews = best_run["p_rews"]
+    g_rews = best_run["g_rews"]
+    win_pcts = best_run["win_pcts"]
+    die_pcts = best_run["die_pcts"]
 
     # Create figure with 2 subplots (Rewards and Rates)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)

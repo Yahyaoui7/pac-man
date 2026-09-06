@@ -1,119 +1,504 @@
-
 ======================================================================
-Training session started at 2026-09-05T09:31:58.189661
-======================================================================
-Loaded baseline player_rl.pt.
-Warm-started ghosts from SL model.
-============================================================
-Asymmetric Adv PPO | WU: 2 | Ratio: 5:1
-
-======================================================================
-Training session started at 2026-09-05T09:32:43.446576
+Training session started at 2026-09-05T19:15:05.207679
 ======================================================================
 Loaded adversarial player checkpoint.
 Loaded adversarial ghost checkpoint.
 ============================================================
-Asymmetric Adv PPO | WU: 2 | Ratio: 5:1
-U 0001 [GHOST WARMUP] | Ep 0000 | P_Rew:    0.0 | G_Rew:    0.0 | Win%:   0.0% | Die%:   0.0% | Loss(P/V): 0.093/5.220 | Ent: 1.138 | Time: 2.4s
-U 0002 [GHOST WARMUP] | Ep 0000 | P_Rew:    0.0 | G_Rew:    0.0 | Win%:   0.0% | Die%:   0.0% | Loss(P/V): 0.091/4.738 | Ent: 1.174 | Time: 4.9s
-U 0003 [PLAYER TURN] | Ep 0000 | P_Rew:    0.0 | G_Rew:    0.0 | Win%:   0.0% | Die%:   0.0% | Loss(P/V): 0.000/12.056 | Ent: 0.299 | Time: 8.1s
-U 0004 [GHOST TURN] | Ep 0000 | P_Rew:    0.0 | G_Rew:    0.0 | Win%:   0.0% | Die%:   0.0% | Loss(P/V): 0.021/4.556 | Ent: 1.116 | Time: 11.3s
-
-======================================================================
-Training session started at 2026-09-05T09:39:59.950576
-======================================================================
-Loaded adversarial player checkpoint.
-Loaded adversarial ghost checkpoint.
-============================================================
-Asymmetric Adv PPO | WU: 50 | Ratio: 5:1
-U 0001 [GHOST WARMUP] | Ep 0001 | P_Rew: -204.6 | G_Rew:  302.3 | Win%:  49.5% | Die%: 100.0% | Loss(P/V): 0.056/7.183 | Ent: 0.995 | Time: 84.8s
-U 0002 [GHOST WARMUP] | Ep 0001 | P_Rew: -204.6 | G_Rew:  302.3 | Win%:  49.5% | Die%: 100.0% | Loss(P/V): 0.038/2.110 | Ent: 0.974 | Time: 177.6s
-U 0003 [GHOST WARMUP] | Ep 0002 | P_Rew: -599.5 | G_Rew:  499.7 | Win%:  45.0% | Die%: 100.0% | Loss(P/V): 0.018/5.271 | Ent: 1.030 | Time: 269.1s
-U 0004 [GHOST WARMUP] | Ep 0002 | P_Rew: -599.5 | G_Rew:  499.7 | Win%:  45.0% | Die%: 100.0% | Loss(P/V): 0.014/4.078 | Ent: 0.973 | Time: 369.6s
-U 0005 [GHOST WARMUP] | Ep 0002 | P_Rew: -599.5 | G_Rew:  499.7 | Win%:  45.0% | Die%: 100.0% | Loss(P/V): 0.011/1.942 | Ent: 0.995 | Time: 463.0s
-U 0006 [GHOST WARMUP] | Ep 0002 | P_Rew: -599.5 | G_Rew:  499.7 | Win%:  45.0% | Die%: 100.0% | Loss(P/V): 0.013/3.640 | Ent: 1.041 | Time: 556.0s
-U 0007 [GHOST WARMUP] | Ep 0002 | P_Rew: -599.5 | G_Rew:  499.7 | Win%:  45.0% | Die%: 100.0% | Loss(P/V): 0.014/1.740 | Ent: 1.039 | Time: 655.7s
-U 0008 [GHOST WARMUP] | Ep 0003 | P_Rew: -718.3 | G_Rew:  525.8 | Win%:  60.1% | Die%:  66.7% | Loss(P/V): 0.004/3.784 | Ent: 1.072 | Time: 746.3s
-U 0009 [GHOST WARMUP] | Ep 0004 | P_Rew: -661.2 | G_Rew:  505.6 | Win%:  57.3% | Die%:  75.0% | Loss(P/V): 0.004/5.824 | Ent: 1.106 | Time: 849.4s
-U 0010 [GHOST WARMUP] | Ep 0004 | P_Rew: -661.2 | G_Rew:  505.6 | Win%:  57.3% | Die%:  75.0% | Loss(P/V): 0.008/5.710 | Ent: 1.115 | Time: 942.4s
-U 0011 [GHOST WARMUP] | Ep 0004 | P_Rew: -661.2 | G_Rew:  505.6 | Win%:  57.3% | Die%:  75.0% | Loss(P/V): 0.002/4.823 | Ent: 1.061 | Time: 1034.5s
-U 0012 [GHOST WARMUP] | Ep 0004 | P_Rew: -661.2 | G_Rew:  505.6 | Win%:  57.3% | Die%:  75.0% | Loss(P/V): 0.013/2.542 | Ent: 1.066 | Time: 1123.1s
-U 0013 [GHOST WARMUP] | Ep 0004 | P_Rew: -661.2 | G_Rew:  505.6 | Win%:  57.3% | Die%:  75.0% | Loss(P/V): 0.003/4.282 | Ent: 1.037 | Time: 1215.1s
-U 0014 [GHOST WARMUP] | Ep 0005 | P_Rew: -723.6 | G_Rew:  531.8 | Win%:  65.1% | Die%:  60.0% | Loss(P/V): 0.013/3.606 | Ent: 1.086 | Time: 1306.5s
-U 0015 [GHOST WARMUP] | Ep 0006 | P_Rew: -589.9 | G_Rew:  470.0 | Win%:  63.5% | Die%:  66.7% | Loss(P/V): 0.007/6.493 | Ent: 1.140 | Time: 1396.7s
-U 0016 [GHOST WARMUP] | Ep 0006 | P_Rew: -589.9 | G_Rew:  470.0 | Win%:  63.5% | Die%:  66.7% | Loss(P/V): 0.012/4.833 | Ent: 1.104 | Time: 1490.7s
-U 0017 [GHOST WARMUP] | Ep 0006 | P_Rew: -589.9 | G_Rew:  470.0 | Win%:  63.5% | Die%:  66.7% | Loss(P/V): 0.012/4.989 | Ent: 1.078 | Time: 1587.8s
-U 0018 [GHOST WARMUP] | Ep 0006 | P_Rew: -589.9 | G_Rew:  470.0 | Win%:  63.5% | Die%:  66.7% | Loss(P/V): 0.014/2.732 | Ent: 1.085 | Time: 1680.1s
-U 0019 [GHOST WARMUP] | Ep 0006 | P_Rew: -589.9 | G_Rew:  470.0 | Win%:  63.5% | Die%:  66.7% | Loss(P/V): 0.005/4.383 | Ent: 1.050 | Time: 1770.5s
-U 0020 [GHOST WARMUP] | Ep 0007 | P_Rew: -604.7 | G_Rew:  466.6 | Win%:  68.4% | Die%:  57.1% | Loss(P/V): 0.005/3.964 | Ent: 1.066 | Time: 1860.0s
-U 0021 [GHOST WARMUP] | Ep 0007 | P_Rew: -604.7 | G_Rew:  466.6 | Win%:  68.4% | Die%:  57.1% | Loss(P/V): 0.002/3.332 | Ent: 1.149 | Time: 1952.6s
-U 0022 [GHOST WARMUP] | Ep 0007 | P_Rew: -604.7 | G_Rew:  466.6 | Win%:  68.4% | Die%:  57.1% | Loss(P/V): -0.001/2.658 | Ent: 1.164 | Time: 2051.3s
-U 0023 [GHOST WARMUP] | Ep 0007 | P_Rew: -604.7 | G_Rew:  466.6 | Win%:  68.4% | Die%:  57.1% | Loss(P/V): 0.001/3.909 | Ent: 1.156 | Time: 2153.3s
-U 0024 [GHOST WARMUP] | Ep 0007 | P_Rew: -604.7 | G_Rew:  466.6 | Win%:  68.4% | Die%:  57.1% | Loss(P/V): 0.001/1.703 | Ent: 1.140 | Time: 2251.7s
-U 0025 [GHOST WARMUP] | Ep 0008 | P_Rew: -693.2 | G_Rew:  509.1 | Win%:  70.8% | Die%:  50.0% | Loss(P/V): 0.006/3.903 | Ent: 1.114 | Time: 2349.9s
-U 0026 [GHOST WARMUP] | Ep 0009 | P_Rew: -571.5 | G_Rew:  452.4 | Win%:  70.9% | Die%:  55.6% | Loss(P/V): 0.003/6.735 | Ent: 1.131 | Time: 2447.0s
-U 0027 [GHOST WARMUP] | Ep 0009 | P_Rew: -571.5 | G_Rew:  452.4 | Win%:  70.9% | Die%:  55.6% | Loss(P/V): 0.004/5.177 | Ent: 1.179 | Time: 2552.8s
-U 0028 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% | Die%:  60.0% | Loss(P/V): 0.001/6.225 | Ent: 1.189 | Time: 2652.9s
-U 0029 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% | Die%:  60.0% | Loss(P/V): -0.001/2.948 | Ent: 1.188 | Time: 2746.4s
-U 0030 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% | Die%:  60.0% | Loss(P/V): -0.001/3.544 | Ent: 1.158 | Time: 2843.7s
-U 0031 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% | Die%:  60.0% | Loss(P/V): -0.002/3.924 | Ent: 1.135 | Time: 2950.9s
-U 0032 [GHOST WARMUP] | Ep 0010 | P_Rew: -545.6 | G_Rew:  442.8 | Win%:  69.6% | Die%:  60.0% | Loss(P/V): -0.003/2.518 | Ent: 1.163 | Time: 3056.1s
-Interrupted.
-
-======================================================================
-Training session started at 2026-09-05T10:39:47.000484
-======================================================================
-Loaded adversarial player checkpoint.
-Loaded adversarial ghost checkpoint.
-============================================================
-Asymmetric Adv PPO | WU: 1 | Ratio: 5:1
-U 0001 [GHOST WARMUP] | Ep 0000 | P_Rew:    0.0 | G_Rew:    0.0 | Win%:   0.0% | Die%:   0.0% | Loss(P/V): 0.018/14.979 | Ent: 0.994 | Time: 2.1s
-
-======================================================================
-Training session started at 2026-09-05T10:45:36.016661
-======================================================================
-Loaded adversarial player checkpoint.
-Loaded adversarial ghost checkpoint.
-============================================================
-Asymmetric Adv PPO | WU: 50 | Ratio: 5:1
-U 0001 [GHOST WARMUP] | Ep 0001 | P_Rew:  242.6 | G_Rew:  -71.3 | Win%:  43.5% | Die%: 100.0% | Loss(P/V): 0.028/10.106 | Ent: 1.197 | Time: 82.4s
-U 0002 [GHOST WARMUP] | Ep 0004 | P_Rew: -459.1 | G_Rew:  279.5 | Win%:  42.7% | Die%: 100.0% | Loss(P/V): 0.027/10.028 | Ent: 1.214 | Time: 173.9s
-U 0003 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.010/13.293 | Ent: 1.223 | Time: 264.4s
-U 0004 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.024/13.631 | Ent: 1.205 | Time: 352.3s
-U 0005 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.017/10.026 | Ent: 1.095 | Time: 440.3s
-U 0006 [GHOST WARMUP] | Ep 0005 | P_Rew: -441.9 | G_Rew:  271.0 | Win%:  49.6% | Die%: 100.0% | Loss(P/V): 0.023/8.750 | Ent: 1.058 | Time: 530.3s
-U 0007 [GHOST WARMUP] | Ep 0007 | P_Rew: -2514.8 | G_Rew: 1300.3 | Win%:  55.4% | Die%:  85.7% | Loss(P/V): 0.011/13.464 | Ent: 1.188 | Time: 625.1s
+Asymmetric Adv PPO | WU: 0 | Ratio: 5:1
+U 0001 [PLAYER TURN] | Ep 0004 | P_Rew:  583.0 | G_Rew: -244.0 | Win%:  55.7% | Die%: 100.0% | Loss(P/V): 0.011/21.180 | Ent: 0.362 | Time: 85.7s
+U 0002 [GHOST TURN] | Ep 0007 | P_Rew:  499.6 | G_Rew: -204.1 | Win%:  58.4% | Die%: 100.0% | Loss(P/V): -0.006/14.343 | Ent: 1.372 | Time: 179.3s
+U 0003 [GHOST TURN] | Ep 0008 | P_Rew:  385.0 | G_Rew: -146.2 | Win%:  61.4% | Die%: 100.0% | Loss(P/V): -0.004/10.708 | Ent: 1.373 | Time: 271.5s
+U 0004 [GHOST TURN] | Ep 0010 | P_Rew:  393.3 | G_Rew: -150.6 | Win%:  64.0% | Die%: 100.0% | Loss(P/V): -0.005/12.077 | Ent: 1.378 | Time: 361.1s
+U 0005 [GHOST TURN] | Ep 0010 | P_Rew:  393.3 | G_Rew: -150.6 | Win%:  64.0% | Die%: 100.0% | Loss(P/V): -0.006/15.119 | Ent: 1.377 | Time: 448.3s
+U 0006 [GHOST TURN] | Ep 0010 | P_Rew:  393.3 | G_Rew: -150.6 | Win%:  64.0% | Die%: 100.0% | Loss(P/V): -0.003/9.584 | Ent: 1.373 | Time: 543.4s
+U 0007 [PLAYER TURN] | Ep 0011 | P_Rew: -928.0 | G_Rew:  504.9 | Win%:  67.1% | Die%:  90.9% | Loss(P/V): 0.012/13.923 | Ent: 0.699 | Time: 629.8s
+U 0008 [GHOST TURN] | Ep 0012 | P_Rew: -812.7 | G_Rew:  447.2 | Win%:  66.1% | Die%:  91.7% | Loss(P/V): -0.002/12.530 | Ent: 1.368 | Time: 725.0s
+U 0009 [GHOST TURN] | Ep 0015 | P_Rew: -750.9 | G_Rew:  416.1 | Win%:  67.1% | Die%:  93.3% | Loss(P/V): -0.005/16.392 | Ent: 1.375 | Time: 812.4s
+U 0010 [GHOST TURN] | Ep 0017 | P_Rew: -770.5 | G_Rew:  427.0 | Win%:  64.2% | Die%:  94.1% | Loss(P/V): -0.002/15.602 | Ent: 1.370 | Time: 898.5s
+U 0011 [GHOST TURN] | Ep 0019 | P_Rew: -703.5 | G_Rew:  394.4 | Win%:  64.7% | Die%:  94.7% | Loss(P/V): -0.003/12.497 | Ent: 1.369 | Time: 992.1s
+U 0012 [GHOST TURN] | Ep 0019 | P_Rew: -703.5 | G_Rew:  394.4 | Win%:  64.7% | Die%:  94.7% | Loss(P/V): -0.003/11.741 | Ent: 1.373 | Time: 1082.0s
+U 0013 [PLAYER TURN] | Ep 0019 | P_Rew: -703.5 | G_Rew:  394.4 | Win%:  64.7% | Die%:  94.7% | Loss(P/V): 0.001/25.702 | Ent: 0.580 | Time: 1178.7s
+U 0014 [GHOST TURN] | Ep 0023 | P_Rew: -768.1 | G_Rew:  426.7 | Win%:  63.9% | Die%:  95.7% | Loss(P/V): -0.005/13.138 | Ent: 1.373 | Time: 1269.1s
+U 0015 [GHOST TURN] | Ep 0026 | P_Rew: -584.9 | G_Rew:  335.5 | Win%:  63.9% | Die%:  96.2% | Loss(P/V): -0.009/12.699 | Ent: 1.372 | Time: 1357.0s
+U 0016 [GHOST TURN] | Ep 0034 | P_Rew: -359.8 | G_Rew:  222.5 | Win%:  57.8% | Die%:  97.1% | Loss(P/V): -0.001/14.132 | Ent: 1.369 | Time: 1445.5s
+U 0017 [GHOST TURN] | Ep 0035 | P_Rew: -343.3 | G_Rew:  214.2 | Win%:  58.4% | Die%:  97.1% | Loss(P/V): 0.000/12.159 | Ent: 1.374 | Time: 1534.1s
+U 0018 [GHOST TURN] | Ep 0039 | P_Rew: -283.6 | G_Rew:  184.6 | Win%:  56.3% | Die%:  97.4% | Loss(P/V): -0.000/13.236 | Ent: 1.371 | Time: 1625.5s
+U 0019 [PLAYER TURN] | Ep 0041 | P_Rew: -227.0 | G_Rew:  156.5 | Win%:  57.0% | Die%:  97.6% | Loss(P/V): 0.003/24.509 | Ent: 0.321 | Time: 1714.1s
+U 0020 [GHOST TURN] | Ep 0043 | P_Rew: -198.6 | G_Rew:  142.1 | Win%:  56.7% | Die%:  97.7% | Loss(P/V): -0.002/11.894 | Ent: 1.373 | Time: 1806.5s
+U 0021 [GHOST TURN] | Ep 0043 | P_Rew: -198.6 | G_Rew:  142.1 | Win%:  56.7% | Die%:  97.7% | Loss(P/V): 0.002/10.327 | Ent: 1.379 | Time: 1899.7s
+U 0022 [GHOST TURN] | Ep 0044 | P_Rew: -303.0 | G_Rew:  194.2 | Win%:  57.3% | Die%:  97.7% | Loss(P/V): -0.002/12.026 | Ent: 1.377 | Time: 1996.0s
+U 0023 [GHOST TURN] | Ep 0047 | P_Rew: -224.9 | G_Rew:  155.4 | Win%:  58.0% | Die%:  97.9% | Loss(P/V): -0.009/14.230 | Ent: 1.378 | Time: 2085.0s
+U 0024 [GHOST TURN] | Ep 0049 | P_Rew: -190.7 | G_Rew:  138.6 | Win%:  57.2% | Die%:  98.0% | Loss(P/V): -0.005/10.748 | Ent: 1.376 | Time: 2177.5s
+U 0025 [PLAYER TURN] | Ep 0052 | P_Rew: -171.3 | G_Rew:  129.0 | Win%:  57.9% | Die%:  98.0% | Loss(P/V): 0.003/22.041 | Ent: 0.321 | Time: 2267.0s
+U 0026 [GHOST TURN] | Ep 0054 | P_Rew: -180.7 | G_Rew:  133.8 | Win%:  57.6% | Die%:  98.0% | Loss(P/V): -0.009/14.106 | Ent: 1.379 | Time: 2364.5s
+U 0027 [GHOST TURN] | Ep 0054 | P_Rew: -180.7 | G_Rew:  133.8 | Win%:  57.6% | Die%:  98.0% | Loss(P/V): -0.004/11.400 | Ent: 1.381 | Time: 2450.8s
+U 0028 [GHOST TURN] | Ep 0056 | P_Rew: -246.3 | G_Rew:  166.3 | Win%:  57.5% | Die%:  98.0% | Loss(P/V): -0.008/10.657 | Ent: 1.378 | Time: 2545.2s
+U 0029 [GHOST TURN] | Ep 0058 | P_Rew: -229.1 | G_Rew:  157.7 | Win%:  57.6% | Die%:  98.0% | Loss(P/V): -0.005/11.665 | Ent: 1.376 | Time: 2638.0s
+U 0030 [GHOST TURN] | Ep 0059 | P_Rew: -239.2 | G_Rew:  163.0 | Win%:  57.3% | Die%:  98.0% | Loss(P/V): -0.002/12.505 | Ent: 1.378 | Time: 2729.0s
+U 0031 [PLAYER TURN] | Ep 0062 | P_Rew:   41.1 | G_Rew:   24.3 | Win%:  54.7% | Die%: 100.0% | Loss(P/V): 0.003/24.479 | Ent: 0.337 | Time: 2818.6s
+U 0032 [GHOST TURN] | Ep 0064 | P_Rew:   94.8 | G_Rew:   -2.4 | Win%:  54.5% | Die%: 100.0% | Loss(P/V): -0.007/11.332 | Ent: 1.374 | Time: 2908.1s
+U 0033 [GHOST TURN] | Ep 0064 | P_Rew:   94.8 | G_Rew:   -2.4 | Win%:  54.5% | Die%: 100.0% | Loss(P/V): -0.007/11.028 | Ent: 1.378 | Time: 2998.6s
+U 0034 [GHOST TURN] | Ep 0064 | P_Rew:   94.8 | G_Rew:   -2.4 | Win%:  54.5% | Die%: 100.0% | Loss(P/V): -0.001/8.104 | Ent: 1.380 | Time: 3091.5s
+U 0035 [GHOST TURN] | Ep 0066 | P_Rew:  -87.8 | G_Rew:   88.5 | Win%:  56.5% | Die%: 100.0% | Loss(P/V): -0.006/11.868 | Ent: 1.372 | Time: 3177.7s
+U 0036 [GHOST TURN] | Ep 0066 | P_Rew:  -87.8 | G_Rew:   88.5 | Win%:  56.5% | Die%: 100.0% | Loss(P/V): -0.001/13.673 | Ent: 1.377 | Time: 3268.4s
+U 0037 [PLAYER TURN] | Ep 0067 | P_Rew: -166.1 | G_Rew:  127.4 | Win%:  56.9% | Die%: 100.0% | Loss(P/V): 0.005/19.556 | Ent: 0.421 | Time: 3360.8s
+U 0038 [GHOST TURN] | Ep 0070 | P_Rew:  -27.8 | G_Rew:   58.3 | Win%:  55.8% | Die%: 100.0% | Loss(P/V): -0.007/11.255 | Ent: 1.372 | Time: 3456.1s
+U 0039 [GHOST TURN] | Ep 0070 | P_Rew:  -27.8 | G_Rew:   58.3 | Win%:  55.8% | Die%: 100.0% | Loss(P/V): -0.004/11.741 | Ent: 1.376 | Time: 3543.8s
+U 0040 [GHOST TURN] | Ep 0071 | P_Rew: -190.2 | G_Rew:  138.5 | Win%:  56.3% | Die%:  98.0% | Loss(P/V): -0.003/11.653 | Ent: 1.368 | Time: 3634.6s
+U 0041 [GHOST TURN] | Ep 0074 | P_Rew: -136.1 | G_Rew:  111.0 | Win%:  56.7% | Die%:  98.0% | Loss(P/V): -0.003/14.518 | Ent: 1.365 | Time: 3725.9s
+U 0042 [GHOST TURN] | Ep 0080 | P_Rew: -152.6 | G_Rew:  119.9 | Win%:  56.0% | Die%:  98.0% | Loss(P/V): -0.001/11.796 | Ent: 1.361 | Time: 3814.5s
+U 0043 [PLAYER TURN] | Ep 0080 | P_Rew: -152.6 | G_Rew:  119.9 | Win%:  56.0% | Die%:  98.0% | Loss(P/V): -0.000/26.215 | Ent: 0.369 | Time: 3903.2s
+U 0044 [GHOST TURN] | Ep 0085 | P_Rew: -166.6 | G_Rew:  126.5 | Win%:  56.0% | Die%:  98.0% | Loss(P/V): -0.011/14.707 | Ent: 1.362 | Time: 3996.4s
+U 0045 [GHOST TURN] | Ep 0087 | P_Rew: -156.9 | G_Rew:  121.7 | Win%:  57.4% | Die%:  98.0% | Loss(P/V): -0.004/13.266 | Ent: 1.363 | Time: 4091.5s
+U 0046 [GHOST TURN] | Ep 0088 | P_Rew: -134.2 | G_Rew:  109.9 | Win%:  58.4% | Die%:  98.0% | Loss(P/V): -0.003/10.241 | Ent: 1.363 | Time: 4187.2s
+U 0047 [GHOST TURN] | Ep 0088 | P_Rew: -134.2 | G_Rew:  109.9 | Win%:  58.4% | Die%:  98.0% | Loss(P/V): -0.006/14.780 | Ent: 1.367 | Time: 4283.8s
+U 0048 [GHOST TURN] | Ep 0088 | P_Rew: -134.2 | G_Rew:  109.9 | Win%:  58.4% | Die%:  98.0% | Loss(P/V): -0.003/12.460 | Ent: 1.361 | Time: 4381.5s
+U 0049 [PLAYER TURN] | Ep 0088 | P_Rew: -134.2 | G_Rew:  109.9 | Win%:  58.4% | Die%:  98.0% | Loss(P/V): 0.018/8.910 | Ent: 0.540 | Time: 4475.8s
+U 0050 [GHOST TURN] | Ep 0089 | P_Rew: -483.2 | G_Rew:  284.6 | Win%:  59.2% | Die%:  98.0% | Loss(P/V): -0.000/8.079 | Ent: 1.352 | Time: 4570.5s
+U 0051 [GHOST TURN] | Ep 0091 | P_Rew: -588.7 | G_Rew:  337.6 | Win%:  58.4% | Die%:  98.0% | Loss(P/V): -0.004/12.145 | Ent: 1.356 | Time: 4663.3s
+U 0052 [GHOST TURN] | Ep 0094 | P_Rew: -505.6 | G_Rew:  295.8 | Win%:  57.6% | Die%:  98.0% | Loss(P/V): 0.001/13.918 | Ent: 1.363 | Time: 4755.4s
+U 0053 [GHOST TURN] | Ep 0096 | P_Rew: -502.2 | G_Rew:  293.7 | Win%:  57.1% | Die%:  98.0% | Loss(P/V): -0.005/15.906 | Ent: 1.365 | Time: 4850.5s
+U 0054 [GHOST TURN] | Ep 0099 | P_Rew: -537.8 | G_Rew:  311.3 | Win%:  57.1% | Die%:  98.0% | Loss(P/V): -0.005/15.024 | Ent: 1.359 | Time: 4943.9s
+U 0055 [PLAYER TURN] | Ep 0102 | P_Rew: -547.5 | G_Rew:  315.6 | Win%:  57.4% | Die%:  98.0% | Loss(P/V): 0.003/23.494 | Ent: 0.283 | Time: 5033.5s
+U 0056 [GHOST TURN] | Ep 0102 | P_Rew: -547.5 | G_Rew:  315.6 | Win%:  57.4% | Die%:  98.0% | Loss(P/V): -0.005/13.043 | Ent: 1.353 | Time: 5125.4s
+U 0057 [GHOST TURN] | Ep 0105 | P_Rew: -698.4 | G_Rew:  390.2 | Win%:  56.0% | Die%:  96.0% | Loss(P/V): -0.004/10.125 | Ent: 1.347 | Time: 5215.3s
+U 0058 [GHOST TURN] | Ep 0106 | P_Rew: -732.6 | G_Rew:  407.3 | Win%:  57.2% | Die%:  96.0% | Loss(P/V): -0.006/17.296 | Ent: 1.352 | Time: 5306.1s
+U 0059 [GHOST TURN] | Ep 0107 | P_Rew: -751.5 | G_Rew:  416.8 | Win%:  56.9% | Die%:  96.0% | Loss(P/V): -0.005/13.700 | Ent: 1.363 | Time: 5397.4s
+U 0060 [GHOST TURN] | Ep 0110 | P_Rew: -723.3 | G_Rew:  402.6 | Win%:  56.3% | Die%:  96.0% | Loss(P/V): -0.004/12.984 | Ent: 1.359 | Time: 5489.6s
+U 0061 [PLAYER TURN] | Ep 0110 | P_Rew: -723.3 | G_Rew:  402.6 | Win%:  56.3% | Die%:  96.0% | Loss(P/V): 0.013/15.141 | Ent: 0.450 | Time: 5578.6s
+U 0062 [GHOST TURN] | Ep 0112 | P_Rew: -816.4 | G_Rew:  448.8 | Win%:  59.1% | Die%:  96.0% | Loss(P/V): -0.005/13.785 | Ent: 1.361 | Time: 5671.8s
+U 0063 [GHOST TURN] | Ep 0113 | P_Rew: -779.5 | G_Rew:  430.1 | Win%:  59.1% | Die%:  96.0% | Loss(P/V): -0.001/14.226 | Ent: 1.361 | Time: 5765.0s
+U 0064 [GHOST TURN] | Ep 0115 | P_Rew: -630.7 | G_Rew:  356.2 | Win%:  58.3% | Die%:  96.0% | Loss(P/V): -0.004/14.926 | Ent: 1.356 | Time: 5857.9s
+U 0065 [GHOST TURN] | Ep 0120 | P_Rew: -551.6 | G_Rew:  316.8 | Win%:  55.3% | Die%:  96.0% | Loss(P/V): -0.003/14.102 | Ent: 1.356 | Time: 5949.1s
+U 0066 [GHOST TURN] | Ep 0121 | P_Rew: -393.5 | G_Rew:  239.0 | Win%:  55.0% | Die%:  98.0% | Loss(P/V): -0.001/13.994 | Ent: 1.351 | Time: 6043.7s
+U 0067 [PLAYER TURN] | Ep 0121 | P_Rew: -393.5 | G_Rew:  239.0 | Win%:  55.0% | Die%:  98.0% | Loss(P/V): 0.012/24.184 | Ent: 0.367 | Time: 6138.4s
+U 0068 [GHOST TURN] | Ep 0125 | P_Rew: -471.9 | G_Rew:  279.0 | Win%:  54.1% | Die%:  98.0% | Loss(P/V): -0.007/13.621 | Ent: 1.348 | Time: 6229.0s
+U 0069 [GHOST TURN] | Ep 0129 | P_Rew: -493.3 | G_Rew:  289.0 | Win%:  55.4% | Die%:  98.0% | Loss(P/V): -0.003/17.050 | Ent: 1.356 | Time: 6319.4s
+U 0070 [GHOST TURN] | Ep 0134 | P_Rew: -459.1 | G_Rew:  272.8 | Win%:  55.2% | Die%:  98.0% | Loss(P/V): -0.003/14.185 | Ent: 1.346 | Time: 6412.9s
+U 0071 [GHOST TURN] | Ep 0135 | P_Rew: -455.2 | G_Rew:  270.8 | Win%:  55.4% | Die%:  98.0% | Loss(P/V): -0.003/13.397 | Ent: 1.354 | Time: 6508.3s
+U 0072 [GHOST TURN] | Ep 0138 | P_Rew: -465.7 | G_Rew:  276.5 | Win%:  55.6% | Die%:  98.0% | Loss(P/V): -0.003/13.939 | Ent: 1.344 | Time: 6597.0s
+U 0073 [PLAYER TURN] | Ep 0139 | P_Rew: -108.7 | G_Rew:   98.0 | Win%:  55.0% | Die%:  98.0% | Loss(P/V): 0.006/28.272 | Ent: 0.374 | Time: 6690.1s
+U 0074 [GHOST TURN] | Ep 0139 | P_Rew: -108.7 | G_Rew:   98.0 | Win%:  55.0% | Die%:  98.0% | Loss(P/V): 0.007/9.018 | Ent: 1.327 | Time: 6780.0s
+U 0075 [GHOST TURN] | Ep 0140 | P_Rew: -181.5 | G_Rew:  134.1 | Win%:  55.2% | Die%:  98.0% | Loss(P/V): -0.001/11.591 | Ent: 1.346 | Time: 6875.6s
+U 0076 [GHOST TURN] | Ep 0141 | P_Rew: -287.5 | G_Rew:  187.0 | Win%:  56.2% | Die%:  98.0% | Loss(P/V): 0.002/10.018 | Ent: 1.341 | Time: 6970.1s
+U 0077 [GHOST TURN] | Ep 0141 | P_Rew: -287.5 | G_Rew:  187.0 | Win%:  56.2% | Die%:  98.0% | Loss(P/V): -0.003/12.597 | Ent: 1.357 | Time: 7060.0s
+U 0078 [GHOST TURN] | Ep 0141 | P_Rew: -287.5 | G_Rew:  187.0 | Win%:  56.2% | Die%:  98.0% | Loss(P/V): -0.001/7.154 | Ent: 1.358 | Time: 7150.4s
+U 0079 [PLAYER TURN] | Ep 0141 | P_Rew: -287.5 | G_Rew:  187.0 | Win%:  56.2% | Die%:  98.0% | Loss(P/V): 0.027/12.664 | Ent: 0.567 | Time: 7240.9s
+U 0080 [GHOST TURN] | Ep 0142 | P_Rew: -650.0 | G_Rew:  368.4 | Win%:  56.6% | Die%:  98.0% | Loss(P/V): -0.004/9.884 | Ent: 1.354 | Time: 7336.9s
+U 0081 [GHOST TURN] | Ep 0145 | P_Rew: -678.2 | G_Rew:  382.7 | Win%:  57.0% | Die%:  98.0% | Loss(P/V): -0.005/12.582 | Ent: 1.347 | Time: 7425.7s
+U 0082 [GHOST TURN] | Ep 0148 | P_Rew: -629.2 | G_Rew:  358.8 | Win%:  57.1% | Die%:  98.0% | Loss(P/V): -0.001/11.112 | Ent: 1.353 | Time: 7524.6s
+U 0083 [GHOST TURN] | Ep 0149 | P_Rew: -628.2 | G_Rew:  358.1 | Win%:  58.3% | Die%:  98.0% | Loss(P/V): -0.008/11.627 | Ent: 1.364 | Time: 7623.9s
+U 0084 [GHOST TURN] | Ep 0150 | P_Rew: -696.3 | G_Rew:  392.6 | Win%:  58.3% | Die%:  98.0% | Loss(P/V): -0.006/9.595 | Ent: 1.359 | Time: 7714.3s
+U 0085 [PLAYER TURN] | Ep 0154 | P_Rew: -500.5 | G_Rew:  295.8 | Win%:  58.4% | Die%: 100.0% | Loss(P/V): 0.005/24.071 | Ent: 0.218 | Time: 7812.5s
+U 0086 [GHOST TURN] | Ep 0154 | P_Rew: -500.5 | G_Rew:  295.8 | Win%:  58.4% | Die%: 100.0% | Loss(P/V): -0.002/13.912 | Ent: 1.361 | Time: 7903.0s
+U 0087 [GHOST TURN] | Ep 0156 | P_Rew: -543.8 | G_Rew:  317.1 | Win%:  57.8% | Die%: 100.0% | Loss(P/V): -0.001/13.507 | Ent: 1.363 | Time: 7991.2s
+U 0088 [GHOST TURN] | Ep 0156 | P_Rew: -543.8 | G_Rew:  317.1 | Win%:  57.8% | Die%: 100.0% | Loss(P/V): -0.004/11.096 | Ent: 1.368 | Time: 8087.4s
+U 0089 [GHOST TURN] | Ep 0156 | P_Rew: -543.8 | G_Rew:  317.1 | Win%:  57.8% | Die%: 100.0% | Loss(P/V): 0.003/6.215 | Ent: 1.351 | Time: 8177.5s
+U 0090 [GHOST TURN] | Ep 0159 | P_Rew: -722.3 | G_Rew:  406.0 | Win%:  58.3% | Die%: 100.0% | Loss(P/V): -0.004/13.312 | Ent: 1.368 | Time: 8267.0s
+U 0091 [PLAYER TURN] | Ep 0160 | P_Rew: -767.3 | G_Rew:  428.3 | Win%:  58.7% | Die%: 100.0% | Loss(P/V): 0.010/22.283 | Ent: 0.324 | Time: 8360.5s
+U 0092 [GHOST TURN] | Ep 0162 | P_Rew: -704.9 | G_Rew:  397.0 | Win%:  57.0% | Die%: 100.0% | Loss(P/V): -0.002/13.400 | Ent: 1.365 | Time: 8453.2s
+U 0093 [GHOST TURN] | Ep 0163 | P_Rew: -720.1 | G_Rew:  404.9 | Win%:  56.8% | Die%: 100.0% | Loss(P/V): -0.006/16.081 | Ent: 1.366 | Time: 8550.3s
+U 0094 [GHOST TURN] | Ep 0169 | P_Rew: -702.9 | G_Rew:  395.9 | Win%:  57.7% | Die%: 100.0% | Loss(P/V): -0.008/14.832 | Ent: 1.368 | Time: 8642.2s
+U 0095 [GHOST TURN] | Ep 0175 | P_Rew: -700.0 | G_Rew:  394.6 | Win%:  54.8% | Die%: 100.0% | Loss(P/V): -0.008/15.111 | Ent: 1.369 | Time: 8730.0s
+U 0096 [GHOST TURN] | Ep 0180 | P_Rew: -669.0 | G_Rew:  380.1 | Win%:  54.2% | Die%: 100.0% | Loss(P/V): -0.003/13.807 | Ent: 1.367 | Time: 8818.7s
+U 0097 [PLAYER TURN] | Ep 0184 | P_Rew: -685.8 | G_Rew:  388.3 | Win%:  54.1% | Die%: 100.0% | Loss(P/V): 0.005/27.309 | Ent: 0.269 | Time: 8909.6s
+U 0098 [GHOST TURN] | Ep 0185 | P_Rew: -699.2 | G_Rew:  394.6 | Win%:  54.4% | Die%: 100.0% | Loss(P/V): -0.005/12.800 | Ent: 1.364 | Time: 9002.5s
+U 0099 [GHOST TURN] | Ep 0186 | P_Rew: -670.1 | G_Rew:  379.9 | Win%:  54.3% | Die%: 100.0% | Loss(P/V): -0.003/11.947 | Ent: 1.361 | Time: 9094.8s
+U 0100 [GHOST TURN] | Ep 0188 | P_Rew: -690.2 | G_Rew:  390.1 | Win%:  54.3% | Die%: 100.0% | Loss(P/V): -0.005/11.653 | Ent: 1.366 | Time: 9185.6s
+U 0101 [GHOST TURN] | Ep 0189 | P_Rew: -728.3 | G_Rew:  408.9 | Win%:  54.5% | Die%: 100.0% | Loss(P/V): -0.003/10.746 | Ent: 1.364 | Time: 9280.7s
+U 0102 [GHOST TURN] | Ep 0192 | P_Rew:  -44.5 | G_Rew:   67.2 | Win%:  52.9% | Die%: 100.0% | Loss(P/V): -0.003/13.546 | Ent: 1.366 | Time: 9376.3s
+U 0103 [PLAYER TURN] | Ep 0194 | P_Rew:  -28.1 | G_Rew:   59.0 | Win%:  53.3% | Die%: 100.0% | Loss(P/V): 0.009/20.013 | Ent: 0.271 | Time: 9467.1s
+U 0104 [GHOST TURN] | Ep 0194 | P_Rew:  -28.1 | G_Rew:   59.0 | Win%:  53.3% | Die%: 100.0% | Loss(P/V): -0.006/10.181 | Ent: 1.357 | Time: 9560.8s
+U 0105 [GHOST TURN] | Ep 0194 | P_Rew:  -28.1 | G_Rew:   59.0 | Win%:  53.3% | Die%: 100.0% | Loss(P/V): 0.002/6.309 | Ent: 1.353 | Time: 9652.6s
+U 0106 [GHOST TURN] | Ep 0195 | P_Rew: -477.6 | G_Rew:  282.8 | Win%:  53.9% | Die%:  98.0% | Loss(P/V): -0.000/8.021 | Ent: 1.346 | Time: 9749.0s
+U 0107 [GHOST TURN] | Ep 0195 | P_Rew: -477.6 | G_Rew:  282.8 | Win%:  53.9% | Die%:  98.0% | Loss(P/V): 0.002/9.374 | Ent: 1.340 | Time: 9842.0s
+U 0108 [GHOST TURN] | Ep 0196 | P_Rew: -508.0 | G_Rew:  298.0 | Win%:  54.6% | Die%:  98.0% | Loss(P/V): 0.001/14.322 | Ent: 1.350 | Time: 9934.0s
+U 0109 [PLAYER TURN] | Ep 0197 | P_Rew: -543.7 | G_Rew:  315.8 | Win%:  54.3% | Die%:  98.0% | Loss(P/V): 0.004/21.529 | Ent: 0.306 | Time: 10026.9s
+U 0110 [GHOST TURN] | Ep 0197 | P_Rew: -543.7 | G_Rew:  315.8 | Win%:  54.3% | Die%:  98.0% | Loss(P/V): -0.001/7.309 | Ent: 1.347 | Time: 10124.5s
+U 0111 [GHOST TURN] | Ep 0198 | P_Rew: -817.7 | G_Rew:  452.4 | Win%:  55.2% | Die%:  98.0% | Loss(P/V): -0.002/8.329 | Ent: 1.342 | Time: 10217.1s
+U 0112 [GHOST TURN] | Ep 0203 | P_Rew: -761.0 | G_Rew:  423.9 | Win%:  52.5% | Die%:  98.0% | Loss(P/V): 0.001/12.762 | Ent: 1.331 | Time: 10306.9s
+U 0113 [GHOST TURN] | Ep 0211 | P_Rew: -448.0 | G_Rew:  267.8 | Win%:  47.1% | Die%:  98.0% | Loss(P/V): -0.000/16.841 | Ent: 1.328 | Time: 10399.5s
+U 0114 [GHOST TURN] | Ep 0212 | P_Rew: -441.4 | G_Rew:  264.7 | Win%:  48.4% | Die%:  98.0% | Loss(P/V): -0.002/13.735 | Ent: 1.334 | Time: 10495.7s
+U 0115 [PLAYER TURN] | Ep 0215 | P_Rew: -424.7 | G_Rew:  256.3 | Win%:  46.9% | Die%:  98.0% | Loss(P/V): 0.007/22.055 | Ent: 0.348 | Time: 10586.1s
+U 0116 [GHOST TURN] | Ep 0215 | P_Rew: -424.7 | G_Rew:  256.3 | Win%:  46.9% | Die%:  98.0% | Loss(P/V): 0.002/14.596 | Ent: 1.327 | Time: 10679.0s
+U 0117 [GHOST TURN] | Ep 0215 | P_Rew: -424.7 | G_Rew:  256.3 | Win%:  46.9% | Die%:  98.0% | Loss(P/V): 0.000/9.666 | Ent: 1.323 | Time: 10772.1s
+U 0118 [GHOST TURN] | Ep 0217 | P_Rew: -582.5 | G_Rew:  335.2 | Win%:  48.2% | Die%:  98.0% | Loss(P/V): -0.004/11.302 | Ent: 1.329 | Time: 10870.0s
+U 0119 [GHOST TURN] | Ep 0219 | P_Rew: -569.1 | G_Rew:  328.8 | Win%:  48.2% | Die%:  98.0% | Loss(P/V): 0.001/11.322 | Ent: 1.327 | Time: 10967.6s
+U 0120 [GHOST TURN] | Ep 0220 | P_Rew: -546.7 | G_Rew:  317.6 | Win%:  48.9% | Die%:  98.0% | Loss(P/V): -0.000/12.945 | Ent: 1.320 | Time: 11060.5s
+U 0121 [PLAYER TURN] | Ep 0221 | P_Rew: -542.4 | G_Rew:  315.2 | Win%:  50.2% | Die%:  98.0% | Loss(P/V): 0.004/20.735 | Ent: 0.347 | Time: 11154.2s
+U 0122 [GHOST TURN] | Ep 0223 | P_Rew: -562.1 | G_Rew:  324.4 | Win%:  51.5% | Die%:  98.0% | Loss(P/V): -0.003/14.682 | Ent: 1.326 | Time: 11246.3s
+U 0123 [GHOST TURN] | Ep 0225 | P_Rew: -538.2 | G_Rew:  311.9 | Win%:  53.3% | Die%:  98.0% | Loss(P/V): -0.006/17.484 | Ent: 1.332 | Time: 11338.4s
+U 0124 [GHOST TURN] | Ep 0227 | P_Rew: -509.0 | G_Rew:  297.3 | Win%:  54.6% | Die%:  98.0% | Loss(P/V): -0.003/15.957 | Ent: 1.323 | Time: 11426.9s
+U 0125 [GHOST TURN] | Ep 0228 | P_Rew: -504.6 | G_Rew:  294.7 | Win%:  55.7% | Die%:  98.0% | Loss(P/V): -0.002/14.035 | Ent: 1.321 | Time: 11523.7s
+U 0126 [GHOST TURN] | Ep 0230 | P_Rew: -578.0 | G_Rew:  331.4 | Win%:  55.4% | Die%:  98.0% | Loss(P/V): -0.002/12.352 | Ent: 1.326 | Time: 11617.9s
+U 0127 [PLAYER TURN] | Ep 0231 | P_Rew: -579.7 | G_Rew:  332.2 | Win%:  55.5% | Die%:  98.0% | Loss(P/V): -0.001/24.223 | Ent: 0.328 | Time: 11710.3s
+U 0128 [GHOST TURN] | Ep 0231 | P_Rew: -579.7 | G_Rew:  332.2 | Win%:  55.5% | Die%:  98.0% | Loss(P/V): -0.005/9.490 | Ent: 1.327 | Time: 11799.1s
+U 0129 [GHOST TURN] | Ep 0232 | P_Rew: -701.6 | G_Rew:  393.4 | Win%:  55.5% | Die%:  98.0% | Loss(P/V): -0.003/13.177 | Ent: 1.328 | Time: 11891.6s
+U 0130 [GHOST TURN] | Ep 0232 | P_Rew: -701.6 | G_Rew:  393.4 | Win%:  55.5% | Die%:  98.0% | Loss(P/V): -0.001/11.871 | Ent: 1.318 | Time: 11980.0s
+U 0131 [GHOST TURN] | Ep 0233 | P_Rew: -884.4 | G_Rew:  484.6 | Win%:  57.1% | Die%:  98.0% | Loss(P/V): 0.002/7.864 | Ent: 1.296 | Time: 12068.0s
+U 0132 [GHOST TURN] | Ep 0235 | P_Rew: -815.4 | G_Rew:  450.3 | Win%:  58.2% | Die%:  98.0% | Loss(P/V): -0.003/13.534 | Ent: 1.323 | Time: 12159.3s
+U 0133 [PLAYER TURN] | Ep 0238 | P_Rew: -817.5 | G_Rew:  451.6 | Win%:  55.6% | Die%:  98.0% | Loss(P/V): 0.006/20.466 | Ent: 0.282 | Time: 12256.5s
+U 0134 [GHOST TURN] | Ep 0238 | P_Rew: -817.5 | G_Rew:  451.6 | Win%:  55.6% | Die%:  98.0% | Loss(P/V): -0.006/11.867 | Ent: 1.336 | Time: 12357.7s
 Quit requested.
 
 ======================================================================
-Training session started at 2026-09-05T10:58:20.933907
+Training session started at 2026-09-05T22:54:18.862078
 ======================================================================
 Loaded adversarial player checkpoint.
 Loaded adversarial ghost checkpoint.
 ============================================================
-Asymmetric Adv PPO | WU: 50 | Ratio: 5:1
-U 0001 [GHOST WARMUP] | Ep 0002 | P_Rew:   73.4 | G_Rew:   13.3 | Win%:  18.6% | Die%: 100.0% | Loss(P/V): 0.019/13.949 | Ent: 1.219 | Time: 85.8s
-U 0002 [GHOST WARMUP] | Ep 0002 | P_Rew:   73.4 | G_Rew:   13.3 | Win%:  18.6% | Die%: 100.0% | Loss(P/V): 0.015/19.838 | Ent: 1.197 | Time: 182.4s
-U 0003 [GHOST WARMUP] | Ep 0004 | P_Rew: -1227.3 | G_Rew:  661.2 | Win%:  37.0% | Die%: 100.0% | Loss(P/V): 0.010/14.217 | Ent: 1.236 | Time: 270.7s
-U 0004 [GHOST WARMUP] | Ep 0010 | P_Rew: -506.7 | G_Rew:  302.3 | Win%:  31.8% | Die%: 100.0% | Loss(P/V): 0.015/12.077 | Ent: 1.215 | Time: 360.6s
-U 0005 [GHOST WARMUP] | Ep 0010 | P_Rew: -506.7 | G_Rew:  302.3 | Win%:  31.8% | Die%: 100.0% | Loss(P/V): 0.015/14.072 | Ent: 1.231 | Time: 456.9s
+Asymmetric Adv PPO | WU: 0 | Ratio: 5:1
+U 0001 [PLAYER TURN] | Ep 0001 | P_Rew: -1113.2 | G_Rew:  606.6 | Win%:  94.0% | Die%: 100.0% | Loss(P/V): 0.003/23.870 | Ent: 0.412 | Time: 91.2s
 Interrupted.
 
 ======================================================================
-Training session started at 2026-09-05T11:07:16.183661
+Training session started at 2026-09-05T22:58:21.171932
 ======================================================================
 Loaded adversarial player checkpoint.
 Loaded adversarial ghost checkpoint.
 ============================================================
-Asymmetric Adv PPO | WU: 50 | Ratio: 5:1
-U 0001 [GHOST WARMUP] | Ep 0002 | P_Rew:  347.0 | G_Rew: -128.5 | Win%:  42.8% | Die%: 100.0% | Loss(P/V): 0.006/11.599 | Ent: 1.268 | Time: 90.0s
-U 0002 [GHOST WARMUP] | Ep 0004 | P_Rew:  311.6 | G_Rew: -108.3 | Win%:  45.5% | Die%: 100.0% | Loss(P/V): 0.008/11.475 | Ent: 1.274 | Time: 182.3s
-U 0003 [GHOST WARMUP] | Ep 0004 | P_Rew:  311.6 | G_Rew: -108.3 | Win%:  45.5% | Die%: 100.0% | Loss(P/V): 0.015/13.784 | Ent: 1.258 | Time: 271.5s
-U 0004 [GHOST WARMUP] | Ep 0006 | P_Rew: -715.5 | G_Rew:  404.4 | Win%:  53.4% | Die%: 100.0% | Loss(P/V): 0.005/11.547 | Ent: 1.271 | Time: 363.0s
-U 0005 [GHOST WARMUP] | Ep 0008 | P_Rew: -512.1 | G_Rew:  303.5 | Win%:  53.0% | Die%: 100.0% | Loss(P/V): 0.007/12.576 | Ent: 1.276 | Time: 453.0s
-U 0006 [GHOST WARMUP] | Ep 0010 | P_Rew: -412.0 | G_Rew:  254.0 | Win%:  51.6% | Die%: 100.0% | Loss(P/V): 0.007/10.639 | Ent: 1.293 | Time: 543.6s
-U 0007 [GHOST WARMUP] | Ep 0011 | P_Rew: -328.5 | G_Rew:  210.6 | Win%:  51.0% | Die%: 100.0% | Loss(P/V): -0.006/12.442 | Ent: 1.300 | Time: 642.4s
-U 0008 [GHOST WARMUP] | Ep 0012 | P_Rew: -407.3 | G_Rew:  250.3 | Win%:  51.6% | Die%: 100.0% | Loss(P/V): 0.007/13.308 | Ent: 1.299 | Time: 733.3s
-U 0009 [GHOST WARMUP] | Ep 0013 | P_Rew: -358.2 | G_Rew:  226.0 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): 0.009/11.850 | Ent: 1.300 | Time: 824.4s
-U 0010 [GHOST WARMUP] | Ep 0013 | P_Rew: -358.2 | G_Rew:  226.0 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): 0.012/11.176 | Ent: 1.231 | Time: 918.9s
-U 0011 [GHOST WARMUP] | Ep 0015 | P_Rew: -715.3 | G_Rew:  404.3 | Win%:  54.2% | Die%: 100.0% | Loss(P/V): 0.009/11.003 | Ent: 1.273 | Time: 1012.1s
+Asymmetric Adv PPO | WU: 0 | Ratio: 5:1
+U 0001 [PLAYER TURN] | Ep 0006 | P_Rew:  176.5 | G_Rew:  -39.9 | Win%:  40.7% | Die%: 100.0% | Loss(P/V): -0.005/24.545 | Ent: 0.337 | Time: 92.0s
+U 0002 [GHOST TURN] | Ep 0009 | P_Rew:  140.5 | G_Rew:  -22.5 | Win%:  42.1% | Die%: 100.0% | Loss(P/V): 0.000/11.871 | Ent: 1.322 | Time: 195.5s
+U 0003 [GHOST TURN] | Ep 0011 | P_Rew:  -96.3 | G_Rew:   96.3 | Win%:  44.9% | Die%: 100.0% | Loss(P/V): -0.006/12.710 | Ent: 1.332 | Time: 307.4s
+U 0004 [GHOST TURN] | Ep 0012 | P_Rew:  -92.2 | G_Rew:   93.6 | Win%:  46.0% | Die%: 100.0% | Loss(P/V): -0.005/11.484 | Ent: 1.318 | Time: 404.7s
+U 0005 [GHOST TURN] | Ep 0015 | P_Rew:  -45.9 | G_Rew:   70.3 | Win%:  45.7% | Die%: 100.0% | Loss(P/V): -0.002/13.075 | Ent: 1.319 | Time: 505.9s
+U 0006 [GHOST TURN] | Ep 0015 | P_Rew:  -45.9 | G_Rew:   70.3 | Win%:  45.7% | Die%: 100.0% | Loss(P/V): 0.001/16.845 | Ent: 1.322 | Time: 600.9s
+U 0007 [PLAYER TURN] | Ep 0017 | P_Rew: -254.3 | G_Rew:  174.8 | Win%:  49.8% | Die%: 100.0% | Loss(P/V): 0.006/23.416 | Ent: 0.433 | Time: 689.8s
+U 0008 [GHOST TURN] | Ep 0019 | P_Rew: -211.6 | G_Rew:  153.7 | Win%:  52.2% | Die%: 100.0% | Loss(P/V): -0.004/13.290 | Ent: 1.322 | Time: 778.7s
+U 0009 [GHOST TURN] | Ep 0021 | P_Rew: -273.5 | G_Rew:  184.4 | Win%:  51.1% | Die%: 100.0% | Loss(P/V): -0.002/9.687 | Ent: 1.317 | Time: 870.5s
+U 0010 [GHOST TURN] | Ep 0023 | P_Rew: -194.5 | G_Rew:  145.1 | Win%:  51.6% | Die%: 100.0% | Loss(P/V): -0.007/15.401 | Ent: 1.333 | Time: 959.3s
+U 0011 [GHOST TURN] | Ep 0026 | P_Rew: -126.2 | G_Rew:  110.4 | Win%:  51.6% | Die%: 100.0% | Loss(P/V): -0.002/10.817 | Ent: 1.338 | Time: 1050.3s
+U 0012 [GHOST TURN] | Ep 0029 | P_Rew:  -95.2 | G_Rew:   94.8 | Win%:  51.6% | Die%: 100.0% | Loss(P/V): -0.005/15.619 | Ent: 1.339 | Time: 1147.4s
+U 0013 [PLAYER TURN] | Ep 0031 | P_Rew: -115.4 | G_Rew:  104.8 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): 0.006/26.744 | Ent: 0.407 | Time: 1237.7s
+U 0014 [GHOST TURN] | Ep 0031 | P_Rew: -115.4 | G_Rew:  104.8 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): -0.001/15.978 | Ent: 1.336 | Time: 1327.4s
+U 0015 [GHOST TURN] | Ep 0034 | P_Rew:   -7.4 | G_Rew:   51.0 | Win%:  55.7% | Die%: 100.0% | Loss(P/V): -0.005/14.023 | Ent: 1.325 | Time: 1416.1s
+U 0016 [GHOST TURN] | Ep 0037 | P_Rew:   32.1 | G_Rew:   31.0 | Win%:  55.4% | Die%: 100.0% | Loss(P/V): 0.000/11.562 | Ent: 1.307 | Time: 1511.8s
+U 0017 [GHOST TURN] | Ep 0041 | P_Rew:   45.5 | G_Rew:   24.3 | Win%:  53.8% | Die%: 100.0% | Loss(P/V): 0.001/11.520 | Ent: 1.314 | Time: 1599.5s
+U 0018 [GHOST TURN] | Ep 0041 | P_Rew:   45.5 | G_Rew:   24.3 | Win%:  53.8% | Die%: 100.0% | Loss(P/V): 0.001/12.834 | Ent: 1.317 | Time: 1688.3s
+U 0019 [PLAYER TURN] | Ep 0041 | P_Rew:   45.5 | G_Rew:   24.3 | Win%:  53.8% | Die%: 100.0% | Loss(P/V): 0.008/12.400 | Ent: 0.626 | Time: 1777.2s
+U 0020 [GHOST TURN] | Ep 0042 | P_Rew: -220.5 | G_Rew:  157.4 | Win%:  54.6% | Die%: 100.0% | Loss(P/V): 0.004/9.079 | Ent: 1.297 | Time: 1867.5s
+U 0021 [GHOST TURN] | Ep 0045 | P_Rew: -159.9 | G_Rew:  127.1 | Win%:  54.5% | Die%: 100.0% | Loss(P/V): 0.001/10.816 | Ent: 1.297 | Time: 1957.1s
+U 0022 [GHOST TURN] | Ep 0047 | P_Rew: -156.6 | G_Rew:  125.5 | Win%:  54.5% | Die%: 100.0% | Loss(P/V): -0.003/14.618 | Ent: 1.330 | Time: 2046.1s
+U 0023 [GHOST TURN] | Ep 0049 | P_Rew: -120.0 | G_Rew:  107.1 | Win%:  54.2% | Die%: 100.0% | Loss(P/V): -0.002/12.676 | Ent: 1.323 | Time: 2141.8s
+U 0024 [GHOST TURN] | Ep 0050 | P_Rew:  -96.4 | G_Rew:   95.4 | Win%:  54.7% | Die%: 100.0% | Loss(P/V): -0.003/14.964 | Ent: 1.330 | Time: 2242.0s
+U 0025 [PLAYER TURN] | Ep 0051 | P_Rew:  -71.3 | G_Rew:   82.9 | Win%:  55.7% | Die%: 100.0% | Loss(P/V): -0.001/27.274 | Ent: 0.441 | Time: 2328.5s
+U 0026 [GHOST TURN] | Ep 0054 | P_Rew: -136.6 | G_Rew:  115.3 | Win%:  56.0% | Die%: 100.0% | Loss(P/V): -0.002/10.528 | Ent: 1.320 | Time: 2418.7s
+U 0027 [GHOST TURN] | Ep 0058 | P_Rew: -124.0 | G_Rew:  108.8 | Win%:  56.6% | Die%: 100.0% | Loss(P/V): 0.001/15.382 | Ent: 1.325 | Time: 2509.3s
+U 0028 [GHOST TURN] | Ep 0058 | P_Rew: -124.0 | G_Rew:  108.8 | Win%:  56.6% | Die%: 100.0% | Loss(P/V): -0.002/12.818 | Ent: 1.315 | Time: 2594.2s
+U 0029 [GHOST TURN] | Ep 0058 | P_Rew: -124.0 | G_Rew:  108.8 | Win%:  56.6% | Die%: 100.0% | Loss(P/V): 0.007/5.210 | Ent: 1.300 | Time: 2681.1s
+U 0030 [GHOST TURN] | Ep 0060 | P_Rew: -367.8 | G_Rew:  230.1 | Win%:  57.3% | Die%: 100.0% | Loss(P/V): 0.002/10.145 | Ent: 1.300 | Time: 2777.1s
+U 0031 [PLAYER TURN] | Ep 0061 | P_Rew: -301.8 | G_Rew:  197.1 | Win%:  56.9% | Die%: 100.0% | Loss(P/V): 0.004/26.351 | Ent: 0.409 | Time: 2868.2s
+U 0032 [GHOST TURN] | Ep 0063 | P_Rew: -398.5 | G_Rew:  245.4 | Win%:  56.5% | Die%: 100.0% | Loss(P/V): -0.003/12.376 | Ent: 1.314 | Time: 2962.2s
+U 0033 [GHOST TURN] | Ep 0066 | P_Rew: -282.8 | G_Rew:  187.4 | Win%:  57.1% | Die%: 100.0% | Loss(P/V): -0.005/14.053 | Ent: 1.317 | Time: 3052.6s
+U 0034 [GHOST TURN] | Ep 0069 | P_Rew: -275.4 | G_Rew:  183.5 | Win%:  56.6% | Die%: 100.0% | Loss(P/V): -0.001/12.850 | Ent: 1.310 | Time: 3144.5s
+U 0035 [GHOST TURN] | Ep 0070 | P_Rew: -235.1 | G_Rew:  163.6 | Win%:  56.3% | Die%: 100.0% | Loss(P/V): -0.003/15.554 | Ent: 1.301 | Time: 3238.4s
+U 0036 [GHOST TURN] | Ep 0071 | P_Rew: -223.5 | G_Rew:  157.8 | Win%:  57.8% | Die%: 100.0% | Loss(P/V): -0.003/12.952 | Ent: 1.293 | Time: 3329.5s
+U 0037 [PLAYER TURN] | Ep 0072 | P_Rew: -225.8 | G_Rew:  158.7 | Win%:  57.5% | Die%: 100.0% | Loss(P/V): 0.005/21.432 | Ent: 0.496 | Time: 3425.7s
+U 0038 [GHOST TURN] | Ep 0073 | P_Rew: -312.9 | G_Rew:  202.0 | Win%:  58.6% | Die%: 100.0% | Loss(P/V): -0.004/12.530 | Ent: 1.317 | Time: 3519.8s
+U 0039 [GHOST TURN] | Ep 0075 | P_Rew: -329.3 | G_Rew:  210.4 | Win%:  57.7% | Die%: 100.0% | Loss(P/V): -0.006/12.588 | Ent: 1.304 | Time: 3612.1s
+U 0040 [GHOST TURN] | Ep 0076 | P_Rew: -339.9 | G_Rew:  215.9 | Win%:  58.5% | Die%: 100.0% | Loss(P/V): -0.003/11.053 | Ent: 1.321 | Time: 3703.4s
+U 0041 [GHOST TURN] | Ep 0080 | P_Rew: -294.0 | G_Rew:  193.0 | Win%:  57.7% | Die%: 100.0% | Loss(P/V): -0.002/11.511 | Ent: 1.299 | Time: 3799.5s
+U 0042 [GHOST TURN] | Ep 0080 | P_Rew: -294.0 | G_Rew:  193.0 | Win%:  57.7% | Die%: 100.0% | Loss(P/V): -0.002/11.908 | Ent: 1.344 | Time: 3891.7s
+U 0043 [PLAYER TURN] | Ep 0087 | P_Rew: -435.9 | G_Rew:  263.9 | Win%:  54.7% | Die%: 100.0% | Loss(P/V): 0.001/21.594 | Ent: 0.342 | Time: 3979.0s
+U 0044 [GHOST TURN] | Ep 0088 | P_Rew: -439.1 | G_Rew:  265.7 | Win%:  53.5% | Die%: 100.0% | Loss(P/V): -0.003/10.016 | Ent: 1.322 | Time: 4071.2s
+U 0045 [GHOST TURN] | Ep 0089 | P_Rew: -493.9 | G_Rew:  293.1 | Win%:  54.0% | Die%: 100.0% | Loss(P/V): -0.004/10.764 | Ent: 1.330 | Time: 4161.6s
+U 0046 [GHOST TURN] | Ep 0090 | P_Rew: -500.1 | G_Rew:  296.3 | Win%:  55.5% | Die%: 100.0% | Loss(P/V): -0.000/12.220 | Ent: 1.338 | Time: 4248.9s
+U 0047 [GHOST TURN] | Ep 0090 | P_Rew: -500.1 | G_Rew:  296.3 | Win%:  55.5% | Die%: 100.0% | Loss(P/V): 0.000/12.118 | Ent: 1.322 | Time: 4344.8s
+U 0048 [GHOST TURN] | Ep 0097 | P_Rew: -440.0 | G_Rew:  265.4 | Win%:  52.5% | Die%: 100.0% | Loss(P/V): -0.003/12.482 | Ent: 1.336 | Time: 4434.8s
+U 0049 [PLAYER TURN] | Ep 0100 | P_Rew: -481.7 | G_Rew:  286.5 | Win%:  52.5% | Die%: 100.0% | Loss(P/V): 0.008/26.668 | Ent: 0.429 | Time: 4522.7s
+U 0050 [GHOST TURN] | Ep 0103 | P_Rew: -462.5 | G_Rew:  276.2 | Win%:  52.1% | Die%: 100.0% | Loss(P/V): -0.004/15.261 | Ent: 1.335 | Time: 4604.6s
+U 0051 [GHOST TURN] | Ep 0105 | P_Rew: -450.6 | G_Rew:  270.5 | Win%:  52.5% | Die%: 100.0% | Loss(P/V): -0.003/11.325 | Ent: 1.343 | Time: 4699.0s
+U 0052 [GHOST TURN] | Ep 0106 | P_Rew: -502.1 | G_Rew:  296.5 | Win%:  51.9% | Die%: 100.0% | Loss(P/V): -0.006/9.942 | Ent: 1.334 | Time: 4788.4s
+U 0053 [GHOST TURN] | Ep 0108 | P_Rew: -481.8 | G_Rew:  286.3 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): -0.001/13.964 | Ent: 1.331 | Time: 4880.5s
+U 0054 [GHOST TURN] | Ep 0108 | P_Rew: -481.8 | G_Rew:  286.3 | Win%:  53.1% | Die%: 100.0% | Loss(P/V): 0.005/8.863 | Ent: 1.337 | Time: 4971.4s
+U 0055 [PLAYER TURN] | Ep 0112 | P_Rew: -264.0 | G_Rew:  178.0 | Win%:  53.3% | Die%: 100.0% | Loss(P/V): 0.006/22.572 | Ent: 0.410 | Time: 5059.2s
+U 0056 [GHOST TURN] | Ep 0113 | P_Rew: -258.6 | G_Rew:  175.3 | Win%:  53.2% | Die%: 100.0% | Loss(P/V): -0.006/11.634 | Ent: 1.339 | Time: 5148.1s
+U 0057 [GHOST TURN] | Ep 0114 | P_Rew: -277.2 | G_Rew:  184.6 | Win%:  54.0% | Die%: 100.0% | Loss(P/V): -0.001/12.081 | Ent: 1.345 | Time: 5237.0s
+U 0058 [GHOST TURN] | Ep 0116 | P_Rew: -315.8 | G_Rew:  204.1 | Win%:  54.0% | Die%: 100.0% | Loss(P/V): -0.003/16.572 | Ent: 1.340 | Time: 5331.9s
+U 0059 [GHOST TURN] | Ep 0117 | P_Rew: -397.6 | G_Rew:  244.8 | Win%:  54.4% | Die%: 100.0% | Loss(P/V): -0.005/11.478 | Ent: 1.342 | Time: 5424.3s
+U 0060 [GHOST TURN] | Ep 0118 | P_Rew: -414.4 | G_Rew:  253.2 | Win%:  54.7% | Die%: 100.0% | Loss(P/V): -0.002/12.468 | Ent: 1.342 | Time: 5514.5s
+U 0061 [PLAYER TURN] | Ep 0120 | P_Rew: -423.0 | G_Rew:  257.5 | Win%:  54.6% | Die%: 100.0% | Loss(P/V): 0.009/21.829 | Ent: 0.395 | Time: 5603.3s
+U 0062 [GHOST TURN] | Ep 0121 | P_Rew: -411.6 | G_Rew:  251.6 | Win%:  54.7% | Die%: 100.0% | Loss(P/V): -0.004/14.340 | Ent: 1.334 | Time: 5701.3s
+U 0063 [GHOST TURN] | Ep 0121 | P_Rew: -411.6 | G_Rew:  251.6 | Win%:  54.7% | Die%: 100.0% | Loss(P/V): -0.004/15.518 | Ent: 1.342 | Time: 5788.6s
+U 0064 [GHOST TURN] | Ep 0122 | P_Rew: -483.0 | G_Rew:  287.3 | Win%:  55.2% | Die%: 100.0% | Loss(P/V): -0.003/17.639 | Ent: 1.342 | Time: 5877.7s
+U 0065 [GHOST TURN] | Ep 0124 | P_Rew: -425.7 | G_Rew:  258.9 | Win%:  54.8% | Die%: 100.0% | Loss(P/V): -0.005/14.322 | Ent: 1.347 | Time: 5966.8s
+U 0066 [GHOST TURN] | Ep 0125 | P_Rew: -418.6 | G_Rew:  255.3 | Win%:  55.5% | Die%: 100.0% | Loss(P/V): -0.004/12.537 | Ent: 1.330 | Time: 6055.9s
+U 0067 [PLAYER TURN] | Ep 0130 | P_Rew: -430.2 | G_Rew:  260.9 | Win%:  54.4% | Die%: 100.0% | Loss(P/V): 0.001/27.373 | Ent: 0.474 | Time: 6153.9s
+U 0068 [GHOST TURN] | Ep 0132 | P_Rew: -372.8 | G_Rew:  232.2 | Win%:  54.3% | Die%: 100.0% | Loss(P/V): -0.001/10.558 | Ent: 1.337 | Time: 6242.0s
+U 0069 [GHOST TURN] | Ep 0132 | P_Rew: -372.8 | G_Rew:  232.2 | Win%:  54.3% | Die%: 100.0% | Loss(P/V): 0.005/7.013 | Ent: 1.342 | Time: 6330.3s
+U 0070 [GHOST TURN] | Ep 0135 | P_Rew: -659.2 | G_Rew:  375.6 | Win%:  54.4% | Die%: 100.0% | Loss(P/V): -0.003/14.215 | Ent: 1.334 | Time: 6423.7s
+U 0071 [GHOST TURN] | Ep 0136 | P_Rew: -672.5 | G_Rew:  382.1 | Win%:  56.0% | Die%: 100.0% | Loss(P/V): -0.001/16.425 | Ent: 1.333 | Time: 6507.3s
+U 0072 [GHOST TURN] | Ep 0138 | P_Rew: -713.5 | G_Rew:  402.6 | Win%:  56.9% | Die%: 100.0% | Loss(P/V): -0.003/13.046 | Ent: 1.324 | Time: 6595.5s
+U 0073 [PLAYER TURN] | Ep 0138 | P_Rew: -713.5 | G_Rew:  402.6 | Win%:  56.9% | Die%: 100.0% | Loss(P/V): 0.003/28.079 | Ent: 0.516 | Time: 6682.9s
+U 0074 [GHOST TURN] | Ep 0143 | P_Rew: -557.6 | G_Rew:  324.8 | Win%:  56.2% | Die%: 100.0% | Loss(P/V): -0.006/13.691 | Ent: 1.304 | Time: 6771.5s
+U 0075 [GHOST TURN] | Ep 0143 | P_Rew: -557.6 | G_Rew:  324.8 | Win%:  56.2% | Die%: 100.0% | Loss(P/V): -0.000/9.224 | Ent: 1.333 | Time: 6859.6s
+U 0076 [GHOST TURN] | Ep 0145 | P_Rew: -732.0 | G_Rew:  412.4 | Win%:  58.0% | Die%: 100.0% | Loss(P/V): 0.002/9.181 | Ent: 1.305 | Time: 6948.2s
+U 0077 [GHOST TURN] | Ep 0146 | P_Rew: -738.2 | G_Rew:  415.5 | Win%:  58.4% | Die%: 100.0% | Loss(P/V): -0.001/10.103 | Ent: 1.321 | Time: 7036.2s
+U 0078 [GHOST TURN] | Ep 0150 | P_Rew: -738.2 | G_Rew:  415.5 | Win%:  57.8% | Die%: 100.0% | Loss(P/V): -0.001/11.830 | Ent: 1.296 | Time: 7125.5s
+U 0079 [PLAYER TURN] | Ep 0150 | P_Rew: -738.2 | G_Rew:  415.5 | Win%:  57.8% | Die%: 100.0% | Loss(P/V): 0.009/22.833 | Ent: 0.604 | Time: 7217.4s
+U 0080 [GHOST TURN] | Ep 0154 | P_Rew: -773.8 | G_Rew:  433.3 | Win%:  57.0% | Die%: 100.0% | Loss(P/V): -0.001/12.444 | Ent: 1.307 | Time: 7306.6s
+U 0081 [GHOST TURN] | Ep 0155 | P_Rew: -779.9 | G_Rew:  436.5 | Win%:  57.3% | Die%: 100.0% | Loss(P/V): -0.003/11.912 | Ent: 1.324 | Time: 7398.0s
+U 0082 [GHOST TURN] | Ep 0157 | P_Rew: -763.6 | G_Rew:  428.4 | Win%:  56.1% | Die%: 100.0% | Loss(P/V): -0.000/15.393 | Ent: 1.310 | Time: 7485.3s
+U 0083 [GHOST TURN] | Ep 0159 | P_Rew: -686.1 | G_Rew:  389.5 | Win%:  56.7% | Die%: 100.0% | Loss(P/V): 0.002/13.560 | Ent: 1.315 | Time: 7572.6s
+U 0084 [GHOST TURN] | Ep 0160 | P_Rew: -756.2 | G_Rew:  424.5 | Win%:  57.3% | Die%: 100.0% | Loss(P/V): -0.001/10.768 | Ent: 1.323 | Time: 7663.7s
+U 0085 [PLAYER TURN] | Ep 0161 | P_Rew: -773.4 | G_Rew:  432.9 | Win%:  57.4% | Die%: 100.0% | Loss(P/V): 0.011/21.559 | Ent: 0.461 | Time: 7755.2s
+U 0086 [GHOST TURN] | Ep 0161 | P_Rew: -773.4 | G_Rew:  432.9 | Win%:  57.4% | Die%: 100.0% | Loss(P/V): 0.001/20.247 | Ent: 1.337 | Time: 7843.5s
+U 0087 [GHOST TURN] | Ep 0161 | P_Rew: -773.4 | G_Rew:  432.9 | Win%:  57.4% | Die%: 100.0% | Loss(P/V): 0.000/9.039 | Ent: 1.329 | Time: 7931.4s
+U 0088 [GHOST TURN] | Ep 0161 | P_Rew: -773.4 | G_Rew:  432.9 | Win%:  57.4% | Die%: 100.0% | Loss(P/V): 0.002/6.773 | Ent: 1.335 | Time: 8022.4s
+U 0089 [GHOST TURN] | Ep 0162 | P_Rew: -1236.9 | G_Rew:  663.8 | Win%:  58.0% | Die%:  98.0% | Loss(P/V): 0.001/7.871 | Ent: 1.336 | Time: 8115.8s
+U 0090 [GHOST TURN] | Ep 0166 | P_Rew: -1199.0 | G_Rew:  644.9 | Win%:  56.7% | Die%:  98.0% | Loss(P/V): -0.002/12.419 | Ent: 1.324 | Time: 8203.7s
+U 0091 [PLAYER TURN] | Ep 0169 | P_Rew: -1093.8 | G_Rew:  592.5 | Win%:  55.1% | Die%:  98.0% | Loss(P/V): 0.007/19.341 | Ent: 0.394 | Time: 8295.2s
+U 0092 [GHOST TURN] | Ep 0172 | P_Rew: -1034.3 | G_Rew:  563.4 | Win%:  53.9% | Die%:  98.0% | Loss(P/V): 0.003/13.412 | Ent: 1.318 | Time: 8385.0s
+U 0093 [GHOST TURN] | Ep 0172 | P_Rew: -1034.3 | G_Rew:  563.4 | Win%:  53.9% | Die%:  98.0% | Loss(P/V): 0.000/12.544 | Ent: 1.327 | Time: 8480.1s
+U 0094 [GHOST TURN] | Ep 0177 | P_Rew: -1083.3 | G_Rew:  587.8 | Win%:  51.9% | Die%:  98.0% | Loss(P/V): -0.004/13.464 | Ent: 1.322 | Time: 8568.5s
+U 0095 [GHOST TURN] | Ep 0177 | P_Rew: -1083.3 | G_Rew:  587.8 | Win%:  51.9% | Die%:  98.0% | Loss(P/V): -0.001/13.050 | Ent: 1.323 | Time: 8655.7s
+U 0096 [GHOST TURN] | Ep 0180 | P_Rew: -1071.9 | G_Rew:  582.2 | Win%:  54.5% | Die%:  98.0% | Loss(P/V): -0.006/14.869 | Ent: 1.322 | Time: 8744.1s
+U 0097 [PLAYER TURN] | Ep 0182 | P_Rew: -1036.2 | G_Rew:  564.5 | Win%:  55.1% | Die%:  98.0% | Loss(P/V): -0.001/27.748 | Ent: 0.435 | Time: 8832.7s
+U 0098 [GHOST TURN] | Ep 0183 | P_Rew: -746.1 | G_Rew:  418.8 | Win%:  54.9% | Die%:  98.0% | Loss(P/V): -0.003/13.784 | Ent: 1.322 | Time: 8919.8s
+U 0099 [GHOST TURN] | Ep 0184 | P_Rew: -807.5 | G_Rew:  449.5 | Win%:  55.6% | Die%:  98.0% | Loss(P/V): -0.003/11.216 | Ent: 1.317 | Time: 9012.0s
+U 0100 [GHOST TURN] | Ep 0186 | P_Rew: -771.8 | G_Rew:  431.7 | Win%:  55.2% | Die%:  98.0% | Loss(P/V): -0.001/10.405 | Ent: 1.320 | Time: 9105.4s
+U 0101 [GHOST TURN] | Ep 0187 | P_Rew: -756.7 | G_Rew:  424.1 | Win%:  56.1% | Die%:  98.0% | Loss(P/V): 0.001/14.170 | Ent: 1.318 | Time: 9199.3s
+U 0102 [GHOST TURN] | Ep 0188 | P_Rew: -749.0 | G_Rew:  420.5 | Win%:  56.0% | Die%:  98.0% | Loss(P/V): -0.001/9.960 | Ent: 1.317 | Time: 9291.8s
+U 0103 [PLAYER TURN] | Ep 0189 | P_Rew: -749.2 | G_Rew:  420.6 | Win%:  55.4% | Die%:  98.0% | Loss(P/V): 0.007/22.686 | Ent: 0.538 | Time: 9385.0s
+U 0104 [GHOST TURN] | Ep 0189 | P_Rew: -749.2 | G_Rew:  420.6 | Win%:  55.4% | Die%:  98.0% | Loss(P/V): -0.004/13.146 | Ent: 1.314 | Time: 9475.4s
+U 0105 [GHOST TURN] | Ep 0189 | P_Rew: -749.2 | G_Rew:  420.6 | Win%:  55.4% | Die%:  98.0% | Loss(P/V): -0.003/12.590 | Ent: 1.315 | Time: 9566.6s
+U 0106 [GHOST TURN] | Ep 0190 | P_Rew: -1058.4 | G_Rew:  575.4 | Win%:  57.0% | Die%:  98.0% | Loss(P/V): -0.000/7.095 | Ent: 1.305 | Time: 9663.9s
+U 0107 [GHOST TURN] | Ep 0191 | P_Rew: -1027.3 | G_Rew:  559.6 | Win%:  58.2% | Die%:  98.0% | Loss(P/V): -0.004/10.843 | Ent: 1.319 | Time: 9753.5s
+U 0108 [GHOST TURN] | Ep 0192 | P_Rew: -1076.5 | G_Rew:  584.3 | Win%:  59.4% | Die%:  98.0% | Loss(P/V): -0.000/14.642 | Ent: 1.310 | Time: 9849.5s
+U 0109 [PLAYER TURN] | Ep 0196 | P_Rew: -903.8 | G_Rew:  498.1 | Win%:  57.3% | Die%:  98.0% | Loss(P/V): -0.001/15.542 | Ent: 0.415 | Time: 9947.5s
+U 0110 [GHOST TURN] | Ep 0196 | P_Rew: -903.8 | G_Rew:  498.1 | Win%:  57.3% | Die%:  98.0% | Loss(P/V): -0.000/13.754 | Ent: 1.317 | Time: 10037.7s
+U 0111 [GHOST TURN] | Ep 0196 | P_Rew: -903.8 | G_Rew:  498.1 | Win%:  57.3% | Die%:  98.0% | Loss(P/V): 0.000/17.672 | Ent: 1.297 | Time: 10128.8s
+U 0112 [GHOST TURN] | Ep 0197 | P_Rew: -1041.0 | G_Rew:  566.5 | Win%:  58.0% | Die%:  98.0% | Loss(P/V): -0.003/12.545 | Ent: 1.313 | Time: 10228.6s
+U 0113 [GHOST TURN] | Ep 0198 | P_Rew: -1079.3 | G_Rew:  585.6 | Win%:  59.3% | Die%:  98.0% | Loss(P/V): 0.001/14.526 | Ent: 1.302 | Time: 10315.7s
+U 0114 [GHOST TURN] | Ep 0201 | P_Rew: -988.9 | G_Rew:  540.1 | Win%:  58.1% | Die%:  98.0% | Loss(P/V): -0.006/11.659 | Ent: 1.320 | Time: 10419.5s
+U 0115 [PLAYER TURN] | Ep 0203 | P_Rew: -964.3 | G_Rew:  528.1 | Win%:  59.8% | Die%:  98.0% | Loss(P/V): 0.012/21.266 | Ent: 0.486 | Time: 10510.3s
+U 0116 [GHOST TURN] | Ep 0206 | P_Rew: -960.9 | G_Rew:  526.4 | Win%:  59.8% | Die%:  98.0% | Loss(P/V): -0.002/10.181 | Ent: 1.336 | Time: 10599.6s
+U 0117 [GHOST TURN] | Ep 0208 | P_Rew: -934.9 | G_Rew:  513.6 | Win%:  60.2% | Die%:  98.0% | Loss(P/V): 0.003/12.730 | Ent: 1.340 | Time: 10689.2s
+U 0118 [GHOST TURN] | Ep 0208 | P_Rew: -934.9 | G_Rew:  513.6 | Win%:  60.2% | Die%:  98.0% | Loss(P/V): -0.000/8.991 | Ent: 1.315 | Time: 10774.3s
+U 0119 [GHOST TURN] | Ep 0211 | P_Rew: -997.4 | G_Rew:  544.1 | Win%:  59.2% | Die%:  96.0% | Loss(P/V): -0.004/9.454 | Ent: 1.326 | Time: 10869.0s
+U 0120 [GHOST TURN] | Ep 0211 | P_Rew: -997.4 | G_Rew:  544.1 | Win%:  59.2% | Die%:  96.0% | Loss(P/V): -0.003/15.253 | Ent: 1.344 | Time: 10960.1s
+U 0121 [PLAYER TURN] | Ep 0212 | P_Rew: -676.2 | G_Rew:  384.5 | Win%:  59.0% | Die%:  98.0% | Loss(P/V): 0.009/13.871 | Ent: 0.671 | Time: 11054.8s
+U 0122 [GHOST TURN] | Ep 0213 | P_Rew: -663.0 | G_Rew:  377.9 | Win%:  59.1% | Die%:  98.0% | Loss(P/V): -0.000/10.472 | Ent: 1.352 | Time: 11142.9s
+U 0123 [GHOST TURN] | Ep 0213 | P_Rew: -663.0 | G_Rew:  377.9 | Win%:  59.1% | Die%:  98.0% | Loss(P/V): -0.002/12.238 | Ent: 1.316 | Time: 11237.4s
+U 0124 [GHOST TURN] | Ep 0213 | P_Rew: -663.0 | G_Rew:  377.9 | Win%:  59.1% | Die%:  98.0% | Loss(P/V): 0.006/5.485 | Ent: 1.309 | Time: 11330.5s
+U 0125 [GHOST TURN] | Ep 0214 | P_Rew: -995.3 | G_Rew:  543.0 | Win%:  60.4% | Die%:  96.0% | Loss(P/V): 0.001/8.037 | Ent: 1.326 | Time: 11419.6s
+U 0126 [GHOST TURN] | Ep 0214 | P_Rew: -995.3 | G_Rew:  543.0 | Win%:  60.4% | Die%:  96.0% | Loss(P/V): 0.000/11.147 | Ent: 1.331 | Time: 11510.4s
+U 0127 [PLAYER TURN] | Ep 0216 | P_Rew: -1050.8 | G_Rew:  571.0 | Win%:  60.7% | Die%:  96.0% | Loss(P/V): 0.008/14.620 | Ent: 0.332 | Time: 11602.2s
+U 0128 [GHOST TURN] | Ep 0218 | P_Rew: -1005.7 | G_Rew:  548.4 | Win%:  61.9% | Die%:  96.0% | Loss(P/V): -0.000/12.800 | Ent: 1.341 | Time: 11694.1s
+U 0129 [GHOST TURN] | Ep 0219 | P_Rew: -1012.3 | G_Rew:  551.7 | Win%:  61.4% | Die%:  96.0% | Loss(P/V): -0.002/12.589 | Ent: 1.355 | Time: 11785.5s
+U 0130 [GHOST TURN] | Ep 0220 | P_Rew: -1121.0 | G_Rew:  606.1 | Win%:  61.7% | Die%:  96.0% | Loss(P/V): -0.002/11.206 | Ent: 1.287 | Time: 11877.8s
+U 0131 [GHOST TURN] | Ep 0221 | P_Rew: -1130.1 | G_Rew:  610.6 | Win%:  61.2% | Die%:  96.0% | Loss(P/V): 0.002/10.399 | Ent: 1.348 | Time: 11968.4s
+U 0132 [GHOST TURN] | Ep 0223 | P_Rew: -1021.1 | G_Rew:  556.1 | Win%:  61.1% | Die%:  96.0% | Loss(P/V): -0.005/15.980 | Ent: 1.328 | Time: 12061.4s
+U 0133 [PLAYER TURN] | Ep 0228 | P_Rew: -999.7 | G_Rew:  545.5 | Win%:  62.0% | Die%:  96.0% | Loss(P/V): -0.002/15.947 | Ent: 0.452 | Time: 12153.4s
+U 0134 [GHOST TURN] | Ep 0232 | P_Rew: -1021.7 | G_Rew:  556.6 | Win%:  60.0% | Die%:  96.0% | Loss(P/V): -0.001/10.216 | Ent: 1.337 | Time: 12244.4s
+U 0135 [GHOST TURN] | Ep 0234 | P_Rew: -971.0 | G_Rew:  531.9 | Win%:  59.0% | Die%:  96.0% | Loss(P/V): 0.001/9.855 | Ent: 1.343 | Time: 12334.0s
+U 0136 [GHOST TURN] | Ep 0235 | P_Rew: -977.3 | G_Rew:  535.2 | Win%:  59.2% | Die%:  96.0% | Loss(P/V): -0.003/8.515 | Ent: 1.336 | Time: 12424.3s
+U 0137 [GHOST TURN] | Ep 0235 | P_Rew: -977.3 | G_Rew:  535.2 | Win%:  59.2% | Die%:  96.0% | Loss(P/V): -0.004/15.763 | Ent: 1.286 | Time: 12520.4s
+U 0138 [GHOST TURN] | Ep 0237 | P_Rew: -1069.1 | G_Rew:  581.1 | Win%:  59.3% | Die%:  96.0% | Loss(P/V): -0.005/8.907 | Ent: 1.331 | Time: 12621.7s
+U 0139 [PLAYER TURN] | Ep 0240 | P_Rew: -638.2 | G_Rew:  365.7 | Win%:  58.2% | Die%:  96.0% | Loss(P/V): 0.007/17.369 | Ent: 0.447 | Time: 12712.9s
+U 0140 [GHOST TURN] | Ep 0242 | P_Rew: -613.2 | G_Rew:  353.2 | Win%:  56.7% | Die%:  96.0% | Loss(P/V): -0.004/13.395 | Ent: 1.328 | Time: 12805.2s
+U 0141 [GHOST TURN] | Ep 0243 | P_Rew: -614.8 | G_Rew:  354.0 | Win%:  57.4% | Die%:  96.0% | Loss(P/V): -0.001/14.480 | Ent: 1.326 | Time: 12897.9s
+U 0142 [GHOST TURN] | Ep 0245 | P_Rew: -641.4 | G_Rew:  367.3 | Win%:  58.5% | Die%:  96.0% | Loss(P/V): -0.006/13.221 | Ent: 1.321 | Time: 12990.8s
+U 0143 [GHOST TURN] | Ep 0247 | P_Rew: -500.6 | G_Rew:  296.9 | Win%:  57.9% | Die%:  96.0% | Loss(P/V): -0.004/11.800 | Ent: 1.335 | Time: 13081.0s
+U 0144 [GHOST TURN] | Ep 0248 | P_Rew: -488.9 | G_Rew:  291.0 | Win%:  57.9% | Die%:  96.0% | Loss(P/V): -0.004/12.231 | Ent: 1.290 | Time: 13176.6s
+U 0145 [PLAYER TURN] | Ep 0249 | P_Rew: -523.2 | G_Rew:  308.4 | Win%:  57.6% | Die%:  96.0% | Loss(P/V): 0.005/24.429 | Ent: 0.609 | Time: 13262.3s
+U 0146 [GHOST TURN] | Ep 0249 | P_Rew: -523.2 | G_Rew:  308.4 | Win%:  57.6% | Die%:  96.0% | Loss(P/V): 0.004/6.473 | Ent: 1.273 | Time: 13352.8s
+U 0147 [GHOST TURN] | Ep 0250 | P_Rew: -842.2 | G_Rew:  466.9 | Win%:  59.1% | Die%:  94.0% | Loss(P/V): -0.001/8.392 | Ent: 1.282 | Time: 13447.5s
+U 0148 [GHOST TURN] | Ep 0254 | P_Rew: -864.1 | G_Rew:  477.8 | Win%:  57.4% | Die%:  94.0% | Loss(P/V): -0.001/10.807 | Ent: 1.351 | Time: 13538.0s
+U 0149 [GHOST TURN] | Ep 0254 | P_Rew: -864.1 | G_Rew:  477.8 | Win%:  57.4% | Die%:  94.0% | Loss(P/V): -0.004/11.053 | Ent: 1.280 | Time: 13626.6s
+U 0150 [GHOST TURN] | Ep 0257 | P_Rew: -1012.8 | G_Rew:  550.6 | Win%:  57.7% | Die%:  92.0% | Loss(P/V): -0.004/13.543 | Ent: 1.312 | Time: 13716.6s
+U 0151 [PLAYER TURN] | Ep 0262 | P_Rew: -676.0 | G_Rew:  383.0 | Win%:  57.1% | Die%:  94.0% | Loss(P/V): 0.009/22.219 | Ent: 0.431 | Time: 13810.4s
+U 0152 [GHOST TURN] | Ep 0262 | P_Rew: -676.0 | G_Rew:  383.0 | Win%:  57.1% | Die%:  94.0% | Loss(P/V): -0.001/14.300 | Ent: 1.327 | Time: 13897.7s
+U 0153 [GHOST TURN] | Ep 0263 | P_Rew: -704.1 | G_Rew:  397.0 | Win%:  57.7% | Die%:  94.0% | Loss(P/V): -0.002/12.910 | Ent: 1.305 | Time: 13991.9s
+U 0154 [GHOST TURN] | Ep 0263 | P_Rew: -704.1 | G_Rew:  397.0 | Win%:  57.7% | Die%:  94.0% | Loss(P/V): -0.001/7.225 | Ent: 1.264 | Time: 14077.5s
+U 0155 [GHOST TURN] | Ep 0264 | P_Rew: -682.4 | G_Rew:  386.0 | Win%:  57.7% | Die%:  94.0% | Loss(P/V): 0.001/9.343 | Ent: 1.275 | Time: 14166.8s
+U 0156 [GHOST TURN] | Ep 0269 | P_Rew: -675.4 | G_Rew:  382.5 | Win%:  56.3% | Die%:  94.0% | Loss(P/V): -0.001/11.923 | Ent: 1.331 | Time: 14253.1s
+U 0157 [PLAYER TURN] | Ep 0273 | P_Rew: -615.0 | G_Rew:  352.1 | Win%:  54.8% | Die%:  94.0% | Loss(P/V): 0.001/17.554 | Ent: 0.403 | Time: 14343.8s
+U 0158 [GHOST TURN] | Ep 0273 | P_Rew: -615.0 | G_Rew:  352.1 | Win%:  54.8% | Die%:  94.0% | Loss(P/V): -0.007/12.791 | Ent: 1.329 | Time: 14433.8s
+U 0159 [GHOST TURN] | Ep 0273 | P_Rew: -615.0 | G_Rew:  352.1 | Win%:  54.8% | Die%:  94.0% | Loss(P/V): -0.006/14.226 | Ent: 1.317 | Time: 14529.0s
+U 0160 [GHOST TURN] | Ep 0276 | P_Rew: -705.9 | G_Rew:  397.0 | Win%:  55.9% | Die%:  94.0% | Loss(P/V): -0.004/16.447 | Ent: 1.336 | Time: 14616.9s
+U 0161 [GHOST TURN] | Ep 0282 | P_Rew: -736.2 | G_Rew:  411.7 | Win%:  53.2% | Die%:  94.0% | Loss(P/V): -0.000/13.376 | Ent: 1.346 | Time: 14707.0s
+U 0162 [GHOST TURN] | Ep 0283 | P_Rew: -745.1 | G_Rew:  416.1 | Win%:  54.2% | Die%:  94.0% | Loss(P/V): -0.003/10.558 | Ent: 1.346 | Time: 14792.7s
+U 0163 [PLAYER TURN] | Ep 0286 | P_Rew: -688.4 | G_Rew:  387.8 | Win%:  52.3% | Die%:  94.0% | Loss(P/V): 0.013/17.042 | Ent: 0.506 | Time: 14883.7s
+U 0164 [GHOST TURN] | Ep 0288 | P_Rew: -698.0 | G_Rew:  392.6 | Win%:  51.9% | Die%:  94.0% | Loss(P/V): 0.003/10.704 | Ent: 1.336 | Time: 14974.7s
+U 0165 [GHOST TURN] | Ep 0288 | P_Rew: -698.0 | G_Rew:  392.6 | Win%:  51.9% | Die%:  94.0% | Loss(P/V): 0.001/11.998 | Ent: 1.344 | Time: 15068.9s
+U 0166 [GHOST TURN] | Ep 0290 | P_Rew: -667.5 | G_Rew:  377.1 | Win%:  52.4% | Die%:  94.0% | Loss(P/V): -0.006/10.193 | Ent: 1.329 | Time: 15165.2s
+U 0167 [GHOST TURN] | Ep 0292 | P_Rew: -660.5 | G_Rew:  373.9 | Win%:  52.5% | Die%:  94.0% | Loss(P/V): 0.003/11.538 | Ent: 1.334 | Time: 15254.7s
+U 0168 [GHOST TURN] | Ep 0294 | P_Rew: -616.0 | G_Rew:  351.6 | Win%:  51.9% | Die%:  94.0% | Loss(P/V): -0.002/10.731 | Ent: 1.335 | Time: 15341.3s
+U 0169 [PLAYER TURN] | Ep 0296 | P_Rew: -603.7 | G_Rew:  345.6 | Win%:  51.9% | Die%:  94.0% | Loss(P/V): 0.005/19.105 | Ent: 0.470 | Time: 15437.5s
+U 0170 [GHOST TURN] | Ep 0300 | P_Rew: -228.1 | G_Rew:  158.2 | Win%:  50.9% | Die%:  96.0% | Loss(P/V): -0.000/15.209 | Ent: 1.335 | Time: 15528.9s
+U 0171 [GHOST TURN] | Ep 0304 | P_Rew: -246.9 | G_Rew:  167.7 | Win%:  50.0% | Die%:  96.0% | Loss(P/V): -0.004/11.225 | Ent: 1.333 | Time: 15623.0s
+U 0172 [GHOST TURN] | Ep 0306 | P_Rew:  -88.6 | G_Rew:   90.1 | Win%:  50.3% | Die%:  98.0% | Loss(P/V): -0.003/11.638 | Ent: 1.340 | Time: 15714.2s
+U 0173 [GHOST TURN] | Ep 0308 | P_Rew:  -90.5 | G_Rew:   90.8 | Win%:  49.5% | Die%:  98.0% | Loss(P/V): -0.006/12.506 | Ent: 1.334 | Time: 15810.3s
+U 0174 [GHOST TURN] | Ep 0311 | P_Rew:  -39.5 | G_Rew:   65.5 | Win%:  50.2% | Die%:  98.0% | Loss(P/V): -0.000/11.902 | Ent: 1.329 | Time: 15902.0s
+U 0175 [PLAYER TURN] | Ep 0315 | P_Rew:  257.7 | G_Rew:  -82.0 | Win%:  48.3% | Die%: 100.0% | Loss(P/V): 0.005/17.960 | Ent: 0.459 | Time: 15990.1s
+U 0176 [GHOST TURN] | Ep 0320 | P_Rew:  265.6 | G_Rew:  -86.2 | Win%:  47.9% | Die%: 100.0% | Loss(P/V): -0.001/12.423 | Ent: 1.341 | Time: 16079.2s
+U 0177 [GHOST TURN] | Ep 0321 | P_Rew:  276.8 | G_Rew:  -91.8 | Win%:  48.4% | Die%: 100.0% | Loss(P/V): -0.003/12.435 | Ent: 1.338 | Time: 16170.2s
+U 0178 [GHOST TURN] | Ep 0324 | P_Rew:  318.3 | G_Rew: -112.5 | Win%:  48.8% | Die%: 100.0% | Loss(P/V): -0.001/11.830 | Ent: 1.306 | Time: 16258.3s
+U 0179 [GHOST TURN] | Ep 0327 | P_Rew:  368.3 | G_Rew: -137.2 | Win%:  49.1% | Die%: 100.0% | Loss(P/V): 0.000/11.385 | Ent: 1.326 | Time: 16347.9s
+U 0180 [GHOST TURN] | Ep 0327 | P_Rew:  368.3 | G_Rew: -137.2 | Win%:  49.1% | Die%: 100.0% | Loss(P/V): 0.003/12.680 | Ent: 1.334 | Time: 16440.6s
+U 0181 [PLAYER TURN] | Ep 0327 | P_Rew:  368.3 | G_Rew: -137.2 | Win%:  49.1% | Die%: 100.0% | Loss(P/V): -0.001/21.825 | Ent: 0.689 | Time: 16536.5s
+U 0182 [GHOST TURN] | Ep 0328 | P_Rew:  238.8 | G_Rew:  -72.6 | Win%:  50.8% | Die%: 100.0% | Loss(P/V): -0.003/12.090 | Ent: 1.307 | Time: 16626.4s
+U 0183 [GHOST TURN] | Ep 0333 | P_Rew:  244.9 | G_Rew:  -75.6 | Win%:  51.8% | Die%: 100.0% | Loss(P/V): -0.004/12.835 | Ent: 1.314 | Time: 16714.7s
+U 0184 [GHOST TURN] | Ep 0337 | P_Rew:  297.0 | G_Rew: -102.1 | Win%:  53.3% | Die%: 100.0% | Loss(P/V): -0.006/13.087 | Ent: 1.334 | Time: 16804.5s
+U 0185 [GHOST TURN] | Ep 0337 | P_Rew:  297.0 | G_Rew: -102.1 | Win%:  53.3% | Die%: 100.0% | Loss(P/V): -0.002/13.331 | Ent: 1.345 | Time: 16895.2s
+U 0186 [GHOST TURN] | Ep 0338 | P_Rew:  266.3 | G_Rew:  -86.7 | Win%:  53.6% | Die%: 100.0% | Loss(P/V): -0.006/14.047 | Ent: 1.338 | Time: 16986.8s
+U 0187 [PLAYER TURN] | Ep 0340 | P_Rew:  256.6 | G_Rew:  -81.9 | Win%:  54.1% | Die%: 100.0% | Loss(P/V): -0.004/24.424 | Ent: 0.491 | Time: 17075.6s
+U 0188 [GHOST TURN] | Ep 0340 | P_Rew:  256.6 | G_Rew:  -81.9 | Win%:  54.1% | Die%: 100.0% | Loss(P/V): -0.000/12.891 | Ent: 1.331 | Time: 17166.1s
+U 0189 [GHOST TURN] | Ep 0345 | P_Rew:  177.3 | G_Rew:  -42.7 | Win%:  52.5% | Die%: 100.0% | Loss(P/V): -0.001/12.478 | Ent: 1.325 | Time: 17260.5s
+U 0190 [GHOST TURN] | Ep 0347 | P_Rew:  185.2 | G_Rew:  -46.6 | Win%:  52.8% | Die%: 100.0% | Loss(P/V): -0.007/11.462 | Ent: 1.326 | Time: 17357.7s
+U 0191 [GHOST TURN] | Ep 0348 | P_Rew:  184.4 | G_Rew:  -46.2 | Win%:  53.8% | Die%: 100.0% | Loss(P/V): -0.005/12.573 | Ent: 1.328 | Time: 17451.0s
+U 0192 [GHOST TURN] | Ep 0349 | P_Rew:  188.9 | G_Rew:  -47.8 | Win%:  54.1% | Die%: 100.0% | Loss(P/V): 0.003/13.859 | Ent: 1.337 | Time: 17548.7s
+U 0193 [PLAYER TURN] | Ep 0351 | P_Rew:  229.1 | G_Rew:  -68.2 | Win%:  55.0% | Die%: 100.0% | Loss(P/V): 0.003/18.360 | Ent: 0.363 | Time: 17646.9s
+U 0194 [GHOST TURN] | Ep 0353 | P_Rew:  225.0 | G_Rew:  -66.1 | Win%:  55.6% | Die%: 100.0% | Loss(P/V): -0.004/11.430 | Ent: 1.340 | Time: 17739.8s
+U 0195 [GHOST TURN] | Ep 0357 | P_Rew:  205.2 | G_Rew:  -56.6 | Win%:  54.5% | Die%: 100.0% | Loss(P/V): 0.002/11.615 | Ent: 1.331 | Time: 17831.8s
+U 0196 [GHOST TURN] | Ep 0358 | P_Rew:  146.4 | G_Rew:  -27.0 | Win%:  55.0% | Die%: 100.0% | Loss(P/V): -0.002/11.215 | Ent: 1.316 | Time: 17925.8s
+U 0197 [GHOST TURN] | Ep 0359 | P_Rew:   97.6 | G_Rew:   -2.6 | Win%:  55.1% | Die%: 100.0% | Loss(P/V): -0.002/11.153 | Ent: 1.300 | Time: 18020.6s
+U 0198 [GHOST TURN] | Ep 0361 | P_Rew:   84.4 | G_Rew:    4.0 | Win%:  55.8% | Die%: 100.0% | Loss(P/V): -0.002/9.335 | Ent: 1.337 | Time: 18111.4s
+U 0199 [PLAYER TURN] | Ep 0365 | P_Rew:  120.7 | G_Rew:  -13.9 | Win%:  55.3% | Die%: 100.0% | Loss(P/V): 0.001/18.611 | Ent: 0.392 | Time: 18200.8s
+U 0200 [GHOST TURN] | Ep 0367 | P_Rew:  161.1 | G_Rew:  -34.8 | Win%:  56.3% | Die%: 100.0% | Loss(P/V): -0.001/12.203 | Ent: 1.334 | Time: 18294.4s
+U 0201 [GHOST TURN] | Ep 0369 | P_Rew:  171.4 | G_Rew:  -40.3 | Win%:  57.1% | Die%: 100.0% | Loss(P/V): -0.002/8.284 | Ent: 1.322 | Time: 18383.9s
+U 0202 [GHOST TURN] | Ep 0370 | P_Rew:  182.7 | G_Rew:  -45.9 | Win%:  56.7% | Die%: 100.0% | Loss(P/V): 0.005/12.189 | Ent: 1.316 | Time: 18475.5s
+U 0203 [GHOST TURN] | Ep 0373 | P_Rew:  237.4 | G_Rew:  -74.1 | Win%:  56.1% | Die%: 100.0% | Loss(P/V): 0.003/12.847 | Ent: 1.330 | Time: 18574.4s
+U 0204 [GHOST TURN] | Ep 0378 | P_Rew:  352.9 | G_Rew: -131.5 | Win%:  54.1% | Die%: 100.0% | Loss(P/V): -0.005/12.038 | Ent: 1.319 | Time: 18663.6s
+U 0205 [PLAYER TURN] | Ep 0378 | P_Rew:  352.9 | G_Rew: -131.5 | Win%:  54.1% | Die%: 100.0% | Loss(P/V): 0.005/23.141 | Ent: 0.479 | Time: 18751.9s
+U 0206 [GHOST TURN] | Ep 0382 | P_Rew:  388.5 | G_Rew: -149.6 | Win%:  56.0% | Die%: 100.0% | Loss(P/V): -0.000/12.216 | Ent: 1.323 | Time: 18846.0s
+U 0207 [GHOST TURN] | Ep 0382 | P_Rew:  388.5 | G_Rew: -149.6 | Win%:  56.0% | Die%: 100.0% | Loss(P/V): 0.003/16.570 | Ent: 1.332 | Time: 18935.4s
+U 0208 [GHOST TURN] | Ep 0383 | P_Rew:  320.8 | G_Rew: -115.4 | Win%:  57.1% | Die%: 100.0% | Loss(P/V): 0.002/12.013 | Ent: 1.318 | Time: 19029.9s
+U 0209 [GHOST TURN] | Ep 0384 | P_Rew:  291.5 | G_Rew: -100.8 | Win%:  57.7% | Die%: 100.0% | Loss(P/V): -0.002/14.676 | Ent: 1.345 | Time: 19119.9s
+U 0210 [GHOST TURN] | Ep 0385 | P_Rew:  281.4 | G_Rew:  -95.5 | Win%:  58.1% | Die%: 100.0% | Loss(P/V): -0.001/9.786 | Ent: 1.312 | Time: 19214.3s
+U 0211 [PLAYER TURN] | Ep 0387 | P_Rew:  286.6 | G_Rew:  -98.3 | Win%:  57.9% | Die%: 100.0% | Loss(P/V): 0.005/18.236 | Ent: 0.359 | Time: 19311.9s
+U 0212 [GHOST TURN] | Ep 0387 | P_Rew:  286.6 | G_Rew:  -98.3 | Win%:  57.9% | Die%: 100.0% | Loss(P/V): -0.001/11.740 | Ent: 1.334 | Time: 19403.4s
+U 0213 [GHOST TURN] | Ep 0388 | P_Rew:  309.0 | G_Rew: -109.5 | Win%:  58.1% | Die%: 100.0% | Loss(P/V): -0.006/12.852 | Ent: 1.348 | Time: 19493.9s
+U 0214 [GHOST TURN] | Ep 0390 | P_Rew:  307.1 | G_Rew: -108.5 | Win%:  57.7% | Die%: 100.0% | Loss(P/V): -0.005/9.220 | Ent: 1.339 | Time: 19586.1s
+U 0215 [GHOST TURN] | Ep 0391 | P_Rew:  359.3 | G_Rew: -134.5 | Win%:  57.2% | Die%: 100.0% | Loss(P/V): -0.002/13.974 | Ent: 1.349 | Time: 19675.2s
+U 0216 [GHOST TURN] | Ep 0391 | P_Rew:  359.3 | G_Rew: -134.5 | Win%:  57.2% | Die%: 100.0% | Loss(P/V): -0.003/11.369 | Ent: 1.357 | Time: 19778.5s
+U 0217 [PLAYER TURN] | Ep 0394 | P_Rew:  312.3 | G_Rew: -111.2 | Win%:  58.9% | Die%: 100.0% | Loss(P/V): 0.005/15.826 | Ent: 0.357 | Time: 19871.4s
+U 0218 [GHOST TURN] | Ep 0395 | P_Rew:  337.8 | G_Rew: -123.7 | Win%:  59.2% | Die%: 100.0% | Loss(P/V): -0.000/9.396 | Ent: 1.336 | Time: 19969.9s
+U 0219 [GHOST TURN] | Ep 0396 | P_Rew:  326.0 | G_Rew: -117.8 | Win%:  59.3% | Die%: 100.0% | Loss(P/V): -0.006/13.484 | Ent: 1.358 | Time: 20061.5s
+U 0220 [GHOST TURN] | Ep 0397 | P_Rew:  249.8 | G_Rew:  -80.1 | Win%:  59.7% | Die%: 100.0% | Loss(P/V): -0.002/7.056 | Ent: 1.348 | Time: 20151.7s
+U 0221 [GHOST TURN] | Ep 0397 | P_Rew:  249.8 | G_Rew:  -80.1 | Win%:  59.7% | Die%: 100.0% | Loss(P/V): -0.002/15.868 | Ent: 1.362 | Time: 20245.6s
+U 0222 [GHOST TURN] | Ep 0399 | P_Rew:  196.1 | G_Rew:  -53.4 | Win%:  58.7% | Die%: 100.0% | Loss(P/V): -0.003/13.531 | Ent: 1.343 | Time: 20333.8s
+U 0223 [PLAYER TURN] | Ep 0400 | P_Rew:  189.7 | G_Rew:  -50.3 | Win%:  58.9% | Die%: 100.0% | Loss(P/V): 0.004/22.039 | Ent: 0.467 | Time: 20425.5s
+U 0224 [GHOST TURN] | Ep 0402 | P_Rew:  206.0 | G_Rew:  -58.6 | Win%:  59.9% | Die%: 100.0% | Loss(P/V): -0.006/12.782 | Ent: 1.344 | Time: 20518.6s
+U 0225 [GHOST TURN] | Ep 0405 | P_Rew:  207.6 | G_Rew:  -59.0 | Win%:  59.7% | Die%: 100.0% | Loss(P/V): -0.003/14.120 | Ent: 1.333 | Time: 20622.0s
+U 0226 [GHOST TURN] | Ep 0405 | P_Rew:  207.6 | G_Rew:  -59.0 | Win%:  59.7% | Die%: 100.0% | Loss(P/V): -0.004/11.836 | Ent: 1.353 | Time: 20713.3s
+U 0227 [GHOST TURN] | Ep 0406 | P_Rew:   -5.6 | G_Rew:   47.2 | Win%:  60.5% | Die%: 100.0% | Loss(P/V): 0.001/8.063 | Ent: 1.338 | Time: 20809.3s
+U 0228 [GHOST TURN] | Ep 0408 | P_Rew:    7.0 | G_Rew:   40.9 | Win%:  60.2% | Die%: 100.0% | Loss(P/V): 0.001/10.436 | Ent: 1.344 | Time: 20910.9s
+U 0229 [PLAYER TURN] | Ep 0409 | P_Rew:   23.0 | G_Rew:   32.9 | Win%:  60.1% | Die%: 100.0% | Loss(P/V): 0.003/23.368 | Ent: 0.496 | Time: 21000.6s
+U 0230 [GHOST TURN] | Ep 0409 | P_Rew:   23.0 | G_Rew:   32.9 | Win%:  60.1% | Die%: 100.0% | Loss(P/V): -0.002/14.339 | Ent: 1.350 | Time: 21091.0s
+U 0231 [GHOST TURN] | Ep 0411 | P_Rew:  -79.1 | G_Rew:   83.7 | Win%:  60.9% | Die%: 100.0% | Loss(P/V): -0.007/12.417 | Ent: 1.347 | Time: 21181.4s
+U 0232 [GHOST TURN] | Ep 0413 | P_Rew:  -62.6 | G_Rew:   75.5 | Win%:  61.3% | Die%: 100.0% | Loss(P/V): -0.003/12.349 | Ent: 1.337 | Time: 21272.2s
+U 0233 [GHOST TURN] | Ep 0413 | P_Rew:  -62.6 | G_Rew:   75.5 | Win%:  61.3% | Die%: 100.0% | Loss(P/V): -0.004/13.138 | Ent: 1.343 | Time: 21365.3s
+U 0234 [GHOST TURN] | Ep 0413 | P_Rew:  -62.6 | G_Rew:   75.5 | Win%:  61.3% | Die%: 100.0% | Loss(P/V): -0.002/11.415 | Ent: 1.331 | Time: 21459.0s
+U 0235 [PLAYER TURN] | Ep 0413 | P_Rew:  -62.6 | G_Rew:   75.5 | Win%:  61.3% | Die%: 100.0% | Loss(P/V): 0.018/17.103 | Ent: 0.697 | Time: 21553.2s
+U 0236 [GHOST TURN] | Ep 0414 | P_Rew: -366.7 | G_Rew:  227.5 | Win%:  63.0% | Die%: 100.0% | Loss(P/V): 0.000/15.057 | Ent: 1.325 | Time: 21649.4s
+U 0237 [GHOST TURN] | Ep 0415 | P_Rew: -398.5 | G_Rew:  243.5 | Win%:  64.1% | Die%: 100.0% | Loss(P/V): -0.003/14.147 | Ent: 1.322 | Time: 21747.6s
+U 0238 [GHOST TURN] | Ep 0417 | P_Rew: -407.9 | G_Rew:  248.7 | Win%:  65.2% | Die%: 100.0% | Loss(P/V): -0.002/14.513 | Ent: 1.336 | Time: 21845.0s
+U 0239 [GHOST TURN] | Ep 0419 | P_Rew: -415.3 | G_Rew:  252.4 | Win%:  65.6% | Die%: 100.0% | Loss(P/V): -0.004/14.096 | Ent: 1.316 | Time: 21934.6s
+U 0240 [GHOST TURN] | Ep 0422 | P_Rew: -460.1 | G_Rew:  275.1 | Win%:  66.0% | Die%: 100.0% | Loss(P/V): -0.005/16.257 | Ent: 1.334 | Time: 22028.2s
+U 0241 [PLAYER TURN] | Ep 0422 | P_Rew: -460.1 | G_Rew:  275.1 | Win%:  66.0% | Die%: 100.0% | Loss(P/V): -0.003/23.132 | Ent: 0.453 | Time: 22117.9s
+U 0242 [GHOST TURN] | Ep 0422 | P_Rew: -460.1 | G_Rew:  275.1 | Win%:  66.0% | Die%: 100.0% | Loss(P/V): -0.001/13.329 | Ent: 1.321 | Time: 22211.5s
+U 0243 [GHOST TURN] | Ep 0422 | P_Rew: -460.1 | G_Rew:  275.1 | Win%:  66.0% | Die%: 100.0% | Loss(P/V): 0.009/7.260 | Ent: 1.309 | Time: 22300.3s
+U 0244 [GHOST TURN] | Ep 0422 | P_Rew: -460.1 | G_Rew:  275.1 | Win%:  66.0% | Die%: 100.0% | Loss(P/V): 0.007/7.864 | Ent: 1.311 | Time: 22392.1s
+U 0245 [GHOST TURN] | Ep 0423 | P_Rew: -1000.8 | G_Rew:  544.6 | Win%:  67.1% | Die%:  98.0% | Loss(P/V): -0.002/10.782 | Ent: 1.324 | Time: 22491.5s
+U 0246 [GHOST TURN] | Ep 0423 | P_Rew: -1000.8 | G_Rew:  544.6 | Win%:  67.1% | Die%:  98.0% | Loss(P/V): 0.000/13.857 | Ent: 1.333 | Time: 22580.8s
+U 0247 [PLAYER TURN] | Ep 0423 | P_Rew: -1000.8 | G_Rew:  544.6 | Win%:  67.1% | Die%:  98.0% | Loss(P/V): 0.025/12.127 | Ent: 0.766 | Time: 22672.3s
+U 0248 [GHOST TURN] | Ep 0424 | P_Rew: -1356.2 | G_Rew:  721.5 | Win%:  67.7% | Die%:  96.0% | Loss(P/V): -0.002/9.408 | Ent: 1.326 | Time: 22763.8s
+U 0249 [GHOST TURN] | Ep 0424 | P_Rew: -1356.2 | G_Rew:  721.5 | Win%:  67.7% | Die%:  96.0% | Loss(P/V): -0.003/10.692 | Ent: 1.329 | Time: 22853.5s
+U 0250 [GHOST TURN] | Ep 0428 | P_Rew: -1653.0 | G_Rew:  869.7 | Win%:  66.7% | Die%:  96.0% | Loss(P/V): -0.007/10.750 | Ent: 1.323 | Time: 22950.4s
+U 0251 [GHOST TURN] | Ep 0429 | P_Rew: -1639.8 | G_Rew:  863.1 | Win%:  66.5% | Die%:  96.0% | Loss(P/V): -0.001/16.490 | Ent: 1.348 | Time: 23039.9s
+U 0252 [GHOST TURN] | Ep 0432 | P_Rew: -1769.5 | G_Rew:  928.4 | Win%:  65.0% | Die%:  96.0% | Loss(P/V): -0.001/12.410 | Ent: 1.335 | Time: 23129.5s
+U 0253 [PLAYER TURN] | Ep 0435 | P_Rew: -1656.4 | G_Rew:  871.4 | Win%:  63.3% | Die%:  96.0% | Loss(P/V): 0.007/18.034 | Ent: 0.438 | Time: 23222.3s
+U 0254 [GHOST TURN] | Ep 0436 | P_Rew: -1628.9 | G_Rew:  857.6 | Win%:  64.1% | Die%:  96.0% | Loss(P/V): -0.003/12.581 | Ent: 1.334 | Time: 23314.5s
+U 0255 [GHOST TURN] | Ep 0438 | P_Rew: -1656.0 | G_Rew:  871.4 | Win%:  63.0% | Die%:  96.0% | Loss(P/V): -0.002/11.850 | Ent: 1.317 | Time: 23406.5s
+U 0256 [GHOST TURN] | Ep 0440 | P_Rew: -1673.6 | G_Rew:  880.4 | Win%:  62.5% | Die%:  96.0% | Loss(P/V): -0.004/12.248 | Ent: 1.332 | Time: 23493.6s
+U 0257 [GHOST TURN] | Ep 0443 | P_Rew: -1574.8 | G_Rew:  831.0 | Win%:  62.5% | Die%:  96.0% | Loss(P/V): -0.006/12.335 | Ent: 1.329 | Time: 23586.1s
+U 0258 [GHOST TURN] | Ep 0446 | P_Rew: -1622.3 | G_Rew:  854.9 | Win%:  60.7% | Die%:  96.0% | Loss(P/V): -0.007/10.215 | Ent: 1.312 | Time: 23676.9s
+U 0259 [PLAYER TURN] | Ep 0447 | P_Rew: -1522.0 | G_Rew:  805.2 | Win%:  60.4% | Die%:  96.0% | Loss(P/V): -0.001/20.232 | Ent: 0.518 | Time: 23769.8s
+U 0260 [GHOST TURN] | Ep 0449 | P_Rew: -1466.2 | G_Rew:  777.5 | Win%:  61.1% | Die%:  96.0% | Loss(P/V): -0.005/12.967 | Ent: 1.325 | Time: 23857.2s
+U 0261 [GHOST TURN] | Ep 0450 | P_Rew: -1508.9 | G_Rew:  798.8 | Win%:  61.2% | Die%:  96.0% | Loss(P/V): -0.003/12.447 | Ent: 1.330 | Time: 23949.0s
+U 0262 [GHOST TURN] | Ep 0453 | P_Rew: -1519.3 | G_Rew:  804.4 | Win%:  61.3% | Die%:  96.0% | Loss(P/V): -0.002/8.961 | Ent: 1.331 | Time: 24039.9s
+U 0263 [GHOST TURN] | Ep 0455 | P_Rew: -1534.4 | G_Rew:  811.8 | Win%:  61.5% | Die%:  96.0% | Loss(P/V): -0.005/10.823 | Ent: 1.346 | Time: 24131.5s
+U 0264 [GHOST TURN] | Ep 0458 | P_Rew: -1276.9 | G_Rew:  683.2 | Win%:  60.5% | Die%:  96.0% | Loss(P/V): -0.003/15.996 | Ent: 1.343 | Time: 24219.0s
+U 0265 [PLAYER TURN] | Ep 0458 | P_Rew: -1276.9 | G_Rew:  683.2 | Win%:  60.5% | Die%:  96.0% | Loss(P/V): -0.001/24.626 | Ent: 0.481 | Time: 24312.9s
+U 0266 [GHOST TURN] | Ep 0461 | P_Rew: -1150.7 | G_Rew:  619.8 | Win%:  59.3% | Die%:  96.0% | Loss(P/V): -0.000/8.831 | Ent: 1.342 | Time: 24403.1s
+U 0267 [GHOST TURN] | Ep 0463 | P_Rew: -1137.0 | G_Rew:  613.1 | Win%:  59.5% | Die%:  96.0% | Loss(P/V): -0.004/11.607 | Ent: 1.345 | Time: 24492.9s
+U 0268 [GHOST TURN] | Ep 0464 | P_Rew: -819.6 | G_Rew:  454.4 | Win%:  59.1% | Die%:  96.0% | Loss(P/V): -0.001/13.493 | Ent: 1.346 | Time: 24582.2s
+U 0269 [GHOST TURN] | Ep 0465 | P_Rew: -762.8 | G_Rew:  426.0 | Win%:  58.8% | Die%:  96.0% | Loss(P/V): -0.000/13.741 | Ent: 1.339 | Time: 24674.6s
+U 0270 [GHOST TURN] | Ep 0468 | P_Rew: -757.7 | G_Rew:  423.2 | Win%:  58.6% | Die%:  96.0% | Loss(P/V): -0.007/11.769 | Ent: 1.346 | Time: 24759.9s
+U 0271 [PLAYER TURN] | Ep 0469 | P_Rew: -774.9 | G_Rew:  432.0 | Win%:  58.4% | Die%:  96.0% | Loss(P/V): -0.004/23.590 | Ent: 0.506 | Time: 24847.8s
+U 0272 [GHOST TURN] | Ep 0471 | P_Rew: -835.8 | G_Rew:  462.7 | Win%:  57.4% | Die%:  96.0% | Loss(P/V): -0.003/9.982 | Ent: 1.342 | Time: 24939.4s
+U 0273 [GHOST TURN] | Ep 0472 | P_Rew: -816.6 | G_Rew:  452.9 | Win%:  58.0% | Die%:  96.0% | Loss(P/V): -0.001/16.298 | Ent: 1.346 | Time: 25035.4s
+U 0274 [GHOST TURN] | Ep 0473 | P_Rew: -339.2 | G_Rew:  215.2 | Win%:  57.9% | Die%:  98.0% | Loss(P/V): -0.004/10.198 | Ent: 1.339 | Time: 25129.6s
+U 0275 [GHOST TURN] | Ep 0476 | P_Rew:  342.8 | G_Rew: -125.2 | Win%:  59.2% | Die%: 100.0% | Loss(P/V): -0.006/14.914 | Ent: 1.349 | Time: 25215.3s
+U 0276 [GHOST TURN] | Ep 0477 | P_Rew:  328.3 | G_Rew: -117.8 | Win%:  60.0% | Die%: 100.0% | Loss(P/V): -0.004/14.450 | Ent: 1.338 | Time: 25310.3s
+U 0277 [PLAYER TURN] | Ep 0479 | P_Rew:  314.5 | G_Rew: -111.0 | Win%:  60.1% | Die%: 100.0% | Loss(P/V): 0.014/16.533 | Ent: 0.491 | Time: 25405.7s
+U 0278 [GHOST TURN] | Ep 0479 | P_Rew:  314.5 | G_Rew: -111.0 | Win%:  60.1% | Die%: 100.0% | Loss(P/V): -0.006/13.217 | Ent: 1.342 | Time: 25494.6s
+U 0279 [GHOST TURN] | Ep 0479 | P_Rew:  314.5 | G_Rew: -111.0 | Win%:  60.1% | Die%: 100.0% | Loss(P/V): -0.004/15.779 | Ent: 1.343 | Time: 25581.8s
+U 0280 [GHOST TURN] | Ep 0482 | P_Rew:  214.9 | G_Rew:  -61.1 | Win%:  60.8% | Die%: 100.0% | Loss(P/V): -0.006/8.971 | Ent: 1.333 | Time: 25680.2s
+U 0281 [GHOST TURN] | Ep 0483 | P_Rew:  179.9 | G_Rew:  -43.3 | Win%:  60.3% | Die%: 100.0% | Loss(P/V): -0.006/11.405 | Ent: 1.341 | Time: 25770.5s
+U 0282 [GHOST TURN] | Ep 0486 | P_Rew:  122.6 | G_Rew:  -14.3 | Win%:  59.9% | Die%: 100.0% | Loss(P/V): -0.005/11.784 | Ent: 1.336 | Time: 25857.9s
+U 0283 [PLAYER TURN] | Ep 0487 | P_Rew:  171.5 | G_Rew:  -38.7 | Win%:  60.5% | Die%: 100.0% | Loss(P/V): 0.007/26.012 | Ent: 0.547 | Time: 25945.4s
+U 0284 [GHOST TURN] | Ep 0491 | P_Rew:  123.0 | G_Rew:  -14.7 | Win%:  60.8% | Die%: 100.0% | Loss(P/V): -0.003/11.313 | Ent: 1.336 | Time: 26033.4s
+U 0285 [GHOST TURN] | Ep 0493 | P_Rew:   99.2 | G_Rew:   -3.0 | Win%:  61.6% | Die%: 100.0% | Loss(P/V): -0.007/10.850 | Ent: 1.331 | Time: 26118.0s
+U 0286 [GHOST TURN] | Ep 0497 | P_Rew:   72.5 | G_Rew:   10.3 | Win%:  62.1% | Die%: 100.0% | Loss(P/V): -0.001/8.436 | Ent: 1.332 | Time: 26206.1s
+U 0287 [GHOST TURN] | Ep 0499 | P_Rew:  -22.8 | G_Rew:   57.8 | Win%:  61.4% | Die%: 100.0% | Loss(P/V): -0.004/13.074 | Ent: 1.340 | Time: 26293.4s
+
+======================================================================
+Training session started at 2026-09-06T08:34:06.954027
+======================================================================
+Loaded adversarial player checkpoint.
+Loaded adversarial ghost checkpoint.
+============================================================
+Asymmetric Adv PPO | WU: 0 | Ratio: 5:1
+U 0001 [PLAYER TURN] | Ep 0002 | P_Rew:  222.8 | G_Rew:  -61.4 | Win%:  57.2% | Die%: 100.0% | Loss(P/V): 0.014/22.951 | Ent: 0.475 | Time: 88.3s
+U 0002 [GHOST TURN] | Ep 0002 | P_Rew:  222.8 | G_Rew:  -61.4 | Win%:  57.2% | Die%: 100.0% | Loss(P/V): -0.005/11.512 | Ent: 1.335 | Time: 180.1s
+U 0003 [GHOST TURN] | Ep 0004 | P_Rew: -2441.0 | G_Rew: 1270.5 | Win%:  70.0% | Die%: 100.0% | Loss(P/V): -0.005/13.098 | Ent: 1.340 | Time: 274.1s
+U 0004 [GHOST TURN] | Ep 0006 | P_Rew: -1445.5 | G_Rew:  769.4 | Win%:  65.7% | Die%: 100.0% | Loss(P/V): -0.003/15.932 | Ent: 1.343 | Time: 360.5s
+U 0005 [GHOST TURN] | Ep 0008 | P_Rew: -1481.1 | G_Rew:  786.8 | Win%:  68.5% | Die%: 100.0% | Loss(P/V): 0.002/13.229 | Ent: 1.305 | Time: 450.7s
+U 0006 [GHOST TURN] | Ep 0010 | P_Rew: -1029.2 | G_Rew:  559.6 | Win%:  71.0% | Die%: 100.0% | Loss(P/V): -0.002/14.984 | Ent: 1.342 | Time: 542.1s
+U 0007 [PLAYER TURN] | Ep 0015 | P_Rew: -524.1 | G_Rew:  307.4 | Win%:  60.8% | Die%: 100.0% | Loss(P/V): 0.063/17.521 | Ent: 0.345 | Time: 631.4s
+U 0008 [GHOST TURN] | Ep 0020 | P_Rew: -310.7 | G_Rew:  201.3 | Win%:  54.8% | Die%: 100.0% | Loss(P/V): -0.002/15.981 | Ent: 1.325 | Time: 722.4s
+U 0009 [GHOST TURN] | Ep 0022 | P_Rew: -310.8 | G_Rew:  199.9 | Win%:  56.4% | Die%: 100.0% | Loss(P/V): -0.008/12.935 | Ent: 1.330 | Time: 809.7s
+U 0010 [GHOST TURN] | Ep 0025 | P_Rew: -241.9 | G_Rew:  166.2 | Win%:  54.8% | Die%: 100.0% | Loss(P/V): -0.004/12.589 | Ent: 1.337 | Time: 898.9s
+U 0011 [GHOST TURN] | Ep 0027 | P_Rew: -231.0 | G_Rew:  161.1 | Win%:  55.2% | Die%: 100.0% | Loss(P/V): -0.005/13.661 | Ent: 1.340 | Time: 987.7s
+U 0012 [GHOST TURN] | Ep 0027 | P_Rew: -231.0 | G_Rew:  161.1 | Win%:  55.2% | Die%: 100.0% | Loss(P/V): -0.001/15.745 | Ent: 1.354 | Time: 1079.3s
+U 0013 [PLAYER TURN] | Ep 0027 | P_Rew: -231.0 | G_Rew:  161.1 | Win%:  55.2% | Die%: 100.0% | Loss(P/V): 0.012/15.289 | Ent: 0.701 | Time: 1170.8s
+U 0014 [GHOST TURN] | Ep 0027 | P_Rew: -231.0 | G_Rew:  161.1 | Win%:  55.2% | Die%: 100.0% | Loss(P/V): 0.007/6.342 | Ent: 1.340 | Time: 1260.0s
+U 0015 [GHOST TURN] | Ep 0029 | P_Rew: -961.0 | G_Rew:  523.6 | Win%:  56.9% | Die%:  96.6% | Loss(P/V): -0.001/14.462 | Ent: 1.340 | Time: 1357.4s
+U 0016 [GHOST TURN] | Ep 0035 | P_Rew: -736.5 | G_Rew:  411.7 | Win%:  55.2% | Die%:  97.1% | Loss(P/V): -0.001/14.135 | Ent: 1.329 | Time: 1447.1s
+U 0017 [GHOST TURN] | Ep 0035 | P_Rew: -736.5 | G_Rew:  411.7 | Win%:  55.2% | Die%:  97.1% | Loss(P/V): -0.004/13.080 | Ent: 1.346 | Time: 1545.2s
+U 0018 [GHOST TURN] | Ep 0035 | P_Rew: -736.5 | G_Rew:  411.7 | Win%:  55.2% | Die%:  97.1% | Loss(P/V): -0.002/6.568 | Ent: 1.341 | Time: 1635.7s
+U 0019 [PLAYER TURN] | Ep 0036 | P_Rew: -981.7 | G_Rew:  534.2 | Win%:  56.1% | Die%:  97.2% | Loss(P/V): 0.006/26.087 | Ent: 0.498 | Time: 1728.6s
+U 0020 [GHOST TURN] | Ep 0036 | P_Rew: -981.7 | G_Rew:  534.2 | Win%:  56.1% | Die%:  97.2% | Loss(P/V): 0.001/7.582 | Ent: 1.343 | Time: 1819.2s
+U 0021 [GHOST TURN] | Ep 0036 | P_Rew: -981.7 | G_Rew:  534.2 | Win%:  56.1% | Die%:  97.2% | Loss(P/V): 0.001/5.980 | Ent: 1.340 | Time: 1907.8s
+U 0022 [GHOST TURN] | Ep 0039 | P_Rew: -1313.7 | G_Rew:  699.4 | Win%:  56.9% | Die%:  94.9% | Loss(P/V): -0.003/10.976 | Ent: 1.337 | Time: 1998.5s
+U 0023 [GHOST TURN] | Ep 0039 | P_Rew: -1313.7 | G_Rew:  699.4 | Win%:  56.9% | Die%:  94.9% | Loss(P/V): -0.004/12.555 | Ent: 1.355 | Time: 2084.3s
+U 0024 [GHOST TURN] | Ep 0039 | P_Rew: -1313.7 | G_Rew:  699.4 | Win%:  56.9% | Die%:  94.9% | Loss(P/V): 0.004/7.416 | Ent: 1.361 | Time: 2176.5s
+U 0025 [PLAYER TURN] | Ep 0040 | P_Rew: -1835.3 | G_Rew:  959.2 | Win%:  57.1% | Die%:  92.5% | Loss(P/V): 0.011/14.638 | Ent: 0.657 | Time: 2269.1s
+U 0026 [GHOST TURN] | Ep 0043 | P_Rew: -1754.1 | G_Rew:  919.1 | Win%:  55.8% | Die%:  93.0% | Loss(P/V): -0.004/11.865 | Ent: 1.351 | Time: 2353.9s
+U 0027 [GHOST TURN] | Ep 0046 | P_Rew: -1603.0 | G_Rew:  843.9 | Win%:  55.4% | Die%:  93.5% | Loss(P/V): -0.001/12.150 | Ent: 1.351 | Time: 2442.1s
+U 0028 [GHOST TURN] | Ep 0047 | P_Rew: -1569.3 | G_Rew:  827.0 | Win%:  55.6% | Die%:  93.6% | Loss(P/V): -0.001/10.909 | Ent: 1.362 | Time: 2531.5s
+U 0029 [GHOST TURN] | Ep 0048 | P_Rew: -1518.0 | G_Rew:  801.5 | Win%:  56.0% | Die%:  93.8% | Loss(P/V): -0.005/12.170 | Ent: 1.352 | Time: 2623.1s
+U 0030 [GHOST TURN] | Ep 0049 | P_Rew: -1564.5 | G_Rew:  824.7 | Win%:  56.7% | Die%:  93.9% | Loss(P/V): -0.003/10.303 | Ent: 1.350 | Time: 2711.0s
+U 0031 [PLAYER TURN] | Ep 0049 | P_Rew: -1564.5 | G_Rew:  824.7 | Win%:  56.7% | Die%:  93.9% | Loss(P/V): 0.004/22.195 | Ent: 0.471 | Time: 2800.7s
+U 0032 [GHOST TURN] | Ep 0050 | P_Rew: -1520.8 | G_Rew:  803.0 | Win%:  57.3% | Die%:  94.0% | Loss(P/V): -0.003/15.992 | Ent: 1.355 | Time: 2889.0s
+U 0033 [GHOST TURN] | Ep 0052 | P_Rew: -1564.9 | G_Rew:  824.9 | Win%:  57.4% | Die%:  94.0% | Loss(P/V): -0.002/12.200 | Ent: 1.344 | Time: 2977.2s
+U 0034 [GHOST TURN] | Ep 0056 | P_Rew: -1341.6 | G_Rew:  713.2 | Win%:  55.7% | Die%:  94.0% | Loss(P/V): -0.001/13.765 | Ent: 1.335 | Time: 3067.6s
+U 0035 [GHOST TURN] | Ep 0057 | P_Rew: -1256.5 | G_Rew:  670.9 | Win%:  55.8% | Die%:  94.0% | Loss(P/V): -0.001/15.274 | Ent: 1.344 | Time: 3167.9s
+U 0036 [GHOST TURN] | Ep 0059 | P_Rew: -1260.2 | G_Rew:  672.7 | Win%:  55.5% | Die%:  94.0% | Loss(P/V): 0.006/11.177 | Ent: 1.332 | Time: 3257.4s
+U 0037 [PLAYER TURN] | Ep 0060 | P_Rew: -1304.5 | G_Rew:  694.9 | Win%:  55.4% | Die%:  94.0% | Loss(P/V): 0.009/19.541 | Ent: 0.412 | Time: 3347.7s
+U 0038 [GHOST TURN] | Ep 0063 | P_Rew: -1342.7 | G_Rew:  714.2 | Win%:  55.6% | Die%:  94.0% | Loss(P/V): -0.005/10.231 | Ent: 1.324 | Time: 3433.1s
+U 0039 [GHOST TURN] | Ep 0066 | P_Rew: -1324.3 | G_Rew:  705.0 | Win%:  56.7% | Die%:  94.0% | Loss(P/V): -0.003/10.126 | Ent: 1.329 | Time: 3523.6s
+U 0040 [GHOST TURN] | Ep 0067 | P_Rew: -1408.4 | G_Rew:  747.0 | Win%:  56.9% | Die%:  94.0% | Loss(P/V): -0.002/9.413 | Ent: 1.333 | Time: 3618.4s
+U 0041 [GHOST TURN] | Ep 0071 | P_Rew: -1349.5 | G_Rew:  718.2 | Win%:  58.2% | Die%:  94.0% | Loss(P/V): -0.001/13.385 | Ent: 1.323 | Time: 3705.8s
+U 0042 [GHOST TURN] | Ep 0071 | P_Rew: -1349.5 | G_Rew:  718.2 | Win%:  58.2% | Die%:  94.0% | Loss(P/V): -0.005/11.567 | Ent: 1.341 | Time: 3796.7s
+U 0043 [PLAYER TURN] | Ep 0072 | P_Rew: -1337.4 | G_Rew:  712.1 | Win%:  58.8% | Die%:  94.0% | Loss(P/V): 0.003/21.497 | Ent: 0.412 | Time: 3897.4s
+U 0044 [GHOST TURN] | Ep 0074 | P_Rew: -1330.2 | G_Rew:  708.5 | Win%:  60.0% | Die%:  94.0% | Loss(P/V): -0.009/13.605 | Ent: 1.346 | Time: 4011.6s
+U 0045 [GHOST TURN] | Ep 0075 | P_Rew: -1303.6 | G_Rew:  695.0 | Win%:  61.0% | Die%:  94.0% | Loss(P/V): 0.001/11.672 | Ent: 1.317 | Time: 4114.6s
+U 0046 [GHOST TURN] | Ep 0079 | P_Rew: -823.9 | G_Rew:  456.7 | Win%:  58.7% | Die%:  96.0% | Loss(P/V): -0.003/13.582 | Ent: 1.328 | Time: 4217.9s
+U 0047 [GHOST TURN] | Ep 0081 | P_Rew: -828.3 | G_Rew:  459.0 | Win%:  59.1% | Die%:  96.0% | Loss(P/V): 0.002/13.394 | Ent: 1.327 | Time: 4319.2s
+U 0048 [GHOST TURN] | Ep 0083 | P_Rew: -814.5 | G_Rew:  451.7 | Win%:  61.3% | Die%:  96.0% | Loss(P/V): -0.008/16.157 | Ent: 1.352 | Time: 4412.4s
+Quit requested.

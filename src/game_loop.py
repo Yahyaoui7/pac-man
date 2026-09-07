@@ -41,7 +41,9 @@ class GameStarter:
         self.level_manager = LevelManager(config)
         self.sound_manager = SoundManager()
         self.score_management = ScoreManager(config)
-        self.highscore_manager = HighScoreManager(".highscores.json")
+        self.highscore_manager = HighScoreManager(
+            config.highscore_filename or "highscores.json"
+        )
         self.entity_manager: Any = None
 
         self.lives: int = config.lives

@@ -6,7 +6,6 @@ import pygame
 import pygame.draw as dr
 from typing import Any, List
 
-from AI_arena.ghosts.ghost_controller import CNNGhostController
 from AI_arena.player.player_controller import CNNPlayerController
 from src.graphics.renderer import State
 from src.graphics import ui_helpers as ui
@@ -50,7 +49,7 @@ class PlayingState(State):
         self.hunter_cursed_until_death: bool = False
         self.effect_deck: list[str] = []
         self.player_speed: float = 0.0
-        self.ghost_controller: CNNGhostController | None = None
+        self.ghost_controller: Any | None = None
         self.ghost_decision_sources: dict[str, str] = {}
         self.ghost_predictions: dict[str, str | None] = {}
         self.ghost_decision_cells: dict[str, tuple[int, int]] = {}
@@ -62,6 +61,7 @@ class PlayingState(State):
         # Last cell (grid_x, grid_y) at which the AI made a decision.
         # Model is re-queried only when the player reaches a *new* cell center.
         self.ai_last_decision_cell: tuple[int, int] | None = None
+        self._last_printed_action: str | None = None
 
     def enter(self) -> None:
         self.game.level_manager.load_level(
@@ -266,11 +266,13 @@ class PlayingState(State):
                     scores_str = ""
                     if scores_dict:
                         scores_str = " | Search: [" + " ".join(f"{d}:{s:+.0f}" for d, s in scores_dict.items()) + "]"
-                    print(
-                        f"🤖 [AI {mode}] Frame {self.ai_frame_counter:04d} "
-                        f"Node ({em.player.grid_x:02d},{em.player.grid_y:02d}) "
-                        f"-> {action:<5s} | NN: [{probs_str}]{scores_str}"
-                    )
+                    if not hasattr(self, "_last_printed_action") or self._last_printed_action != action:
+                        self._last_printed_action = action
+                        print(
+                            f"🤖 [AI {mode}] Frame {self.ai_frame_counter:04d} "
+                            f"Node ({em.player.grid_x:02d},{em.player.grid_y:02d}) "
+                            f"-> {action:<5s} | NN: [{probs_str}]{scores_str}"
+                        )
 
         self.movement.update_entity(em.player)
 

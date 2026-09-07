@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-import torch
+import numpy as np
 
 from AI_arena.data.formatter import DIRECTIONS, ObservationFormatter
 
@@ -37,7 +37,7 @@ def format_player_observation(
     ghosts: list[Any],
     movement: Any,
     initial_pellet_count: int | None = None,
-    device: str | torch.device = "cpu",
+    device: str = "cpu",
     visit_counts: list[list[int]] | None = None,
     prev_nearest_pellet_dist: float = -1.0,
     prev_nearest_ghost_dist: float = -1.0,
@@ -48,7 +48,7 @@ def format_player_observation(
     same_action_count: int = 0,
     region_completion_frac: float = 0.0,
     region_is_dirty: float = 0.0,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return grid [1, 6, 25, 50], player features [1, 50], and mask [1, 4]."""
     effective_dir = getattr(player, "next_direction", None) or player.direction
     if effective_dir is None and hasattr(player, "facing"):
@@ -100,7 +100,7 @@ def format_player_observation(
             timers.append(-1.0)
 
     # 4. Valid Actions Mask (4: UP, DOWN, LEFT, RIGHT)
-    action_features = valid_actions[0].float().tolist()
+    action_features = [float(v) for v in valid_actions[0]]
 
     # 5. Pellets Remaining Fractions (2: normal, power)
     normal_remaining = 0
@@ -282,7 +282,7 @@ def format_player_observation(
         *ghost_distances,          # 4
         nearest_pp_dist_norm,      # 1
         nearest_np_dist_norm,      # 1
-        *directional_pellet_lookahead, # 4
+        *directional_pellet_lookahead,  # 4
         *local_danger,             # 4
         delta_pellet,              # 1
         delta_ghost,               # 1
@@ -300,8 +300,10 @@ def format_player_observation(
         raise ValueError(
             f"Expected {PLAYER_EXTRA_FEATURE_COUNT} player features, got {len(features)}"
         )
+    player_feats = np.array([features], dtype=np.float32)
+
     return (
         grid,
-        torch.tensor([features], dtype=torch.float32, device=device),
+        player_feats,
         valid_actions,
     )

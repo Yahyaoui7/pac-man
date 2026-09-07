@@ -26,7 +26,7 @@ class NameInputState(State):
                     self.player_name = self.player_name[:-1]
                 elif event.key == pygame.K_RETURN:
                     self.confirm_name()
-                elif event.unicode.isalnum():
+                elif event.unicode.isalnum() or event.unicode == " ":
                     if len(self.player_name) < self.max_name_length:
                         self.player_name += event.unicode
 

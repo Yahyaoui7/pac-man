@@ -14,8 +14,6 @@ from __future__ import annotations
 
 from typing import Any
 import numpy as np
-import torch
-import torch.nn.functional as F
 
 
 class PacmanLookaheadSearch:
@@ -126,6 +124,7 @@ class PacmanLookaheadSearch:
         player: Any = None,
         ghosts: list[Any] | None = None,
         pellets: list[list[int]] | None = None,
+        prev_action: int | None = None,
     ) -> dict[int, float]:
         """Evaluate all candidate initial actions using beam lookahead search.
 
@@ -176,7 +175,16 @@ class PacmanLookaheadSearch:
         is_endgame = rem_pellets <= 15
 
         # Initialize beam with all legal first moves
-        beam: list[tuple[float, list[int], tuple[int, int], dict[tuple[int, int], float], list[dict[str, Any]], float]] = []
+        beam: list[
+            tuple[
+                float,
+                list[int],
+                tuple[int, int],
+                dict[tuple[int, int], float],
+                list[dict[str, Any]],
+                float,
+            ]
+        ] = []
         action_leaf_scores: dict[int, list[float]] = {a: [] for a in legal_actions}
 
         for a in legal_actions:
@@ -200,6 +208,25 @@ class PacmanLookaheadSearch:
 
             new_pwr = 45.0 if is_super else max(0.0, powered_timer - 0.8)
             init_score = pellet_val + eaten_g * 100.0
+
+            # Anti-reversal: penalize immediate 180-degree flip unless ghost is close
+            if (
+                prev_action is not None
+                and len(legal_actions) > 1
+                and a == self.REVERSE_ACTION.get(prev_action)
+                and powered_timer <= 0
+            ):
+                min_g_d = min(
+                    (
+                        abs(g["pos"][0] - py) + abs(g["pos"][1] - px)
+                        for g in active_ghosts
+                        if not g["edible"] and g["pos"][0] >= 0
+                    ),
+                    default=999,
+                )
+                if min_g_d > 2:
+                    init_score -= 3.0
+
             beam.append(
                 (
                     init_score,
@@ -352,9 +379,12 @@ class PacmanLookaheadSearch:
         player: Any = None,
         ghosts: list[Any] | None = None,
         pellets: list[list[int]] | None = None,
+        prev_action: int | None = None,
     ) -> int:
         """Return the single best discrete action chosen by lookahead search."""
-        scores = self.get_action_scores(player=player, ghosts=ghosts, pellets=pellets)
+        scores = self.get_action_scores(
+            player=player, ghosts=ghosts, pellets=pellets, prev_action=prev_action
+        )
         return int(max(scores, key=lambda a: scores[a]))
 
     def get_action_distribution(
@@ -363,19 +393,18 @@ class PacmanLookaheadSearch:
         ghosts: list[Any] | None = None,
         pellets: list[list[int]] | None = None,
         temperature: float = 1.0,
-    ) -> torch.Tensor:
+    ) -> Any:
         """Return a softmax distribution over actions for policy distillation."""
         scores = self.get_action_scores(player=player, ghosts=ghosts, pellets=pellets)
         raw_vals = [scores.get(a, -1e4) for a in range(4)]
-        t_vals = torch.tensor(raw_vals, dtype=torch.float32)
-        valid_mask = t_vals > -500.0
-        if not valid_mask.any():
-            return torch.full((4,), 0.25, dtype=torch.float32)
-
-        # Scale non-masked values by temperature
-        t_vals[~valid_mask] = -1e4
-        probs = F.softmax(t_vals / max(0.01, temperature), dim=-1)
-        return probs
+        arr = np.array(raw_vals, dtype=np.float32)
+        valid_mask = arr > -500.0
+        if not np.any(valid_mask):
+            return np.full((4,), 0.25, dtype=np.float32)
+        arr[~valid_mask] = -1e4
+        shift = (arr - np.max(arr)) / max(0.01, temperature)
+        exp_v = np.exp(shift)
+        return exp_v / np.sum(exp_v)
 
     def _simulate_ghosts(
         self,

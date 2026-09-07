@@ -59,14 +59,16 @@ class HighScoreManager:
             json.dump(self.highscores, file)
 
     def add_score(self, name: str, score: int) -> None:
-        name = name.strip()
+        sanitized_name = "".join(
+            c for c in name if c.isalnum() or c == " "
+        )[:10].strip()
 
-        if name == "":
-            name = "Player"
+        if not sanitized_name:
+            sanitized_name = "Player"
 
         new_score = {
-            "name": name,
-            "score": score,
+            "name": sanitized_name,
+            "score": max(0, int(score)),
         }
 
         self.highscores.append(new_score)

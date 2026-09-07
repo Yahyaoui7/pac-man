@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pygame
-from typing import Optional, Any
+from typing import Any
 
 from src.graphics.UI.button import Button, ButtonManager
 from src.graphics.renderer import State

@@ -11,3 +11,7 @@ AI_arena/data/PACMAN_IMITATION_DATA.jsonl
 # *.onnx
 # *.safetensors
 AI_arena/models/backups
+
+dist/
+build/
+PacMan_AI.spec

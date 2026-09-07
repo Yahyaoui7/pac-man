@@ -4,10 +4,10 @@ install:
 	uv sync
 
 run:
-	uv run python pac_man.py config.json
+	uv run python pac-man.py config.json
 
 debug:
-	uv run python -m pdb -m pac_man.py config.json
+	uv run python -m pdb -m pac-man.py config.json
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -22,6 +22,7 @@ lint:
 		--exclude=mazegenerator-2.0.2-py3-none-any \
 		--warn-return-any \
 		--warn-unused-ignores \
+		--ignore-missing-imports \
 		--disallow-untyped-defs \
 		--check-untyped-defs
 

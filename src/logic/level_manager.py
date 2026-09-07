@@ -1,6 +1,6 @@
 import random
 from typing import Optional
-from mazegenerator import MazeGenerator  # type: ignore
+from mazegenerator import MazeGenerator
 from src.logic.config import GameConfig, LevelConfig
 
 

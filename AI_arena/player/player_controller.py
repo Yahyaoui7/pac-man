@@ -5,20 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import torch
+import os
+import sys
+import onnxruntime as ort
+import numpy as np
 
-from AI_arena.models.cnn_player import (
-    PlayerActorCritic,
-    load_checkpoint_into_policy,
-)
 from src.graphics.entitys.ghost import Ghost
 from src.graphics.entitys.player import Player
 
 from AI_arena.player.data.observation import format_player_observation
 
-BEST_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl_best.pt"
-
-DEFAULT_STAGE_PATH = Path(__file__).parent.parent / "models" / "player_rl.pt"
+ONNX_MODEL_PATH = Path(__file__).parent.parent / "models" / "player_model.onnx"
 DIRECTIONS = ("UP", "DOWN", "LEFT", "RIGHT")
 
 
@@ -29,39 +26,49 @@ class CNNPlayerController:
         self,
         model_path: str | Path | None = None,
         use_search: bool = True,
-        search_horizon: int = 12,
+        search_horizon: int = 8,
     ) -> None:
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = PlayerActorCritic().to(self.device)
         self.use_search = use_search
         self.search_horizon = search_horizon
         self.search_planner: Any = None
 
-        if model_path is None:
-            candidates = [DEFAULT_STAGE_PATH, BEST_STAGE_PATH]
-            existing = [c for c in candidates if c.exists()]
-            if existing:
-                path = max(existing, key=lambda p: p.stat().st_mtime)
-            else:
-                path = DEFAULT_STAGE_PATH
-        else:
+        if model_path:
             path = Path(model_path)
-
-        if path.exists() and load_checkpoint_into_policy(
-            self.model, path, device=self.device
-        ):
-            print(f"Loaded player RL checkpoint from {path} (Search lookahead: {self.use_search})")
+        elif ONNX_MODEL_PATH.exists():
+            path = ONNX_MODEL_PATH
+        elif Path("AI_arena/models/player_model.onnx").exists():
+            path = Path("AI_arena/models/player_model.onnx")
         else:
-            print(
-                f"Warning: Player RL checkpoint {path} not found or failed to load. Using untrained weights."
+            exe_dir = (
+                Path(sys.executable).resolve().parent
+                if getattr(sys, "frozen", False)
+                else Path(__file__).resolve().parent
             )
+            alt = exe_dir / "AI_arena" / "models" / "player_model.onnx"
+            path = alt if alt.exists() else ONNX_MODEL_PATH
 
-        self.model.eval()
+        if path.exists():
+            opts = ort.SessionOptions()
+            opts.intra_op_num_threads = min(4, os.cpu_count() or 4)
+            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            self.session = ort.InferenceSession(
+                str(path), sess_options=opts, providers=["CPUExecutionProvider"]
+            )
+            print(
+                f"Loaded ONNX model from {path} (Search lookahead: "
+                f"{self.use_search}, horizon: {self.search_horizon})"
+            )
+        else:
+            raise FileNotFoundError(f"ONNX model not found at {path}")
+
         self.last_diagnostics: dict[str, Any] = {}
-        self.last_action_idx: int | None = None
-        self._hidden: torch.Tensor | None = None  # GRU memory persists across steps
+        self.device = "cpu"
+        self.reset_state()
 
-        # Observation feature state tracking
+    def reset_state(self) -> None:
+        """Reset internal state history (e.g. between games or post-respawn)."""
+        self.last_action_idx: int | None = None
+        self._hidden: np.ndarray = np.zeros((2, 1, 384), dtype=np.float32)
         self.visit_counts: list[list[int]] | None = None
         self.initial_pellet_count: int | None = None
         self.prev_nearest_pellet_dist: float = -1.0
@@ -70,19 +77,6 @@ class CNNPlayerController:
         self.steps_since_pellet: int = 0
         self.same_action_count: int = 0
         self.last_positions: list[tuple[int, int]] = []
-
-    def reset_state(self) -> None:
-        """Reset internal state history (e.g. between games or post-respawn)."""
-        self.last_action_idx = None
-        self._hidden = None  # wipe GRU memory on new game/life
-        self.visit_counts = None
-        self.initial_pellet_count = None
-        self.prev_nearest_pellet_dist = -1.0
-        self.prev_nearest_ghost_dist = -1.0
-        self.prev_nearest_pp_dist = -1.0
-        self.steps_since_pellet = 0
-        self.same_action_count = 0
-        self.last_positions = []
 
     def get_action(
         self,
@@ -111,7 +105,11 @@ class CNNPlayerController:
         ):
             self.visit_counts = [[0 for _ in range(width)] for _ in range(height)]
 
-        if 0 <= py < height and 0 <= px < width:
+        if (
+            self.visit_counts is not None
+            and 0 <= py < height
+            and 0 <= px < width
+        ):
             self.visit_counts[py][px] += 1
             self.last_positions.append((py, px))
             if len(self.last_positions) > 20:
@@ -121,28 +119,46 @@ class CNNPlayerController:
             maze, pellets, player, ghosts, movement_system
         )
 
-        with torch.no_grad():
-            # Pass hidden state into model, receive updated hidden state back
-            logits, value, self._hidden = self.model(grid, extra_features, self._hidden)
-            logits = logits.float()
-            value = value.float()
-            masked_logits = logits.masked_fill(~valid_actions, -1e8)
-            masked_logits = torch.nan_to_num(
-                masked_logits, nan=-1e8, posinf=10.0, neginf=-1e8
-            )
-            probs = torch.softmax(masked_logits, dim=-1)[0]
-            probs = torch.nan_to_num(probs, nan=0.0, posinf=1.0, neginf=0.0)
-            if probs.sum() <= 0:
-                probs = valid_actions[0].float()
-                if probs.sum() <= 0:
-                    probs = torch.ones_like(probs)
-            probs = probs / probs.sum()
+        # Convert observation tensors / arrays to numpy arrays
+        grid_np = (
+            grid.cpu().numpy().astype(np.float32)
+            if hasattr(grid, "cpu")
+            else np.asarray(grid, dtype=np.float32)
+        )
+        extra_np = (
+            extra_features.cpu().numpy().astype(np.float32)
+            if hasattr(extra_features, "cpu")
+            else np.asarray(extra_features, dtype=np.float32)
+        )
+        valid_np = (
+            valid_actions.cpu().numpy()[0]
+            if hasattr(valid_actions, "cpu")
+            else np.asarray(valid_actions[0], dtype=bool)
+        )
 
-            nn_action_index = (
-                int(torch.multinomial(probs, 1).item())
-                if sample
-                else int(torch.argmax(masked_logits, dim=-1).item())
-            )
+        outputs = self.session.run(
+            ["logits", "value", "next_hidden"],
+            {
+                "grid": grid_np,
+                "extra_features": extra_np,
+                "hidden": self._hidden,
+            },
+        )
+        logits_np, value_np, self._hidden = outputs
+        logits = logits_np[0]  # shape: (4,)
+
+        # Mask invalid actions
+        masked_logits = np.where(valid_np, logits, -1e8)
+
+        # Softmax for probabilities
+        shift_logits = masked_logits - np.max(masked_logits)
+        exp_logits = np.exp(shift_logits)
+        probs = exp_logits / np.sum(exp_logits)
+
+        if sample:
+            nn_action_index = int(np.random.choice(len(probs), p=probs))
+        else:
+            nn_action_index = int(np.argmax(masked_logits))
 
         active_search = self.use_search if use_search is None else use_search
         search_scores = None
@@ -154,17 +170,15 @@ class CNNPlayerController:
                     maze=maze,
                     movement=movement_system,
                     horizon=self.search_horizon,
+                    beam_width=20,
                 )
-            action_index = self.search_planner.get_best_action(
-                player=player,
-                ghosts=ghosts,
-                pellets=pellets,
-            )
             search_scores = self.search_planner.get_action_scores(
                 player=player,
                 ghosts=ghosts,
                 pellets=pellets,
+                prev_action=self.last_action_idx,
             )
+            action_index = int(max(search_scores, key=lambda a: search_scores[a]))
         else:
             action_index = nn_action_index
 
@@ -190,16 +204,16 @@ class CNNPlayerController:
             "chosen_action": chosen_action,
             "search_used": active_search,
             "nn_action": DIRECTIONS[nn_action_index],
-            "estimated_value": round(float(value.item()), 4),
+            "estimated_value": round(float(value_np[0, 0]), 4),
             "probabilities": {
-                d: round(float(probs[i].item()), 4) for i, d in enumerate(DIRECTIONS)
+                d: round(float(probs[i]), 4) for i, d in enumerate(DIRECTIONS)
             },
             "logits": {
-                d: round(float(logits[0, i].item()), 4)
+                d: round(float(logits[i]), 4)
                 for i, d in enumerate(DIRECTIONS)
             },
             "valid_actions": {
-                d: bool(valid_actions[0, i].item()) for i, d in enumerate(DIRECTIONS)
+                d: bool(valid_np[i]) for i, d in enumerate(DIRECTIONS)
             },
         }
         if search_scores is not None:
@@ -216,7 +230,7 @@ class CNNPlayerController:
         player: Player,
         ghosts: list[Ghost],
         movement_system: Any,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         return format_player_observation(
             maze=maze,
             pellets=pellets,

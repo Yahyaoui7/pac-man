@@ -6,11 +6,13 @@ __pycache__/
 .mypy_cache/
 scratch/
 AI_arena/data/PACMAN_IMITATION_DATA.jsonl
-# *.pt
-# *.pth
-# *.onnx
-# *.safetensors
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.ckpt
 AI_arena/models/backups
+!AI_arena/models/player_model.onnx
 
 dist/
 build/

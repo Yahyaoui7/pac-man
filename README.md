@@ -188,13 +188,17 @@ _Detailed documentation_: [docs/architecture.md](docs/architecture.md)
 
 ---
 
-## Project Management
+---
 
-A structured project management approach was maintained throughout the development lifecycle:
+## 📅 Project Management
 
-- **Work Tracking**: Phased delivery tracking core gameplay, maze integration, highscores, AI training, and release packaging.
-- **Documentation**: All management records, acceptance test matrices, and risk analyses are maintained in the dedicated directory:
-  👉 [**Project Management Directory (docs/)**](docs/)
+This project was developed by **Nabil Yahyaoui Idrissi**, **Mouad Mennioui**, and **Oussama Errami** over 10 weeks at 1337 coding school. We used **Jira Kanban** for task tracking (80+ tickets) and **Git feature branches** for parallel development (~300 commits).
+
+All project management evidence is in the [`project_management/`](./project_management/) directory:
+- [Project Timeline & Progress Tracking](./project_management/project_timeline.md)
+- [Team Organization](./project_management/team_organization.md)
+- [Risk Analysis & Mitigation](./project_management/risk_analysis.md)
+- [Acceptance Test Plan](./project_management/acceptance_test_plan.md)
 
 ---
 

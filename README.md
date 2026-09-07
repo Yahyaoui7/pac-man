@@ -211,7 +211,6 @@ A structured project management approach was maintained throughout the developme
 In accordance with 42 AI guidelines, AI tools were leveraged deliberately for specific development phases:
 
 - **Reinforcement Learning Architecture Design**: Exploring network topology options (CNN spatial feature extractors combined with recurrent GRU memory for corridor history).
-- **Search Optimization**: Designing the heuristic scoring functions for forward beam search lookahead (anti-oscillation penalties, dead-end traps).
 - **Static Analysis Remediation**: Accelerating `mypy` strict type-hint coverage across game state transitions and `flake8` compliance.
 - **Standalone Packaging**: Identifying and resolving PyInstaller bundle path resolution issues (`sys._MEIPASS`) when decoupling the runtime from PyTorch.
 

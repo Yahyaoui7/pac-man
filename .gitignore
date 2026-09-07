@@ -17,3 +17,4 @@ AI_arena/models/backups
 dist/
 build/
 PacMan_AI.spec
+.jira_env

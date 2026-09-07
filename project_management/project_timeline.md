@@ -63,13 +63,12 @@ This document shows the actual development timeline of the Pac-Man project, deri
 ---
 
 ## Phase 4: AI Research & Data Collection (July 19–31)
-**Commits:** 30 | **Contributors:** Mouad, Nabil, Oussama
+**Commits:** 30 | **Contributors:** Mouad, Nabil
 
 | What was done | Who |
 |---|---|
 | CNN architecture research & planning | Nabil (`SCRUM-130`) |
 | MLP formating and features setup | Mouad |
-| MLP training implementation | Oussama (`SCRUM-131`) |
 | CNN data collection pipeline | Nabil |
 | Data collection loop for training | Mouad |
 | CNN base architecture | Mouad |

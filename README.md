@@ -192,7 +192,7 @@ _Detailed documentation_: [docs/architecture.md](docs/architecture.md)
 
 ## 📅 Project Management
 
-This project was developed by **Nabil Yahyaoui Idrissi**, **Mouad Mennioui**, and **Oussama Errami** over 10 weeks at 1337 coding school. We used **Jira Kanban** for task tracking (80+ tickets) and **Git feature branches** for parallel development (~300 commits).
+This project was developed by **Nabil Yahyaoui Idrissi** and **Mouad Mennioui** over 10 weeks at 1337 coding school. We used **Jira Kanban** for task tracking (80+ tickets) and **Git feature branches** for parallel development (~300 commits).
 
 All project management evidence is in the [`project_management/`](./project_management/) directory:
 - [Project Timeline & Progress Tracking](./project_management/project_timeline.md)

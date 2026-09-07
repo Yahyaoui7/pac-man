@@ -6,13 +6,11 @@
 |---|---|---|
 | **Mouad Mennioui** | mmenniou | Game Engine, UI/UX, Rendering, Maze Integration, RL Training Pipeline |
 | **Nabil Yahyaoui Idrissi** | nyahyaou | Ghosts AI, Player Logic, Sound/Score Systems, CNN/SL Models, Ghost Neural Model |
-| **Oussama Errami** | oerrami | MLP Research & Training |
 
 ## Contribution Summary (from Git)
 
 - **Mouad Mennioui**: ~220 commits — Led the game engine architecture (`game_loop.py`), state management (Home, Pause, GameOver, Victory screens), UI rendering, cheat modes, entity system, pellet/collision integration, maze generation with A-Maze-ing, keyboard/mouse input manager, custom sprite animations, and the RL training pipeline for the Pac-Man player model.
 - **Nabil Yahyaoui Idrissi**: ~100 commits — Led the ghost AI system (movement, chase/flee BFS, edible mode, respawn logic), player movement and wall collision, score management, highscore persistence (save/load/validate), sound management, CNN data collection, supervised learning (SL) player model training, and the adversarial ghost neural model (SL_ghosts_model branch).
-- **Oussama Errami**: 2 commits — Contributed the MLP training implementation during the AI research phase (July 22–23).
 
 ## How We Split the Work
 
@@ -31,9 +29,6 @@ The project was tracked using **Jira Kanban** with tasks tagged by category (e.g
 - **Score & Highscore:** Score tracking (pacgums, super-pacgums, ghosts), highscore JSON persistence, name validation, top-10 list (`SCRUM-46`, `SCRUM-48` to `SCRUM-53`)
 - **Sound:** Sound integration across game states (menu, gameplay, ghost eating, game over, pause) (`SCRUM-89`)
 - **AI Models:** CNN data collection pipeline, SL player model training, adversarial ghost model on dedicated branch (`SL_ghosts_model`)
-
-### Oussama Errami
-- **AI Research:** MLP training implementation during the neural network research phase
 
 ## How Decisions Were Made
 
